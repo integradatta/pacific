@@ -2,7 +2,7 @@
 
 **Data:** 2026-06-16
 **Status:** aprovado para implementação (formato com localização simulada)
-**Natureza:** projeto acadêmico fictício. Escala pequena (~30 credores, ~30 devedores).
+**Natureza:** projeto acadêmico fictício. SaaS multi-tenant de 3 níveis. Escala-alvo: ~30 credores × ~100 devedores (variável, sem limite fixo) ≈ 3.000 usuários em 1–2 anos. Escala pequena — **sem over-engineering** (nada de sharding/microsserviços).
 
 ---
 
@@ -53,19 +53,43 @@ Pacific/
 - **Backend:** NestJS, Prisma, PostgreSQL (Supabase), Socket.io, BullMQ (Redis), node-cron.
 - **Infra:** Supabase (DB/Auth/Storage/RLS), OneSignal (push), Mapbox, Vercel (web), Expo EAS (mobile), Docker (dev local).
 
-### Multi-tenancy
+### Multi-tenancy (3 níveis — definitivo)
 
-- **Tenant = Credor.** Toda entidade de negócio carrega `tenantId`.
-- Isolamento em duas camadas: (1) escopo obrigatório por `tenantId` em todos os queries/guards do NestJS; (2) **Row-Level Security** no Supabase com policies por tenant.
-- Auth via **Supabase Auth**. JWT com claim de `tenantId` (credor) ou vínculo de devedor. Guards no NestJS validam tenant em cada request.
+Um único código-fonte, um único banco PostgreSQL. O que muda por usuário é o **contexto que o login devolve**, não o código.
+
+**Hierarquia de papéis:**
+
+1. **Super-admin** — dono da plataforma. Não pertence a nenhum tenant (`tenantId = null`); acesso cross-tenant explícito.
+2. **Credor** — cada credor é um **tenant** (organização). Vê apenas o próprio tenant.
+3. **Devedor** — pertence ao tenant de um credor. Vê apenas a própria dívida dentro daquele tenant.
+
+**Código de organização (estilo Google Classroom):**
+
+- **Uma string única por tenant** (`orgCode`), gerada quando a conta do credor é criada. Não existem códigos por pessoa.
+- O devedor baixa **o mesmo app** que todos; ao digitar o `orgCode`, o sistema apenas o **vincula ao tenant correto**. Ninguém "baixa" código.
+
+**Isolamento de dados (crítico):**
+
+- Banco único; **`tenantId` em todas as tabelas de negócio**; toda query filtra por `tenantId`.
+- Devedor/credor do Tenant A nunca acessa dado do Tenant B.
+- Todo acesso a dados passa por uma **camada tenant-scoped** (`TenantContext` + serviço de dados que injeta `tenantId` e resolve o *datasource* do tenant). Hoje há um só datasource; a abstração permite, no futuro, **extrair um tenant para um banco separado** (isolamento físico para clientes maiores / dados financeiros sensíveis) **sem reescrever queries**.
+- **RLS** no Postgres como defesa em profundidade (segunda camada).
+- Auth via **Supabase Auth**; JWT carrega `role` + `tenantId`. Guards no NestJS validam papel e tenant em cada request.
+
+**Restrições de escala (anti-over-engineering):**
+
+- Monolito bem estruturado; **sem sharding, sem microsserviços**.
+- Índices em `tenantId` e em todas as foreign keys.
+- **Paginação obrigatória** em qualquer listagem de devedores — nunca carregar todos em memória.
+- Queries nunca fazem varredura completa por tenant.
 
 ---
 
 ## 4. Modelo de dados (entidades principais)
 
-- **Tenant** — o credor (carteira). Possui `walletCode` único.
-- **User** — conta de acesso (role: `CREDITOR` | `DEBTOR`), vinculada a Supabase Auth.
-- **Debtor** — pessoa devedora (pertence a um tenant). Pode ter um `User` mobile vinculado.
+- **Tenant** — a organização do credor. Possui `orgCode` único (indexado) e `status`. Criado junto com a conta do credor.
+- **User** — conta de acesso (role: `SUPER_ADMIN` | `CREDITOR` | `DEBTOR`), vinculada a Supabase Auth. `tenantId` indexado (nulo para super-admin).
+- **Debtor** — pessoa devedora (pertence a um tenant). `userId` (vínculo único após resgate do `orgCode`), `redeemedAt`, índice em `tenantId`.
 - **Debt** — dívida: principal, taxa (`rate`) + período (`ratePeriod`) definidos pelo credor, data de início, vencimento, status, moeda. Pertence a tenant + devedor.
 - **LedgerEntry** — histórico financeiro (lançamentos: acréscimo de juros, pagamento, ajuste).
 - **DebtSnapshot** — evolução diária (saldo, juros acumulados) para gráficos.
@@ -77,7 +101,9 @@ Pacific/
 - **GeoEvent** — eventos de chegada/saída (timeline de movimentação).
 - **Score** — recuperabilidade e temperatura por dívida (snapshot recalculável).
 
-Enums: `DebtStatus` (semáforo), `RatePeriod` (`MONTHLY` | `ANNUAL`), `AlertType`, `UserRole`, `ConsentState`, `LedgerEntryType`.
+Enums: `UserRole` (`SUPER_ADMIN` | `CREDITOR` | `DEBTOR`), `TenantStatus` (`ACTIVE` | `SUSPENDED`), `DebtStatus` (semáforo), `RatePeriod` (`MONTHLY` | `ANNUAL`), `AlertType`, `ConsentState`, `LedgerEntryType`.
+
+> Todas as tabelas de negócio (Debtor, Debt, LedgerEntry, DebtSnapshot, Score, Alert, Notification, LocationConsent, LocationPing, SavedPlace, GeoEvent) carregam/derivam `tenantId` e são indexadas por ele.
 
 ---
 
@@ -137,7 +163,7 @@ Padrões: loading / empty / error states em todas as telas; responsivo; estétic
 
 ## 9. Plano de fases (ordem de execução)
 
-1. **Fase 1** — Setup monorepo, schema do banco, autenticação e multi-tenancy (+ RLS).
+1. **Fase 1** — Fundação multi-tenant (validar primeiro). Escopo enxuto: setup do monorepo + **modelo de dados base** (Tenant/User/Debtor com `tenantId`, índices e isolamento funcionando) + **autenticação de 3 papéis** + **cadastro de credor** + **geração do `orgCode`** + **resgate do `orgCode` pelo devedor com vínculo ao tenant correto** + camada de acesso tenant-scoped + RLS. As demais entidades (Debt, etc.) entram nas fases seguintes.
 2. **Fase 2** — Motor financeiro: saldo, juros, projeções, scores, semáforo.
 3. **Fase 3** — Backend: REST, WebSocket, jobs BullMQ/cron, alertas, simulador de localização.
 4. **Fase 4** — Portal web do credor: telas, dashboards, heat map, torre de controle, mapa.
