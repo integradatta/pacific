@@ -388,7 +388,7 @@ Expected: pasta `packages/database/prisma/migrations/<ts>_init/` criada. (Sem Do
 
 ```json
 {
-  "name": "@pacific/api", "version": "0.1.0",
+  "name": "@pacific/api", "version": "0.1.0", "type": "module",
   "scripts": { "build": "nest build", "dev": "nest start --watch", "start": "node dist/main.js", "test": "vitest run", "lint": "tsc --noEmit" },
   "dependencies": {
     "@nestjs/common": "^10.3.0", "@nestjs/core": "^10.3.0", "@nestjs/platform-express": "^10.3.0",
@@ -405,10 +405,11 @@ Expected: pasta `packages/database/prisma/migrations/<ts>_init/` criada. (Sem Do
 ```json
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "module": "commonjs", "moduleResolution": "node", "outDir": "dist", "experimentalDecorators": true, "emitDecoratorMetadata": true },
+  "compilerOptions": { "outDir": "dist", "experimentalDecorators": true, "emitDecoratorMetadata": true },
   "include": ["src"]
 }
 ```
+(Herda `module`/`moduleResolution` = NodeNext da base, para consumir `@pacific/shared` que é ESM. Runtime real do servidor exige `@pacific/shared` buildado — nota de deploy; aqui a verificação é build + testes.)
 
 - [ ] **Step 3: `nest-cli.json`** → `{ "collection": "@nestjs/schematics", "sourceRoot": "src" }`
 
