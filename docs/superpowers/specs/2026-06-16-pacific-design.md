@@ -66,7 +66,7 @@ Pacific/
 - **Tenant** — o credor (carteira). Possui `walletCode` único.
 - **User** — conta de acesso (role: `CREDITOR` | `DEBTOR`), vinculada a Supabase Auth.
 - **Debtor** — pessoa devedora (pertence a um tenant). Pode ter um `User` mobile vinculado.
-- **Debt** — dívida: principal, taxa, data de início, vencimento, status, moeda. Pertence a tenant + devedor.
+- **Debt** — dívida: principal, taxa (`rate`) + período (`ratePeriod`) definidos pelo credor, data de início, vencimento, status, moeda. Pertence a tenant + devedor.
 - **LedgerEntry** — histórico financeiro (lançamentos: acréscimo de juros, pagamento, ajuste).
 - **DebtSnapshot** — evolução diária (saldo, juros acumulados) para gráficos.
 - **Alert** — alertas gerados (tipo, destinatário, canal, status de envio).
@@ -77,15 +77,15 @@ Pacific/
 - **GeoEvent** — eventos de chegada/saída (timeline de movimentação).
 - **Score** — recuperabilidade e temperatura por dívida (snapshot recalculável).
 
-Enums: `DebtStatus` (semáforo), `AlertType`, `UserRole`, `ConsentState`, `LedgerEntryType`.
+Enums: `DebtStatus` (semáforo), `RatePeriod` (`MONTHLY` | `ANNUAL`), `AlertType`, `UserRole`, `ConsentState`, `LedgerEntryType`.
 
 ---
 
 ## 5. Motor financeiro
 
 - **Decimal.js** em todos os valores monetários — nunca float.
-- **Juros compostos.** Taxa armazenada como taxa ao mês (`ratePerMonth`). Saldo atualizado:
-  `saldo(t) = principal × (1 + i)^(diasCorridos/30)`, com `i = ratePerMonth`, calculado com Decimal.js e arredondamento monetário (2 casas) só na borda de apresentação.
+- **Juros compostos.** A **taxa é definida pelo credor por dívida**, com **período explícito** (`ratePeriod`: `MONTHLY` padrão | `ANNUAL`). O sistema normaliza internamente para taxa mensal `i`. Saldo atualizado:
+  `saldo(t) = principal × (1 + i)^(diasCorridos/30)`, calculado com Decimal.js e arredondamento monetário (2 casas) só na borda de apresentação.
 - **Juros acumulados** = `saldo(t) − principal`.
 - **Dias restantes** = `vencimento − hoje` (negativo ⇒ dias em atraso).
 - **Projeções** para horizontes hoje / 30 / 90 / 180 / 365 dias (mesma fórmula com `t` futuro).
@@ -161,7 +161,7 @@ Cada fase só avança após a anterior concluída. Entregáveis transversais (se
 
 ## 11. Decisões técnicas assumidas (autonomia)
 
-- Taxa de juros interpretada como **ao mês**, capitalização composta diária fracionada.
+- Taxa de juros **definida pelo credor por dívida** (`rate` + `ratePeriod`); padrão `MONTHLY`, capitalização composta diária fracionada.
 - Auth única via Supabase; papel diferencia portal (credor) de app (devedor).
 - Redis necessário para BullMQ — incluído no docker-compose.
 - OneSignal e Mapbox por variáveis de ambiente; ausência degrada graciosamente (push vira log interno; mapa exige token para render).
