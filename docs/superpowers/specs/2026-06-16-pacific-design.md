@@ -91,7 +91,7 @@ Um único código-fonte, um único banco PostgreSQL. O que muda por usuário é 
 4. Devedor informa o `orgCode` → sistema **vincula automaticamente** ao tenant correto.
 5. Pronto. **Sem pré-cadastro obrigatório, sem associação manual, sem etapas extras.**
 
-- O **pré-cadastro de devedor pelo credor é opcional** (recurso futuro, nunca requisito do resgate). Se existir e o e-mail casar com um `debtor` não vinculado, o sistema reaproveita o registro; senão cria um novo.
+- **Fluxo oficial:** o resgate é baseado **apenas no `orgCode`** — sempre cria o devedor no tenant. **Não há** pré-cadastro obrigatório, associação manual nem etapas extras. O **pré-cadastro de devedor pelo credor** (e eventual casamento por e-mail) é **recurso futuro opcional**, fora da Fase 1.
 
 ### Escopo do devedor (isolamento intra-tenant)
 

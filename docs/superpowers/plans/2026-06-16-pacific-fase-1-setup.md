@@ -967,15 +967,11 @@ export class RedeemService {
       data: { supabaseId: identity.supabaseId, email: identity.email, role: 'DEBTOR', tenantId: tenant.id },
     });
 
-    // Reaproveita pré-cadastro opcional (e-mail casando, ainda não vinculado); senão cria novo.
-    const pre = await db.debtor.findFirst({ where: { tenantId: tenant.id, email: identity.email, userId: null } });
-    if (pre) {
-      await db.debtor.update({ where: { id: pre.id }, data: { userId: user.id, redeemedAt: new Date() } });
-    } else {
-      await db.debtor.create({
-        data: { tenantId: tenant.id, userId: user.id, name: identity.email, email: identity.email, redeemedAt: new Date() },
-      });
-    }
+    // Fluxo oficial simplificado: resgate baseado APENAS no org_code (sem pré-cadastro,
+    // sem associação manual, sem casar por e-mail). Sempre cria o devedor no tenant.
+    await db.debtor.create({
+      data: { tenantId: tenant.id, userId: user.id, name: identity.email, email: identity.email, redeemedAt: new Date() },
+    });
     return { tenantId: tenant.id };
   }
 }
