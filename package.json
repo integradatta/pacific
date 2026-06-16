@@ -1,0 +1,17 @@
+{
+  "name": "pacific",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "packageManager": "npm@11.13.0",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "db:generate": "npm run db:generate -w @pacific/database",
+    "db:migrate": "npm run db:migrate -w @pacific/database",
+    "db:seed": "npm run db:seed -w @pacific/database"
+  },
+  "devDependencies": { "turbo": "^2.0.0", "typescript": "^5.5.0" }
+}
