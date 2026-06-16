@@ -30,6 +30,14 @@ O módulo de localização é implementado como **simulação com dados sintéti
 
 **Motivo:** preserva 100% das competências técnicas avaliáveis (Mapbox GL, React Native Maps, realtime, geoviz) e a experiência "centro de comando", sem produzir uma ferramenta operacional de vigilância de pessoas reais. É também mais reprodutível e sem PII real — adequado a um projeto acadêmico.
 
+### Status nesta fase: NÃO implementado — apenas pontos de extensão
+
+O módulo de localização **não é implementado agora** (nem simulado). A arquitetura cria **pontos de extensão (ports/contratos)** para que um módulo opcional seja plugado depois **sem refatoração significativa**, cobrindo: localização compartilhada, geofencing, histórico, eventos de chegada/saída e rastreamento em tempo real.
+
+- Contratos em `@pacific/shared/location` (apenas interfaces/tipos, sem comportamento): `LocationProvider`, `LocationService`, `LocationEvent`, `LocationConsent`, `LocationHistory`, `Geofence`, `LivePosition`, `GeoPoint`.
+- Seam no NestJS (`packages/api/src/location`): tokens de DI + `LocationModule.register(...)` dinâmico, **não registrado no `AppModule`** agora. Um módulo futuro implementa os contratos e pluga via `register()` sem alterar o core.
+- Quando for implementado, segue o princípio de simulação acima (sem rastrear pessoas reais).
+
 ---
 
 ## 3. Arquitetura
