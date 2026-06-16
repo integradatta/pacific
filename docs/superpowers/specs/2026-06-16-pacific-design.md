@@ -83,6 +83,30 @@ Um único código-fonte, um único banco PostgreSQL. O que muda por usuário é 
 - **Paginação obrigatória** em qualquer listagem de devedores — nunca carregar todos em memória.
 - Queries nunca fazem varredura completa por tenant.
 
+### Onboarding (fluxo simplificado — alvo < 1 min)
+
+1. Credor cria conta → sistema **gera o `orgCode` automaticamente**.
+2. Credor compartilha o `orgCode`.
+3. Devedor instala **o mesmo app** e cria conta normalmente.
+4. Devedor informa o `orgCode` → sistema **vincula automaticamente** ao tenant correto.
+5. Pronto. **Sem pré-cadastro obrigatório, sem associação manual, sem etapas extras.**
+
+- O **pré-cadastro de devedor pelo credor é opcional** (recurso futuro, nunca requisito do resgate). Se existir e o e-mail casar com um `debtor` não vinculado, o sistema reaproveita o registro; senão cria um novo.
+
+### Escopo do devedor (isolamento intra-tenant)
+
+- `tenant_id` isola **entre** credores. **Dentro** do tenant, o `DEBTOR` só enxerga o próprio registro (escopo por `user_id`/`debtorId`); o `CREDITOR` enxerga todo o seu tenant; o `SUPER_ADMIN` é cross-tenant explícito. A RLS reflete os dois níveis.
+
+### Mitigações de segurança (sem atrito ao usuário)
+
+- **`orgCode` de alta entropia** (~32⁸); lookup por constraint única.
+- **Sem exposição por código vazado:** devedor recém-vinculado sem dívida vê estado vazio; o isolamento intra-tenant impede ver dívida de terceiros.
+- **Rate limit no resgate** (por conta/IP) contra força-bruta — apenas no servidor.
+- **Rotação do `orgCode`** pelo credor (regenera e invalida o antigo) em caso de vazamento — não afeta quem já entrou.
+- **Um vínculo de devedor por conta** + `redeemed_at` (auditoria); resgate **idempotente**.
+- **Mensagens de erro genéricas** no resgate (não revelam existência do código nem status do tenant).
+- **Verificação de identidade** fica com o credor ao atribuir dívida (opcional/futuro), fora do onboarding.
+
 ---
 
 ## 4. Modelo de dados (entidades principais)
