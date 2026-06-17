@@ -8,6 +8,7 @@ import { PaginationQuery, Page } from '../common/pagination.js';
 import { DebtsService } from './debts.service.js';
 import { CreateDebtDto } from './dto/create-debt.dto.js';
 import type { Debt } from '@pacific/database';
+import type { DebtSummary } from '@pacific/shared';
 
 @Controller('debts')
 @UseGuards(new JwtGuard(), TenantGuard, RolesGuard)
@@ -27,5 +28,10 @@ export class DebtsController {
   @Get(':id') @Roles('CREDITOR')
   get(@TenantId() tenantId: string, @Param('id') id: string): Promise<Debt> {
     return this.debts.get(tenantId, id);
+  }
+
+  @Get(':id/summary') @Roles('CREDITOR')
+  summary(@TenantId() tenantId: string, @Param('id') id: string): Promise<DebtSummary> {
+    return this.debts.summary(tenantId, id);
   }
 }
