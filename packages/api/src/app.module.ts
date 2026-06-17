@@ -10,10 +10,12 @@ import { DebtsController } from './debts/debts.controller.js';
 import { DebtsService } from './debts/debts.service.js';
 import { DashboardController } from './dashboard/dashboard.controller.js';
 import { DashboardService } from './dashboard/dashboard.service.js';
+import { NotificationsController } from './notifications/notifications.controller.js';
+import { NotificationsService } from './notifications/notifications.service.js';
 
 @Module({
-  controllers: [CreditorsController, DebtorsController, DebtsController, DashboardController],
-  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, RedeemService, DebtsService, DashboardService],
+  controllers: [CreditorsController, DebtorsController, DebtsController, DashboardController, NotificationsController],
+  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, RedeemService, DebtsService, DashboardService, NotificationsService],
   exports: [PrismaService],
 })
 export class AppModule {}
