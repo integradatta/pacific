@@ -5,13 +5,15 @@ import type { RequestWithUser } from './auth.types.js';
 
 @Injectable()
 export class JwtGuard implements CanActivate {
-  constructor(private readonly secret: string = process.env.SUPABASE_JWT_SECRET ?? '') {}
+  // Segredo opcional: quando ausente, é lido de forma lazy no request (após o .env carregar).
+  constructor(private readonly secret?: string) {}
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<RequestWithUser>();
     const header = req.headers['authorization'];
     if (!header?.startsWith('Bearer ')) throw new UnauthorizedException('Token ausente');
+    const secret = this.secret ?? process.env.SUPABASE_JWT_SECRET ?? '';
     let payload: jwt.JwtPayload;
-    try { payload = jwt.verify(header.slice(7), this.secret) as jwt.JwtPayload; }
+    try { payload = jwt.verify(header.slice(7), secret) as jwt.JwtPayload; }
     catch { throw new UnauthorizedException('Token inválido'); }
     const meta = (payload.app_metadata ?? {}) as { role?: string; tenantId?: string };
     const role: AuthUser['role'] =

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, Injectable } from '@nestjs/common';
 import { generateUniqueOrgCode } from '@pacific/shared';
 import { TenantDatasourceResolver } from '../tenancy/tenant-datasource.resolver.js';
 
@@ -17,10 +17,20 @@ export class CreditorsService {
     const orgCode = await generateUniqueOrgCode(
       async (code) => (await db.tenant.findUnique({ where: { orgCode: code } })) !== null,
     );
-    const tenant = await db.tenant.create({ data: { name: input.orgName, orgCode } });
-    await db.user.create({
-      data: { supabaseId: input.supabaseId, email: input.email, role: 'CREDITOR', tenantId: tenant.id },
-    });
-    return { tenantId: tenant.id, orgCode };
+    // Transacional: evita tenant órfão se o user.create falhar (ex.: supabaseId duplicado).
+    try {
+      return await db.$transaction(async (tx) => {
+        const tenant = await tx.tenant.create({ data: { name: input.orgName, orgCode } });
+        await tx.user.create({
+          data: { supabaseId: input.supabaseId, email: input.email, role: 'CREDITOR', tenantId: tenant.id },
+        });
+        return { tenantId: tenant.id, orgCode };
+      });
+    } catch (e) {
+      if ((e as { code?: string }).code === 'P2002') {
+        throw new ConflictException('Conta já registrada');
+      }
+      throw e;
+    }
   }
 }
