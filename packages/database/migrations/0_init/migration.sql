@@ -10,6 +10,9 @@ CREATE TYPE "DebtStatus" AS ENUM ('GREEN', 'YELLOW', 'ORANGE', 'RED');
 -- CreateEnum
 CREATE TYPE "RatePeriod" AS ENUM ('MONTHLY', 'ANNUAL');
 
+-- CreateEnum
+CREATE TYPE "NotificationType" AS ENUM ('DUE_SOON', 'OVERDUE');
+
 -- CreateTable
 CREATE TABLE "Tenant" (
     "id" TEXT NOT NULL,
@@ -65,6 +68,21 @@ CREATE TABLE "Debt" (
     CONSTRAINT "Debt_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "Notification" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "debtorId" TEXT,
+    "debtId" TEXT,
+    "type" "NotificationType" NOT NULL,
+    "title" TEXT NOT NULL,
+    "body" TEXT NOT NULL,
+    "readAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Notification_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "Tenant_orgCode_key" ON "Tenant"("orgCode");
 
@@ -94,6 +112,12 @@ CREATE INDEX "Debt_tenantId_idx" ON "Debt"("tenantId");
 
 -- CreateIndex
 CREATE INDEX "Debt_debtorId_idx" ON "Debt"("debtorId");
+
+-- CreateIndex
+CREATE INDEX "Notification_tenantId_idx" ON "Notification"("tenantId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Notification_debtId_type_key" ON "Notification"("debtId", "type");
 
 -- AddForeignKey
 ALTER TABLE "User" ADD CONSTRAINT "User_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;

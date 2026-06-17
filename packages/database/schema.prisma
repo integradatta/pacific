@@ -30,6 +30,11 @@ enum RatePeriod {
   ANNUAL
 }
 
+enum NotificationType {
+  DUE_SOON
+  OVERDUE
+}
+
 model Tenant {
   id        String       @id @default(uuid())
   name      String
@@ -91,4 +96,19 @@ model Debt {
 
   @@index([tenantId])
   @@index([debtorId])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  tenantId  String
+  debtorId  String?
+  debtId    String?
+  type      NotificationType
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@unique([debtId, type])
+  @@index([tenantId])
 }
