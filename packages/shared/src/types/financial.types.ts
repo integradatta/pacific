@@ -24,3 +24,12 @@ export interface DashboardKpis {
   totalOverdue: string;     // soma dos saldos vencidos (status RED)
   countByStatus: Record<DebtStatus, number>;
 }
+
+export interface PortfolioRow {
+  id: string;
+  debtorName: string;
+  balance: string;
+  daysRemaining: number;
+  status: DebtStatus;
+  dueDate: string; // ISO
+}

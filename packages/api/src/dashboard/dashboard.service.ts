@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { balanceAt, deriveStatus, daysRemaining, type DashboardKpis, type DebtStatus } from '@pacific/shared';
+import { balanceAt, deriveStatus, daysRemaining, type DashboardKpis, type DebtStatus, type PortfolioRow } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 
 @Injectable()
@@ -37,5 +37,32 @@ export class DashboardService {
       totalOverdue: totalOverdue.toFixed(2),
       countByStatus,
     };
+  }
+
+  async portfolio(tenantId: string, asOf: Date = new Date()): Promise<PortfolioRow[]> {
+    const db = this.scoped.db(tenantId);
+    const debts = await db.debt.findMany({
+      where: { tenantId },
+      include: { debtor: { select: { name: true } } },
+      orderBy: { dueDate: 'asc' },
+    });
+    return debts.map((d) => {
+      const terms = {
+        principal: d.principal.toString(),
+        rate: d.rate.toString(),
+        ratePeriod: d.ratePeriod,
+        startDate: d.startDate,
+        dueDate: d.dueDate,
+      };
+      const days = daysRemaining(terms, asOf);
+      return {
+        id: d.id,
+        debtorName: d.debtor.name,
+        balance: balanceAt(terms, asOf),
+        daysRemaining: days,
+        status: deriveStatus(days),
+        dueDate: d.dueDate.toISOString(),
+      };
+    });
   }
 }
