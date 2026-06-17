@@ -114,6 +114,7 @@ Um único código-fonte, um único banco PostgreSQL. O que muda por usuário é 
 - **Um vínculo de devedor por conta** + `redeemed_at` (auditoria); resgate **idempotente**.
 - **Mensagens de erro genéricas** no resgate (não revelam existência do código nem status do tenant).
 - **Verificação de identidade** fica com o credor ao atribuir dívida (opcional/futuro), fora do onboarding.
+- **Cadastro de credor exige sessão Supabase válida** (`@UseGuards(JwtGuard)`); `supabaseId`/`email` derivam do **JWT verificado**, nunca do corpo da requisição (evita identity squatting — CWE-345/639). **Tradeoff aceito:** o signup de credor é self-service (qualquer conta Supabase autenticada cria um tenant) para manter o onboarding simples; o abuso é limitado (tenant vazio, isolamento multi-tenant intacto, escala fechada ~30). Gate de convite/aprovação de admin e rate limit no `register-creditor` ficam como **melhoria futura**.
 
 ---
 
