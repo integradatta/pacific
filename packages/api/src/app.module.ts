@@ -8,10 +8,12 @@ import { RedeemService } from './debtors/redeem.service.js';
 import { DebtorsController } from './debtors/debtors.controller.js';
 import { DebtsController } from './debts/debts.controller.js';
 import { DebtsService } from './debts/debts.service.js';
+import { DashboardController } from './dashboard/dashboard.controller.js';
+import { DashboardService } from './dashboard/dashboard.service.js';
 
 @Module({
-  controllers: [CreditorsController, DebtorsController, DebtsController],
-  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, RedeemService, DebtsService],
+  controllers: [CreditorsController, DebtorsController, DebtsController, DashboardController],
+  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, RedeemService, DebtsService, DashboardService],
   exports: [PrismaService],
 })
 export class AppModule {}
