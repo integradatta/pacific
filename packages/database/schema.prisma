@@ -18,6 +18,18 @@ enum TenantStatus {
   SUSPENDED
 }
 
+enum DebtStatus {
+  GREEN
+  YELLOW
+  ORANGE
+  RED
+}
+
+enum RatePeriod {
+  MONTHLY
+  ANNUAL
+}
+
 model Tenant {
   id        String       @id @default(uuid())
   name      String
@@ -26,6 +38,7 @@ model Tenant {
   createdAt DateTime     @default(now())
   users     User[]
   debtors   Debtor[]
+  debts     Debt[]
 }
 
 model User {
@@ -51,7 +64,29 @@ model Debtor {
   email      String?
   redeemedAt DateTime?
   createdAt  DateTime  @default(now())
+  debts      Debt[]
 
   @@index([tenantId])
   @@index([tenantId, email])
+}
+
+model Debt {
+  id          String     @id @default(uuid())
+  tenantId    String
+  tenant      Tenant     @relation(fields: [tenantId], references: [id])
+  debtorId    String
+  debtor      Debtor     @relation(fields: [debtorId], references: [id])
+  description String?
+  principal   Decimal    @db.Decimal(14, 2)
+  rate        Decimal    @db.Decimal(9, 6)
+  ratePeriod  RatePeriod @default(MONTHLY)
+  currency    String     @default("BRL")
+  startDate   DateTime
+  dueDate     DateTime
+  status      DebtStatus @default(GREEN)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([tenantId])
+  @@index([debtorId])
 }
