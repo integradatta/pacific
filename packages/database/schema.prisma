@@ -38,7 +38,6 @@ model Tenant {
   createdAt DateTime     @default(now())
   users     User[]
   debtors   Debtor[]
-  debts     Debt[]
 }
 
 model User {
@@ -66,6 +65,7 @@ model Debtor {
   createdAt  DateTime  @default(now())
   debts      Debt[]
 
+  @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, email])
 }
@@ -73,9 +73,11 @@ model Debtor {
 model Debt {
   id          String     @id @default(uuid())
   tenantId    String
-  tenant      Tenant     @relation(fields: [tenantId], references: [id])
   debtorId    String
-  debtor      Debtor     @relation(fields: [debtorId], references: [id])
+  // FK composta (debtorId, tenantId) → Debtor(id, tenantId): o banco garante que a
+  // dívida e o devedor pertencem ao MESMO tenant (paridade de tenant). A integridade
+  // com Tenant é transitiva via Debtor.
+  debtor      Debtor     @relation(fields: [debtorId, tenantId], references: [id, tenantId])
   description String?
   principal   Decimal    @db.Decimal(14, 2)
   rate        Decimal    @db.Decimal(9, 6)

@@ -87,6 +87,9 @@ CREATE INDEX "Debtor_tenantId_idx" ON "Debtor"("tenantId");
 CREATE INDEX "Debtor_tenantId_email_idx" ON "Debtor"("tenantId", "email");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "Debtor_id_tenantId_key" ON "Debtor"("id", "tenantId");
+
+-- CreateIndex
 CREATE INDEX "Debt_tenantId_idx" ON "Debt"("tenantId");
 
 -- CreateIndex
@@ -102,8 +105,5 @@ ALTER TABLE "Debtor" ADD CONSTRAINT "Debtor_tenantId_fkey" FOREIGN KEY ("tenantI
 ALTER TABLE "Debtor" ADD CONSTRAINT "Debtor_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "Debt" ADD CONSTRAINT "Debt_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "Debt" ADD CONSTRAINT "Debt_debtorId_fkey" FOREIGN KEY ("debtorId") REFERENCES "Debtor"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "Debt" ADD CONSTRAINT "Debt_debtorId_tenantId_fkey" FOREIGN KEY ("debtorId", "tenantId") REFERENCES "Debtor"("id", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
