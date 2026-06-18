@@ -15,7 +15,8 @@ function fakeDb() {
     },
   };
 }
-const svc = (db: ReturnType<typeof fakeDb>) => new DashboardService({ db: () => db } as never);
+const svc = (db: ReturnType<typeof fakeDb>) =>
+  new DashboardService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db) } as never);
 
 describe('DashboardService.kpis', () => {
   it('agrega carteira com saldos e status (asOf fixo)', async () => {

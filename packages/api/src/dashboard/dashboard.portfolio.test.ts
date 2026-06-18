@@ -8,7 +8,8 @@ function pfDebt(id: string, name: string, dueDate: Date, rate = '0', principal =
 function pfDb(debts: ReturnType<typeof pfDebt>[]) {
   return { debt: { findMany: vi.fn(async () => debts) } };
 }
-const svc = (db: ReturnType<typeof pfDb>) => new DashboardService({ db: () => db } as never);
+const svc = (db: ReturnType<typeof pfDb>) =>
+  new DashboardService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db) } as never);
 
 describe('DashboardService.portfolio', () => {
   it('mapeia dívidas para linhas com status/dias/saldo + nome do devedor', async () => {

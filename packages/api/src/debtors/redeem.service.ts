@@ -1,31 +1,32 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { TenantDatasourceResolver } from '../tenancy/tenant-datasource.resolver.js';
+import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 
 interface Identity { supabaseId: string; email: string; }
 
 @Injectable()
 export class RedeemService {
-  constructor(private readonly resolver: TenantDatasourceResolver) {}
+  constructor(private readonly scoped: TenantScopedService) {}
 
   async redeem(identity: Identity, orgCode: string): Promise<{ tenantId: string }> {
-    const db = this.resolver.forTenant('__redeem__');
+    const base = this.scoped.raw();
 
-    // Idempotência: usuário já vinculado.
-    const existing = await db.user.findUnique({ where: { supabaseId: identity.supabaseId } });
+    // Idempotência: usuário já vinculado (User/Tenant não estão sob RLS — lookups globais).
+    const existing = await base.user.findUnique({ where: { supabaseId: identity.supabaseId } });
     if (existing?.tenantId) return { tenantId: existing.tenantId };
 
     // Erro genérico para código inválido OU tenant inativo (não revela qual).
-    const tenant = await db.tenant.findUnique({ where: { orgCode } });
+    const tenant = await base.tenant.findUnique({ where: { orgCode } });
     if (!tenant || tenant.status !== 'ACTIVE') throw new NotFoundException('Código inválido');
 
-    const user = await db.user.create({
-      data: { supabaseId: identity.supabaseId, email: identity.email, role: 'DEBTOR', tenantId: tenant.id },
+    // Escritas com contexto de tenant: a inserção em Debtor passa pela WITH CHECK da RLS.
+    return this.scoped.withTenant(tenant.id, async (tx) => {
+      const user = await tx.user.create({
+        data: { supabaseId: identity.supabaseId, email: identity.email, role: 'DEBTOR', tenantId: tenant.id },
+      });
+      await tx.debtor.create({
+        data: { tenantId: tenant.id, userId: user.id, name: identity.email, email: identity.email, redeemedAt: new Date() },
+      });
+      return { tenantId: tenant.id };
     });
-
-    // Fluxo oficial simplificado: baseado apenas no org_code. Sempre cria o devedor.
-    await db.debtor.create({
-      data: { tenantId: tenant.id, userId: user.id, name: identity.email, email: identity.email, redeemedAt: new Date() },
-    });
-    return { tenantId: tenant.id };
   }
 }

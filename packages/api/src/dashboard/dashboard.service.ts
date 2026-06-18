@@ -8,10 +8,9 @@ export class DashboardService {
   constructor(private readonly scoped: TenantScopedService) {}
 
   // Agregação de carteira (escala pequena, ~100 dívidas/tenant). Saldo/status calculados
-  // pelo motor financeiro; somatórios em Decimal.js.
+  // pelo motor financeiro; somatórios em Decimal.js. A leitura passa por withTenant (RLS).
   async kpis(tenantId: string, asOf: Date = new Date()): Promise<DashboardKpis> {
-    const db = this.scoped.db(tenantId);
-    const debts = await db.debt.findMany({ where: { tenantId } });
+    const debts = await this.scoped.withTenant(tenantId, (tx) => tx.debt.findMany({ where: { tenantId } }));
     let totalLent = new Decimal(0);
     let totalReceivable = new Decimal(0);
     let totalOverdue = new Decimal(0);
@@ -40,12 +39,13 @@ export class DashboardService {
   }
 
   async portfolio(tenantId: string, asOf: Date = new Date()): Promise<PortfolioRow[]> {
-    const db = this.scoped.db(tenantId);
-    const debts = await db.debt.findMany({
-      where: { tenantId },
-      include: { debtor: { select: { name: true } } },
-      orderBy: { dueDate: 'asc' },
-    });
+    const debts = await this.scoped.withTenant(tenantId, (tx) =>
+      tx.debt.findMany({
+        where: { tenantId },
+        include: { debtor: { select: { name: true } } },
+        orderBy: { dueDate: 'asc' },
+      }),
+    );
     return debts.map((d) => {
       const terms = {
         principal: d.principal.toString(),

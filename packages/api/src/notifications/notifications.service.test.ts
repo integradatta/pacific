@@ -19,7 +19,8 @@ function fakeDb(debts: ReturnType<typeof debt>[]) {
     },
   };
 }
-const svc = (db: ReturnType<typeof fakeDb>) => new NotificationsService({ db: () => db } as never);
+const svc = (db: ReturnType<typeof fakeDb>) =>
+  new NotificationsService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db) } as never);
 const asOf = new Date('2026-02-01T00:00:00Z');
 
 describe('NotificationsService', () => {

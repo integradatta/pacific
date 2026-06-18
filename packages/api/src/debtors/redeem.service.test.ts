@@ -9,28 +9,30 @@ function db(tenant: { id: string; status: string } | null) {
     debtor: { create: vi.fn(async () => ({ id: 'd1' })) },
   };
 }
-const resolver = (database: ReturnType<typeof db>) => ({ forTenant: () => database }) as never;
+// raw() devolve o db base (lookups globais); withTenant executa o callback com o mesmo db.
+const scoped = (database: ReturnType<typeof db>) =>
+  ({ raw: () => database, withTenant: async (_t: string, fn: (tx: typeof database) => unknown) => fn(database) }) as never;
 
 describe('RedeemService.redeem', () => {
   it('vincula devedor ao tenant do código', async () => {
     const database = db({ id: 't1', status: 'ACTIVE' });
-    const out = await new RedeemService(resolver(database)).redeem({ supabaseId: 'sb9', email: 'd@x.com' }, 'PAC-AAAA-BBBB');
+    const out = await new RedeemService(scoped(database)).redeem({ supabaseId: 'sb9', email: 'd@x.com' }, 'PAC-AAAA-BBBB');
     expect(out.tenantId).toBe('t1');
     expect(database.user.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ role: 'DEBTOR', tenantId: 't1' }) }));
     expect(database.debtor.create).toHaveBeenCalledOnce();
   });
   it('código inexistente → NotFound genérico', async () => {
-    await expect(new RedeemService(resolver(db(null))).redeem({ supabaseId: 'sb', email: 'd@x.com' }, 'PAC-ZZZZ-ZZZZ'))
+    await expect(new RedeemService(scoped(db(null))).redeem({ supabaseId: 'sb', email: 'd@x.com' }, 'PAC-ZZZZ-ZZZZ'))
       .rejects.toBeInstanceOf(NotFoundException);
   });
   it('tenant suspenso → NotFound genérico (não revela)', async () => {
-    await expect(new RedeemService(resolver(db({ id: 't1', status: 'SUSPENDED' }))).redeem({ supabaseId: 'sb', email: 'd@x.com' }, 'PAC-AAAA-BBBB'))
+    await expect(new RedeemService(scoped(db({ id: 't1', status: 'SUSPENDED' }))).redeem({ supabaseId: 'sb', email: 'd@x.com' }, 'PAC-AAAA-BBBB'))
       .rejects.toBeInstanceOf(NotFoundException);
   });
   it('idempotente: usuário já vinculado retorna o vínculo sem recriar', async () => {
     const database = db({ id: 't1', status: 'ACTIVE' });
     database.user.findUnique = vi.fn(async () => ({ id: 'u1', tenantId: 't1', role: 'DEBTOR' }));
-    const out = await new RedeemService(resolver(database)).redeem({ supabaseId: 'sb9', email: 'd@x.com' }, 'PAC-AAAA-BBBB');
+    const out = await new RedeemService(scoped(database)).redeem({ supabaseId: 'sb9', email: 'd@x.com' }, 'PAC-AAAA-BBBB');
     expect(out.tenantId).toBe('t1');
     expect(database.user.create).not.toHaveBeenCalled();
     expect(database.debtor.create).not.toHaveBeenCalled();

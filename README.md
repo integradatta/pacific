@@ -79,17 +79,17 @@ O isolamento de dados é garantido por `tenantId` em todas as entidades relevant
    ```
    Isso executa a migração `0_init` contra o banco configurado.
 
-5. Aplique as políticas de RLS:
-   ```bash
-   psql "$DATABASE_URL" -f packages/database/src/rls.sql
-   ```
-   Ou cole o conteúdo de `packages/database/src/rls.sql` no SQL Editor do Supabase.
-
-6. Popule dados de exemplo:
+5. Popule dados de exemplo:
    ```bash
    npm run db:seed
    ```
    O comando imprime o `orgCode` da carteira demo ao final.
+
+6. Aplique as políticas de RLS **por último** (a RLS com `WITH CHECK` bloquearia os inserts do seed, que roda sem contexto de tenant):
+   ```bash
+   psql "$DATABASE_URL" -f packages/database/src/rls.sql
+   ```
+   Ou cole o conteúdo de `packages/database/src/rls.sql` no SQL Editor do Supabase. A API define o tenant por request (`set_config` dentro de uma transação, via `TenantScopedService.withTenant`), então as queries continuam funcionando com a RLS ativa.
 
 ---
 

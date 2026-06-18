@@ -14,7 +14,9 @@ function fakeDb() {
     },
   };
 }
-const svc = (db: ReturnType<typeof fakeDb>) => new DebtsService({ db: () => db } as never);
+// withTenant executa o callback com o db fake como "tx" (a transação real só roda em runtime).
+const svc = (db: ReturnType<typeof fakeDb>) =>
+  new DebtsService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db) } as never);
 const base = { principal: '1000.00', rate: '0.030000', ratePeriod: 'MONTHLY' as const, startDate: '2026-05-01T00:00:00Z', dueDate: '2026-07-01T00:00:00Z' };
 
 describe('DebtsService', () => {
