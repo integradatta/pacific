@@ -28,3 +28,16 @@ ALTER TABLE "Notification" FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation_notification ON "Notification"
   USING ("tenantId" = current_setting('app.current_tenant', true))
   WITH CHECK ("tenantId" = current_setting('app.current_tenant', true));
+
+-- DebtorAccess is intentionally OUTSIDE RLS — same rationale as User/Tenant.
+-- The magic-link login flow looks up a row by tokenHash before any tenant context
+-- is established (there is no authenticated session yet at that point).
+-- The table contains only a token hash + scalar ids; no sensitive debt/PII data.
+-- Tenant isolation is enforced at the application layer (service validates tenantId
+-- after the token lookup resolves).
+
+ALTER TABLE "DebtorLoginEvent" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "DebtorLoginEvent" FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_debtor_login_event ON "DebtorLoginEvent"
+  USING ("tenantId" = current_setting('app.current_tenant', true))
+  WITH CHECK ("tenantId" = current_setting('app.current_tenant', true));

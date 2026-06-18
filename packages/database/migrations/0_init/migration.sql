@@ -83,6 +83,32 @@ CREATE TABLE "Notification" (
     CONSTRAINT "Notification_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "DebtorAccess" (
+    "id" TEXT NOT NULL,
+    "debtorId" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "active" BOOLEAN NOT NULL DEFAULT true,
+    "lastSeenAt" TIMESTAMP(3),
+    "rotatedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "DebtorAccess_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "DebtorLoginEvent" (
+    "id" TEXT NOT NULL,
+    "debtorId" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "success" BOOLEAN NOT NULL,
+    "ip" TEXT,
+    "at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "DebtorLoginEvent_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "Tenant_orgCode_key" ON "Tenant"("orgCode");
 
@@ -119,6 +145,21 @@ CREATE INDEX "Notification_tenantId_idx" ON "Notification"("tenantId");
 -- CreateIndex
 CREATE UNIQUE INDEX "Notification_debtId_type_key" ON "Notification"("debtId", "type");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "DebtorAccess_debtorId_key" ON "DebtorAccess"("debtorId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "DebtorAccess_tokenHash_key" ON "DebtorAccess"("tokenHash");
+
+-- CreateIndex
+CREATE INDEX "DebtorAccess_tenantId_idx" ON "DebtorAccess"("tenantId");
+
+-- CreateIndex
+CREATE INDEX "DebtorLoginEvent_tenantId_idx" ON "DebtorLoginEvent"("tenantId");
+
+-- CreateIndex
+CREATE INDEX "DebtorLoginEvent_debtorId_at_idx" ON "DebtorLoginEvent"("debtorId", "at");
+
 -- AddForeignKey
 ALTER TABLE "User" ADD CONSTRAINT "User_tenantId_fkey" FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
@@ -131,3 +172,13 @@ ALTER TABLE "Debtor" ADD CONSTRAINT "Debtor_userId_fkey" FOREIGN KEY ("userId") 
 -- AddForeignKey
 ALTER TABLE "Debt" ADD CONSTRAINT "Debt_debtorId_tenantId_fkey" FOREIGN KEY ("debtorId", "tenantId") REFERENCES "Debtor"("id", "tenantId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
+┌─────────────────────────────────────────────────────────┐
+│  Update available 5.22.0 -> 7.8.0                       │
+│                                                         │
+│  This is a major update - please follow the guide at    │
+│  https://pris.ly/d/major-version-upgrade                │
+│                                                         │
+│  Run the following to update                            │
+│    npm i --save-dev prisma@latest                       │
+│    npm i @prisma/client@latest                          │
+└─────────────────────────────────────────────────────────┘
