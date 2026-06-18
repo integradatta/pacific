@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { balanceAt, deriveStatus, daysRemaining, type DashboardKpis, type DebtStatus, type PortfolioRow } from '@pacific/shared';
+import { balanceAt, deriveStatus, daysRemaining, recoverabilityScore, temperatureScore, type DashboardKpis, type DebtStatus, type PortfolioRow } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 
 @Injectable()
@@ -61,6 +61,8 @@ export class DashboardService {
         balance: balanceAt(terms, asOf),
         daysRemaining: days,
         status: deriveStatus(days),
+        recoverability: recoverabilityScore(terms, asOf),
+        temperature: temperatureScore(terms, asOf),
         dueDate: d.dueDate.toISOString(),
       };
     });
