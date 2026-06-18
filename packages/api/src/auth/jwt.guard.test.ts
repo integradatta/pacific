@@ -29,4 +29,13 @@ describe('JwtGuard', () => {
     const t = jwt.sign({ sub: 'x' }, 'outro');
     expect(() => guard.canActivate(ctx({ authorization: `Bearer ${t}` }))).toThrow();
   });
+  it('aceita token de devedor (role DEBTOR) e popula debtorId', () => {
+    const t = jwt.sign({ sub: 'deb1', app_metadata: { role: 'DEBTOR', tenantId: 't1', debtorId: 'deb1' } }, SECRET);
+    const c = ctx({ authorization: `Bearer ${t}` });
+    expect(guard.canActivate(c)).toBe(true);
+    const u = (c.switchToHttp().getRequest() as { user?: { role: string; debtorId?: string; tenantId: string | null } }).user;
+    expect(u?.role).toBe('DEBTOR');
+    expect(u?.debtorId).toBe('deb1');
+    expect(u?.tenantId).toBe('t1');
+  });
 });

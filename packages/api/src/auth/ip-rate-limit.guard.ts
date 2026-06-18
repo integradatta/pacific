@@ -3,7 +3,7 @@ import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable } 
 interface Bucket { count: number; resetAt: number; }
 
 @Injectable()
-export class RedeemRateLimitGuard implements CanActivate {
+export class IpRateLimitGuard implements CanActivate {
   private readonly hits = new Map<string, Bucket>();
   constructor(
     private readonly limit = Number(process.env.REDEEM_RATE_LIMIT ?? 10),

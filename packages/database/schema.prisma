@@ -112,3 +112,28 @@ model Notification {
   @@unique([debtId, type])
   @@index([tenantId])
 }
+
+model DebtorAccess {
+  id         String    @id @default(uuid())
+  debtorId   String    @unique
+  tenantId   String
+  tokenHash  String    @unique
+  active     Boolean   @default(true)
+  lastSeenAt DateTime?
+  rotatedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([tenantId])
+}
+
+model DebtorLoginEvent {
+  id       String   @id @default(uuid())
+  debtorId String
+  tenantId String
+  success  Boolean
+  ip       String?
+  at       DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([debtorId, at])
+}
