@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { monthlyRate, balanceAt, accruedInterest, deriveStatus, daysRemaining, summarize } from './finance.js';
+import { monthlyRate, balanceAt, accruedInterest, deriveStatus, daysRemaining, summarize, recoverabilityScore, temperatureScore } from './finance.js';
 import type { DebtTerms } from '../types/financial.types.js';
 
 const terms = (over: Partial<DebtTerms> = {}): DebtTerms => ({
@@ -36,5 +36,29 @@ describe('motor financeiro (Decimal.js)', () => {
     expect(s.projections.map((p) => p.horizonDays)).toEqual([0, 30, 90, 180, 365]);
     expect(s.projections[0]!.balance).toBe('1000.00');
     expect(s.projections[1]!.balance).toBe('1100.00');
+  });
+});
+
+describe('scores (0–100)', () => {
+  it('temperatura: vencido ⇒ 100; 45 dias ⇒ 50; 90 dias ⇒ 0', () => {
+    const asOf = new Date('2026-01-01T00:00:00Z');
+    expect(temperatureScore(terms({ dueDate: new Date('2025-12-01T00:00:00Z') }), asOf)).toBe(100);
+    expect(temperatureScore(terms({ dueDate: new Date('2026-02-15T00:00:00Z') }), asOf)).toBe(50);
+    expect(temperatureScore(terms({ dueDate: new Date('2026-04-01T00:00:00Z') }), asOf)).toBe(0);
+  });
+  it('recuperabilidade: saudável (no prazo, sem juros) ⇒ 100', () => {
+    expect(recoverabilityScore(terms({ rate: '0', dueDate: new Date('2026-06-01T00:00:00Z') }), new Date('2026-02-01T00:00:00Z'))).toBe(100);
+  });
+  it('recuperabilidade: 90 dias vencido (sem juros) ⇒ 70', () => {
+    expect(recoverabilityScore(terms({ rate: '0', dueDate: new Date('2026-01-01T00:00:00Z') }), new Date('2026-04-01T00:00:00Z'))).toBe(70);
+  });
+  it('recuperabilidade: carga de juros reduz a pontuação (10% de juros ⇒ -2.5)', () => {
+    expect(recoverabilityScore(terms({ rate: '0.10', dueDate: new Date('2026-06-01T00:00:00Z') }), new Date('2026-01-31T00:00:00Z'))).toBe(98);
+  });
+  it('summarize inclui scores 0–100', () => {
+    const s = summarize(terms(), new Date('2026-01-01T00:00:00Z'));
+    expect(typeof s.scores.recoverability).toBe('number');
+    expect(s.scores.temperature).toBeGreaterThanOrEqual(0);
+    expect(s.scores.temperature).toBeLessThanOrEqual(100);
   });
 });

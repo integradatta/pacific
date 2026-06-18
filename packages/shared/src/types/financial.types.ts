@@ -10,11 +10,15 @@ export interface DebtTerms {
 
 export interface Projection { horizonDays: number; balance: string; }
 
+/** Scores 0–100. recoverability = potencial de recuperação; temperature = urgência temporal. */
+export interface DebtScores { recoverability: number; temperature: number; }
+
 export interface DebtSummary {
   balance: string;
   accruedInterest: string;
   daysRemaining: number;
   status: DebtStatus;
+  scores: DebtScores;
   projections: Projection[];
 }
 
@@ -31,5 +35,7 @@ export interface PortfolioRow {
   balance: string;
   daysRemaining: number;
   status: DebtStatus;
+  recoverability: number;
+  temperature: number;
   dueDate: string; // ISO
 }
