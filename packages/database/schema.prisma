@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  CREDITOR
+  DEBTOR
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum DebtStatus {
+  GREEN
+  YELLOW
+  ORANGE
+  RED
+}
+
+enum RatePeriod {
+  MONTHLY
+  ANNUAL
+}
+
+enum NotificationType {
+  DUE_SOON
+  OVERDUE
+}
+
+model Tenant {
+  id        String       @id @default(uuid())
+  name      String
+  orgCode   String       @unique
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  users     User[]
+  debtors   Debtor[]
+}
+
+model User {
+  id         String   @id @default(uuid())
+  supabaseId String   @unique
+  email      String   @unique
+  role       UserRole
+  tenantId   String?
+  tenant     Tenant?  @relation(fields: [tenantId], references: [id])
+  debtor     Debtor?
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model Debtor {
+  id         String    @id @default(uuid())
+  tenantId   String
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+  userId     String?   @unique
+  user       User?     @relation(fields: [userId], references: [id])
+  name       String
+  email      String?
+  redeemedAt DateTime?
+  createdAt  DateTime  @default(now())
+  debts      Debt[]
+
+  @@unique([id, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, email])
+}
+
+model Debt {
+  id          String     @id @default(uuid())
+  tenantId    String
+  debtorId    String
+  // FK composta (debtorId, tenantId) → Debtor(id, tenantId): o banco garante que a
+  // dívida e o devedor pertencem ao MESMO tenant (paridade de tenant). A integridade
+  // com Tenant é transitiva via Debtor.
+  debtor      Debtor     @relation(fields: [debtorId, tenantId], references: [id, tenantId])
+  description String?
+  principal   Decimal    @db.Decimal(14, 2)
+  rate        Decimal    @db.Decimal(9, 6)
+  ratePeriod  RatePeriod @default(MONTHLY)
+  currency    String     @default("BRL")
+  startDate   DateTime
+  dueDate     DateTime
+  status      DebtStatus @default(GREEN)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([tenantId])
+  @@index([debtorId])
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  tenantId  String
+  debtorId  String?
+  debtId    String?
+  type      NotificationType
+  title     String
+  body      String
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@unique([debtId, type])
+  @@index([tenantId])
+}

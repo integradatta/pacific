@@ -1,0 +1,9 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+html, body { background: #0A0E17; color: #E8ECF4; }
+body { font-family: var(--font-sans); }
+::selection { background: #2BE5C2; color: #0A0E17; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }

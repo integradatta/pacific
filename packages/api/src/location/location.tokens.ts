@@ -1,0 +1,2 @@
+export const LOCATION_PROVIDER = Symbol('LOCATION_PROVIDER');
+export const LOCATION_SERVICE = Symbol('LOCATION_SERVICE');

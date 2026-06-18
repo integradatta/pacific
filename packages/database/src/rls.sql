@@ -1,0 +1,30 @@
+-- Row-Level Security: isolamento por tenant (defesa em profundidade — ATIVA).
+--
+-- Como a app ativa: cada request tenant-scoped roda dentro de uma transação
+-- (TenantScopedService.withTenant) que executa, parametrizado:
+--   SELECT set_config('app.current_tenant', '<tenantId>', true);   -- escopo de transação
+-- As policies abaixo filtram por esse valor (USING) e impedem gravar fora do
+-- tenant (WITH CHECK). FORCE garante que nem o owner da tabela burla a policy.
+--
+-- ORDEM DE APLICAÇÃO: aplique este arquivo APÓS as migrações E APÓS o seed
+-- (o seed usa um PrismaClient sem contexto de tenant; com a RLS ativa a WITH CHECK
+-- bloquearia os inserts dele). Em produção, rode após migrate deploy.
+--   psql "$DATABASE_URL" -f packages/database/src/rls.sql   (ou SQL editor do Supabase)
+
+ALTER TABLE "Debtor" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Debtor" FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_debtor ON "Debtor"
+  USING ("tenantId" = current_setting('app.current_tenant', true))
+  WITH CHECK ("tenantId" = current_setting('app.current_tenant', true));
+
+ALTER TABLE "Debt" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Debt" FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_debt ON "Debt"
+  USING ("tenantId" = current_setting('app.current_tenant', true))
+  WITH CHECK ("tenantId" = current_setting('app.current_tenant', true));
+
+ALTER TABLE "Notification" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Notification" FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_notification ON "Notification"
+  USING ("tenantId" = current_setting('app.current_tenant', true))
+  WITH CHECK ("tenantId" = current_setting('app.current_tenant', true));

@@ -1,12 +1,12 @@
-# Pacific — Fase 1 (Setup, Schema, Auth, Multi-tenancy) — Implementation Plan
+# Pacific — Fase 1 (Fundação multi-tenant) — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Estabelecer o monorepo Turborepo, o schema completo do banco (Prisma), o ambiente Docker, a autenticação via Supabase e o isolamento multi-tenant (escopo no NestJS + RLS), entregando uma API que sobe, valida JWT e isola dados por credor.
+**Goal:** Validar a fundação multi-tenant: monorepo + modelo de dados base (Tenant/User/Debtor com `tenantId`, índices, isolamento), autenticação de 3 papéis, cadastro de credor com geração automática de `orgCode`, e resgate do código pelo devedor com auto-vínculo ao tenant — onboarding em < 1 min, sem pré-cadastro obrigatório.
 
-**Architecture:** Monorepo Turborepo com `packages/shared` (tipos/utils), `packages/database` (Prisma), `packages/api` (NestJS). Tenant = credor; todo dado de negócio carrega `tenantId`. Isolamento em duas camadas: guard de tenant no NestJS + Row-Level Security no Postgres (Supabase). Auth por JWT do Supabase validado por um guard.
+**Architecture:** Monorepo Turborepo. Banco único Postgres; `tenantId` em toda tabela de negócio. Papéis: `SUPER_ADMIN` (sem tenant), `CREDITOR` (= 1 tenant), `DEBTOR` (vinculado ao tenant via `orgCode`). Acesso a dados via `TenantScopedService` + `TenantDatasourceResolver` (hoje 1 datasource; permite extração física futura). RLS como defesa em profundidade. Mitigações de segurança no servidor (alta entropia, rate limit, erros genéricos, rotação de código) sem etapas extras ao usuário.
 
-**Tech Stack:** Turborepo, TypeScript estrito, NestJS, Prisma, PostgreSQL (Supabase), Vitest, Docker (Postgres + Redis), Decimal (Prisma `Decimal`).
+**Tech Stack:** Turborepo, TypeScript estrito, NestJS, Prisma, PostgreSQL (Supabase), Vitest, Docker (Postgres + Redis).
 
 **Spec:** `docs/superpowers/specs/2026-06-16-pacific-design.md`
 
@@ -16,47 +16,28 @@
 
 ```
 Pacific/
-├── package.json                       # workspaces, scripts turbo
-├── turbo.json                         # pipeline de tasks
-├── tsconfig.base.json                 # TS estrito compartilhado
-├── docker-compose.yml                 # postgres + redis (dev local)
-├── .env.example                       # todas as variáveis
-├── README.md                          # setup
-├── packages/
-│   ├── shared/
-│   │   ├── package.json
-│   │   ├── tsconfig.json
-│   │   ├── vitest.config.ts
-│   │   └── src/
-│   │       ├── index.ts
-│   │       ├── types/{debt,financial,location}.types.ts
-│   │       └── utils/{date.utils.ts,date.utils.test.ts}
-│   ├── database/
-│   │   ├── package.json
-│   │   ├── schema.prisma
-│   │   ├── prisma/migrations/
-│   │   ├── src/{client.ts,rls.sql}
-│   │   └── seed.ts
-│   └── api/
-│       ├── package.json
-│       ├── tsconfig.json
-│       ├── nest-cli.json
-│       └── src/
-│           ├── main.ts
-│           ├── app.module.ts
-│           ├── common/{http-exception.filter.ts,prisma.service.ts}
-│           ├── auth/{auth.module.ts,jwt.guard.ts,jwt.guard.test.ts,current-user.decorator.ts,auth.types.ts}
-│           └── tenants/{tenant.guard.ts,tenant.guard.test.ts,tenant-context.ts}
+├── package.json · turbo.json · tsconfig.base.json · .nvmrc
+├── docker-compose.yml · .env.example · README.md
+├── packages/shared/src/
+│   ├── types/{auth.types.ts,tenant.types.ts}
+│   └── utils/{date.utils.ts(+test), org-code.ts(+test)}
+├── packages/database/{schema.prisma, src/client.ts, src/rls.sql, seed.ts}
+└── packages/api/src/
+    ├── main.ts · app.module.ts
+    ├── common/{http-exception.filter.ts, prisma.service.ts, pagination.ts}
+    ├── auth/{auth.types.ts, jwt.guard.ts(+test), roles.guard.ts(+test), roles.decorator.ts, current-user.decorator.ts}
+    ├── tenancy/{tenant-context.ts(+test), tenant.guard.ts(+test), tenant-datasource.resolver.ts, tenant-scoped.service.ts}
+    ├── creditors/{creditors.service.ts(+test), creditors.controller.ts, dto/register-creditor.dto.ts}
+    └── debtors/{redeem.service.ts(+test), debtors.controller.ts, redeem-rate-limit.guard.ts(+test), dto/redeem.dto.ts}
 ```
 
 ---
 
 ### Task 1: Scaffold do monorepo
 
-**Files:**
-- Create: `package.json`, `turbo.json`, `tsconfig.base.json`, `.nvmrc`
+**Files:** Create `package.json`, `turbo.json`, `tsconfig.base.json`, `.nvmrc`
 
-- [ ] **Step 1: Criar `package.json` raiz**
+- [ ] **Step 1: `package.json` raiz**
 
 ```json
 {
@@ -68,28 +49,23 @@ Pacific/
   "engines": { "node": ">=20" },
   "scripts": {
     "build": "turbo run build",
-    "dev": "turbo run dev",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "db:generate": "npm run db:generate -w @pacific/database",
     "db:migrate": "npm run db:migrate -w @pacific/database",
     "db:seed": "npm run db:seed -w @pacific/database"
   },
-  "devDependencies": {
-    "turbo": "^2.0.0",
-    "typescript": "^5.5.0"
-  }
+  "devDependencies": { "turbo": "^2.0.0", "typescript": "^5.5.0" }
 }
 ```
 
-- [ ] **Step 2: Criar `turbo.json`**
+- [ ] **Step 2: `turbo.json`**
 
 ```json
 {
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
-    "build": { "dependsOn": ["^build"], "outputs": ["dist/**", ".next/**"] },
-    "dev": { "cache": false, "persistent": true },
+    "build": { "dependsOn": ["^build"], "outputs": ["dist/**"] },
     "lint": {},
     "test": { "dependsOn": ["^build"] },
     "db:generate": { "cache": false }
@@ -97,204 +73,200 @@ Pacific/
 }
 ```
 
-- [ ] **Step 3: Criar `tsconfig.base.json` (estrito)**
+- [ ] **Step 3: `tsconfig.base.json`**
 
 ```json
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "lib": ["ES2022"],
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
-    "exactOptionalPropertyTypes": true,
-    "declaration": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext",
+    "lib": ["ES2022"], "strict": true, "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true, "declaration": true, "esModuleInterop": true,
+    "skipLibCheck": true, "forceConsistentCasingInFileNames": true
   }
 }
 ```
 
-- [ ] **Step 4: Criar `.nvmrc`** com o conteúdo `20`.
+- [ ] **Step 4:** Criar `.nvmrc` com `20`.
 
-- [ ] **Step 5: Instalar e verificar**
+- [ ] **Step 5: Verificar** — Run: `npm install && npx turbo --version` → Expected: imprime versão sem erro.
 
-Run: `npm install && npx turbo --version`
-Expected: turbo imprime a versão (ex.: `2.x.x`) sem erro.
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add package.json turbo.json tsconfig.base.json .nvmrc package-lock.json
-git commit -m "chore: scaffold do monorepo turborepo"
-```
+- [ ] **Step 6: Commit** — `git add -A && git commit -m "chore: scaffold do monorepo turborepo"`
 
 ---
 
-### Task 2: `packages/shared` — tipos e utils de data (TDD)
+### Task 2: `packages/shared` — tipos, date utils e gerador de orgCode (TDD)
 
-**Files:**
-- Create: `packages/shared/package.json`, `tsconfig.json`, `vitest.config.ts`, `src/index.ts`, `src/types/*.ts`, `src/utils/date.utils.ts`
-- Test: `packages/shared/src/utils/date.utils.test.ts`
+**Files:** Create `packages/shared/{package.json,tsconfig.json,vitest.config.ts,src/index.ts,src/types/*.ts,src/utils/*.ts}`; Test: `src/utils/date.utils.test.ts`, `src/utils/org-code.test.ts`
 
-- [ ] **Step 1: Criar `packages/shared/package.json`**
+- [ ] **Step 1: `packages/shared/package.json`**
 
 ```json
 {
-  "name": "@pacific/shared",
-  "version": "0.1.0",
-  "type": "module",
-  "main": "./src/index.ts",
-  "types": "./src/index.ts",
-  "scripts": {
-    "test": "vitest run",
-    "lint": "tsc --noEmit",
-    "build": "tsc -p tsconfig.json"
-  },
+  "name": "@pacific/shared", "version": "0.1.0", "type": "module",
+  "main": "./src/index.ts", "types": "./src/index.ts",
+  "scripts": { "test": "vitest run", "lint": "tsc --noEmit", "build": "tsc -p tsconfig.json" },
   "devDependencies": { "vitest": "^2.0.0" }
 }
 ```
 
-- [ ] **Step 2: Criar `packages/shared/tsconfig.json`**
+- [ ] **Step 2: `packages/shared/tsconfig.json`**
 
 ```json
-{
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": { "outDir": "dist", "rootDir": "src" },
-  "include": ["src"]
-}
+{ "extends": "../../tsconfig.base.json", "compilerOptions": { "outDir": "dist", "rootDir": "src" }, "include": ["src"] }
 ```
 
-- [ ] **Step 3: Criar `packages/shared/vitest.config.ts`**
+- [ ] **Step 3: `packages/shared/vitest.config.ts`**
 
 ```ts
 import { defineConfig } from 'vitest/config';
 export default defineConfig({ test: { include: ['src/**/*.test.ts'] } });
 ```
 
-- [ ] **Step 4: Escrever o teste que falha — `src/utils/date.utils.test.ts`**
+- [ ] **Step 4: Tipos — `src/types/auth.types.ts`**
+
+```ts
+export type UserRole = 'SUPER_ADMIN' | 'CREDITOR' | 'DEBTOR';
+
+export interface AuthUser {
+  supabaseId: string;
+  email: string;
+  role: UserRole;
+  tenantId: string | null; // null apenas para SUPER_ADMIN
+}
+```
+
+- [ ] **Step 5: Tipos — `src/types/tenant.types.ts`**
+
+```ts
+export type TenantStatus = 'ACTIVE' | 'SUSPENDED';
+
+export interface TenantPublic {
+  id: string;
+  name: string;
+  orgCode: string;
+  status: TenantStatus;
+}
+```
+
+- [ ] **Step 6: Teste que falha — `src/utils/date.utils.test.ts`**
 
 ```ts
 import { describe, it, expect } from 'vitest';
-import { daysBetween, daysUntil } from './date.utils';
+import { daysUntil } from './date.utils';
 
-describe('daysBetween / daysUntil', () => {
-  it('conta dias entre duas datas (UTC, sem horas)', () => {
-    expect(daysBetween(new Date('2026-06-16T10:00:00Z'), new Date('2026-06-26T01:00:00Z'))).toBe(10);
-  });
-  it('daysUntil é positivo para data futura', () => {
+describe('daysUntil', () => {
+  it('positivo no futuro', () => {
     expect(daysUntil(new Date('2026-06-26T00:00:00Z'), new Date('2026-06-16T00:00:00Z'))).toBe(10);
   });
-  it('daysUntil é negativo para data vencida', () => {
+  it('negativo se vencido', () => {
     expect(daysUntil(new Date('2026-06-13T00:00:00Z'), new Date('2026-06-16T00:00:00Z'))).toBe(-3);
   });
 });
 ```
 
-- [ ] **Step 5: Rodar o teste e confirmar a falha**
+- [ ] **Step 7: Rodar (deve falhar)** — Run: `npm test -w @pacific/shared` → Expected: FAIL (módulo inexistente).
 
-Run: `npm test -w @pacific/shared`
-Expected: FAIL — `Cannot find module './date.utils'`.
-
-- [ ] **Step 6: Implementar `src/utils/date.utils.ts`**
+- [ ] **Step 8: Implementar `src/utils/date.utils.ts`**
 
 ```ts
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
-function toUtcMidnight(d: Date): number {
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-}
-
+const MS_PER_DAY = 86_400_000;
+const utcMidnight = (d: Date): number => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 export function daysBetween(from: Date, to: Date): number {
-  return Math.round((toUtcMidnight(to) - toUtcMidnight(from)) / MS_PER_DAY);
+  return Math.round((utcMidnight(to) - utcMidnight(from)) / MS_PER_DAY);
 }
-
 export function daysUntil(target: Date, from: Date = new Date()): number {
   return daysBetween(from, target);
 }
 ```
 
-- [ ] **Step 7: Criar os tipos compartilhados**
+- [ ] **Step 9: Teste que falha — `src/utils/org-code.test.ts`**
 
-`src/types/debt.types.ts`:
 ```ts
-export type DebtStatus = 'GREEN' | 'YELLOW' | 'ORANGE' | 'RED';
-export type RatePeriod = 'MONTHLY' | 'ANNUAL';
-export type UserRole = 'CREDITOR' | 'DEBTOR';
+import { describe, it, expect } from 'vitest';
+import { generateOrgCode, ORG_CODE_REGEX, generateUniqueOrgCode } from './org-code';
 
-export interface DebtSummary {
-  id: string;
-  debtorName: string;
-  principal: string;       // valor monetário como string (Decimal)
-  balance: string;
-  accruedInterest: string;
-  rate: string;
-  ratePeriod: RatePeriod;
-  dueDate: string;         // ISO
-  daysRemaining: number;
-  status: DebtStatus;
+describe('generateOrgCode', () => {
+  it('gera no formato PAC-XXXX-XXXX em base32 de Crockford (sem I L O U)', () => {
+    for (let i = 0; i < 200; i++) {
+      const code = generateOrgCode();
+      expect(code).toMatch(ORG_CODE_REGEX);
+      expect(code).not.toMatch(/[ILOU]/);
+    }
+  });
+  it('gera valores distintos', () => {
+    expect(generateOrgCode()).not.toBe(generateOrgCode());
+  });
+});
+
+describe('generateUniqueOrgCode', () => {
+  it('repete enquanto o código já existe e retorna o primeiro livre', async () => {
+    const usados = new Set<string>();
+    let chamadas = 0;
+    const exists = async (c: string): Promise<boolean> => { chamadas++; return chamadas === 1 ? true : usados.has(c); };
+    const code = await generateUniqueOrgCode(exists);
+    expect(code).toMatch(ORG_CODE_REGEX);
+    expect(chamadas).toBeGreaterThanOrEqual(2);
+  });
+});
+```
+
+- [ ] **Step 10: Rodar (deve falhar)** — Run: `npm test -w @pacific/shared` → Expected: FAIL (`org-code` inexistente).
+
+- [ ] **Step 11: Implementar `src/utils/org-code.ts`**
+
+```ts
+import { randomInt } from 'node:crypto';
+
+// Crockford base32 sem caracteres ambíguos (sem I, L, O, U).
+const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+export const ORG_CODE_REGEX = /^PAC-[0-9A-HJKMNP-TV-Z]{4}-[0-9A-HJKMNP-TV-Z]{4}$/;
+
+function block(): string {
+  let out = '';
+  for (let i = 0; i < 4; i++) out += ALPHABET[randomInt(ALPHABET.length)];
+  return out;
+}
+
+export function generateOrgCode(): string {
+  return `PAC-${block()}-${block()}`;
+}
+
+export async function generateUniqueOrgCode(
+  exists: (code: string) => Promise<boolean>,
+  maxAttempts = 10,
+): Promise<string> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const code = generateOrgCode();
+    if (!(await exists(code))) return code;
+  }
+  throw new Error('Não foi possível gerar orgCode único');
 }
 ```
 
-`src/types/financial.types.ts`:
-```ts
-export interface Projection { horizonDays: number; balance: string; }
-export interface DebtScores { recoverability: number; temperature: number; }
-```
-
-`src/types/location.types.ts`:
-```ts
-export type ConsentState = 'GRANTED' | 'REVOKED' | 'NEVER';
-
-export interface LivePosition {
-  debtorId: string;
-  lat: number;
-  lng: number;
-  recordedAt: string;      // ISO
-  online: boolean;
-  battery: number | null;  // 0-100
-  status: 'GREEN' | 'YELLOW' | 'ORANGE' | 'RED';
-}
-```
-
-- [ ] **Step 8: Criar `src/index.ts`**
+- [ ] **Step 12: `src/index.ts`**
 
 ```ts
-export * from './types/debt.types.js';
-export * from './types/financial.types.js';
-export * from './types/location.types.js';
+export * from './types/auth.types.js';
+export * from './types/tenant.types.js';
 export * from './utils/date.utils.js';
+export * from './utils/org-code.js';
 ```
 
-- [ ] **Step 9: Rodar o teste e confirmar que passa**
+- [ ] **Step 13: Rodar e passar** — Run: `npm test -w @pacific/shared` → Expected: PASS (todos).
 
-Run: `npm test -w @pacific/shared`
-Expected: PASS (3 testes).
-
-- [ ] **Step 10: Commit**
-
-```bash
-git add packages/shared
-git commit -m "feat(shared): tipos compartilhados e utils de data com testes"
-```
+- [ ] **Step 14: Commit** — `git add packages/shared && git commit -m "feat(shared): tipos de auth/tenant, date utils e gerador de orgCode com testes"`
 
 ---
 
-### Task 3: `packages/database` — schema Prisma completo
+### Task 3: `packages/database` — schema base 3 níveis
 
-**Files:**
-- Create: `packages/database/package.json`, `schema.prisma`, `src/client.ts`
+**Files:** Create `packages/database/{package.json,schema.prisma,src/client.ts}`
 
-- [ ] **Step 1: Criar `packages/database/package.json`**
+- [ ] **Step 1: `packages/database/package.json`**
 
 ```json
 {
-  "name": "@pacific/database",
-  "version": "0.1.0",
-  "main": "./src/client.ts",
+  "name": "@pacific/database", "version": "0.1.0", "main": "./src/client.ts",
   "scripts": {
     "db:generate": "prisma generate --schema=schema.prisma",
     "db:migrate": "prisma migrate dev --schema=schema.prisma",
@@ -307,37 +279,23 @@ git commit -m "feat(shared): tipos compartilhados e utils de data com testes"
 }
 ```
 
-- [ ] **Step 2: Criar `packages/database/schema.prisma` (todas as entidades + enums)**
+- [ ] **Step 2: `packages/database/schema.prisma` (base da Fase 1)**
 
 ```prisma
-generator client {
-  provider = "prisma-client-js"
-}
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
 
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-enum UserRole       { CREDITOR DEBTOR }
-enum DebtStatus     { GREEN YELLOW ORANGE RED }
-enum RatePeriod     { MONTHLY ANNUAL }
-enum LedgerEntryType{ INTEREST_ACCRUAL PAYMENT ADJUSTMENT PRINCIPAL }
-enum AlertType      { D30 D15 D7 D3 D1 DUE OVERDUE }
-enum AlertChannel   { PUSH IN_APP }
-enum AlertStatus    { PENDING SENT FAILED }
-enum ConsentState   { NEVER GRANTED REVOKED }
-enum GeoEventType   { ARRIVAL DEPARTURE }
+enum UserRole     { SUPER_ADMIN CREDITOR DEBTOR }
+enum TenantStatus { ACTIVE SUSPENDED }
 
 model Tenant {
-  id         String   @id @default(uuid())
-  name       String
-  walletCode String   @unique
-  createdAt  DateTime @default(now())
-  users      User[]
-  debtors    Debtor[]
-  debts      Debt[]
-  alerts     Alert[]
+  id        String       @id @default(uuid())
+  name      String
+  orgCode   String       @unique
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  users     User[]
+  debtors   Debtor[]
 }
 
 model User {
@@ -353,153 +311,23 @@ model User {
 }
 
 model Debtor {
-  id          String           @id @default(uuid())
-  tenantId    String
-  tenant      Tenant           @relation(fields: [tenantId], references: [id])
-  userId      String?          @unique
-  user        User?            @relation(fields: [userId], references: [id])
-  name        String
-  city        String?
-  region      String?
-  debts       Debt[]
-  consent     LocationConsent?
-  pings       LocationPing[]
-  savedPlaces SavedPlace[]
-  geoEvents   GeoEvent[]
-  createdAt   DateTime         @default(now())
-  @@index([tenantId])
-}
-
-model Debt {
-  id          String        @id @default(uuid())
-  tenantId    String
-  tenant      Tenant        @relation(fields: [tenantId], references: [id])
-  debtorId    String
-  debtor      Debtor        @relation(fields: [debtorId], references: [id])
-  description String?
-  principal   Decimal       @db.Decimal(14, 2)
-  rate        Decimal       @db.Decimal(9, 6)
-  ratePeriod  RatePeriod    @default(MONTHLY)
-  currency    String        @default("BRL")
-  startDate   DateTime
-  dueDate     DateTime
-  status      DebtStatus    @default(GREEN)
-  ledger      LedgerEntry[]
-  snapshots   DebtSnapshot[]
-  scores      Score[]
-  alerts      Alert[]
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  @@index([tenantId])
-  @@index([debtorId])
-}
-
-model LedgerEntry {
-  id        String          @id @default(uuid())
-  debtId    String
-  debt      Debt            @relation(fields: [debtId], references: [id])
-  type      LedgerEntryType
-  amount    Decimal         @db.Decimal(14, 2)
-  occurredAt DateTime
-  note      String?
-  createdAt DateTime        @default(now())
-  @@index([debtId])
-}
-
-model DebtSnapshot {
-  id              String   @id @default(uuid())
-  debtId          String
-  debt            Debt     @relation(fields: [debtId], references: [id])
-  capturedAt      DateTime
-  balance         Decimal  @db.Decimal(14, 2)
-  accruedInterest Decimal  @db.Decimal(14, 2)
-  @@unique([debtId, capturedAt])
-  @@index([debtId])
-}
-
-model Score {
-  id             String   @id @default(uuid())
-  debtId         String
-  debt           Debt     @relation(fields: [debtId], references: [id])
-  recoverability Int
-  temperature    Int
-  computedAt     DateTime @default(now())
-  @@index([debtId])
-}
-
-model Alert {
-  id         String       @id @default(uuid())
+  id         String    @id @default(uuid())
   tenantId   String
-  tenant     Tenant       @relation(fields: [tenantId], references: [id])
-  debtId     String
-  debt       Debt         @relation(fields: [debtId], references: [id])
-  type       AlertType
-  channel    AlertChannel
-  status     AlertStatus  @default(PENDING)
-  recipientRole UserRole
-  scheduledFor DateTime
-  sentAt     DateTime?
-  notification Notification?
-  createdAt  DateTime     @default(now())
-  @@unique([debtId, type, recipientRole])
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+  userId     String?   @unique
+  user       User?     @relation(fields: [userId], references: [id])
+  name       String
+  email      String?
+  redeemedAt DateTime?
+  createdAt  DateTime  @default(now())
   @@index([tenantId])
-}
-
-model Notification {
-  id        String   @id @default(uuid())
-  alertId   String   @unique
-  alert     Alert    @relation(fields: [alertId], references: [id])
-  title     String
-  body      String
-  readAt    DateTime?
-  createdAt DateTime @default(now())
-}
-
-model LocationConsent {
-  id         String       @id @default(uuid())
-  debtorId   String       @unique
-  debtor     Debtor       @relation(fields: [debtorId], references: [id])
-  state      ConsentState @default(NEVER)
-  grantedAt  DateTime?
-  revokedAt  DateTime?
-  updatedAt  DateTime     @updatedAt
-}
-
-model LocationPing {
-  id         String   @id @default(uuid())
-  debtorId   String
-  debtor     Debtor   @relation(fields: [debtorId], references: [id])
-  lat        Float
-  lng        Float
-  online     Boolean  @default(true)
-  battery    Int?
-  accuracy   Float?
-  recordedAt DateTime @default(now())
-  @@index([debtorId, recordedAt])
-}
-
-model SavedPlace {
-  id        String  @id @default(uuid())
-  debtorId  String
-  debtor    Debtor  @relation(fields: [debtorId], references: [id])
-  label     String
-  lat       Float
-  lng       Float
-  radiusM   Int     @default(150)
-}
-
-model GeoEvent {
-  id        String       @id @default(uuid())
-  debtorId  String
-  debtor    Debtor       @relation(fields: [debtorId], references: [id])
-  type      GeoEventType
-  placeLabel String
-  occurredAt DateTime    @default(now())
-  @@index([debtorId, occurredAt])
+  @@index([tenantId, email])
 }
 ```
 
-- [ ] **Step 3: Criar `packages/database/src/client.ts`**
+> Nota: Debt, LedgerEntry, Score, Alert, Notification e as entidades de localização entram na Fase 2+, sempre com `tenantId` indexado.
+
+- [ ] **Step 3: `src/client.ts`**
 
 ```ts
 import { PrismaClient } from '@prisma/client';
@@ -507,145 +335,85 @@ export const prisma = new PrismaClient();
 export * from '@prisma/client';
 ```
 
-- [ ] **Step 4: Gerar o client e validar o schema**
+- [ ] **Step 4: Gerar e validar** — Run: `npm run db:generate -w @pacific/database && npm run lint -w @pacific/database` → Expected: client gerado + `schema is valid`.
 
-Run: `npm run db:generate -w @pacific/database && npm run lint -w @pacific/database`
-Expected: `Generated Prisma Client` + `The schema is valid`.
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add packages/database
-git commit -m "feat(database): schema prisma completo com entidades e enums"
-```
+- [ ] **Step 5: Commit** — `git add packages/database && git commit -m "feat(database): schema base 3 niveis (tenant/user/debtor)"`
 
 ---
 
-### Task 4: Docker, variáveis de ambiente e migração inicial
+### Task 4: Docker, env e migração inicial
 
-**Files:**
-- Create: `docker-compose.yml`, `.env.example`
+**Files:** Create `docker-compose.yml`, `.env.example`
 
-- [ ] **Step 1: Criar `docker-compose.yml`**
+- [ ] **Step 1: `docker-compose.yml`**
 
 ```yaml
 services:
   postgres:
     image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: pacific
-      POSTGRES_PASSWORD: pacific
-      POSTGRES_DB: pacific
+    environment: { POSTGRES_USER: pacific, POSTGRES_PASSWORD: pacific, POSTGRES_DB: pacific }
     ports: ["5432:5432"]
     volumes: ["pgdata:/var/lib/postgresql/data"]
   redis:
     image: redis:7-alpine
     ports: ["6379:6379"]
-volumes:
-  pgdata:
+volumes: { pgdata: {} }
 ```
 
-- [ ] **Step 2: Criar `.env.example`**
+- [ ] **Step 2: `.env.example`**
 
 ```bash
-# Banco (dev local via docker-compose; em produção usar a string do Supabase)
 DATABASE_URL="postgresql://pacific:pacific@localhost:5432/pacific?schema=public"
-
-# Supabase
 SUPABASE_URL=""
-SUPABASE_ANON_KEY=""
 SUPABASE_SERVICE_ROLE_KEY=""
 SUPABASE_JWT_SECRET=""
-
-# Redis / BullMQ
 REDIS_URL="redis://localhost:6379"
-
-# OneSignal (push) — opcional; ausência degrada para registro interno
-ONESIGNAL_APP_ID=""
-ONESIGNAL_API_KEY=""
-
-# Mapbox (front)
-NEXT_PUBLIC_MAPBOX_TOKEN=""
-
-# API
 API_PORT="3333"
+REDEEM_RATE_LIMIT="10"          # tentativas de resgate por janela
+REDEEM_RATE_WINDOW_MS="600000"  # 10 min
 ```
 
-- [ ] **Step 3: Criar a migração inicial** (requer Postgres no ar via Docker; em máquina sem Docker, apontar `DATABASE_URL` para o Supabase)
+- [ ] **Step 3: Migração inicial** — Run: `cp .env.example packages/database/.env && (docker compose up -d postgres || true) && npm run db:migrate -w @pacific/database -- --name init`
+Expected: pasta `packages/database/prisma/migrations/<ts>_init/` criada. (Sem Docker, apontar `DATABASE_URL` para o Supabase.)
 
-Run: `cp .env.example packages/database/.env && (docker compose up -d postgres || true) && npm run db:migrate -w @pacific/database -- --name init`
-Expected: pasta `packages/database/prisma/migrations/<timestamp>_init/` criada e migração aplicada.
-
-- [ ] **Step 4: Commit**
-
-```bash
-git add docker-compose.yml .env.example packages/database/prisma/migrations
-git commit -m "chore: docker-compose, .env.example e migração inicial"
-```
+- [ ] **Step 4: Commit** — `git add docker-compose.yml .env.example packages/database/prisma && git commit -m "chore: docker-compose, env e migracao inicial"`
 
 ---
 
-### Task 5: `packages/api` — bootstrap NestJS, validação e erro padronizado
+### Task 5: `packages/api` — bootstrap NestJS, validação, erro padronizado, paginação
 
-**Files:**
-- Create: `packages/api/package.json`, `tsconfig.json`, `nest-cli.json`, `src/main.ts`, `src/app.module.ts`, `src/common/http-exception.filter.ts`, `src/common/prisma.service.ts`
+**Files:** Create `packages/api/{package.json,tsconfig.json,nest-cli.json,src/main.ts,src/app.module.ts,src/common/http-exception.filter.ts,src/common/prisma.service.ts,src/common/pagination.ts}`
 
-- [ ] **Step 1: Criar `packages/api/package.json`**
+- [ ] **Step 1: `packages/api/package.json`**
 
 ```json
 {
-  "name": "@pacific/api",
-  "version": "0.1.0",
-  "scripts": {
-    "build": "nest build",
-    "dev": "nest start --watch",
-    "start": "node dist/main.js",
-    "test": "vitest run",
-    "lint": "tsc --noEmit"
-  },
+  "name": "@pacific/api", "version": "0.1.0", "type": "module",
+  "scripts": { "build": "nest build", "dev": "nest start --watch", "start": "node dist/main.js", "test": "vitest run", "lint": "tsc --noEmit" },
   "dependencies": {
-    "@nestjs/common": "^10.3.0",
-    "@nestjs/core": "^10.3.0",
-    "@nestjs/platform-express": "^10.3.0",
-    "@pacific/database": "*",
-    "@pacific/shared": "*",
-    "class-transformer": "^0.5.1",
-    "class-validator": "^0.14.1",
-    "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "@nestjs/common": "^10.3.0", "@nestjs/core": "^10.3.0", "@nestjs/platform-express": "^10.3.0",
+    "@pacific/database": "*", "@pacific/shared": "*",
+    "class-transformer": "^0.5.1", "class-validator": "^0.14.1",
+    "jsonwebtoken": "^9.0.2", "reflect-metadata": "^0.2.2", "rxjs": "^7.8.1"
   },
-  "devDependencies": {
-    "@nestjs/cli": "^10.3.0",
-    "@types/node": "^20.14.0",
-    "vitest": "^2.0.0"
-  }
+  "devDependencies": { "@nestjs/cli": "^10.3.0", "@types/jsonwebtoken": "^9.0.6", "@types/node": "^20.14.0", "vitest": "^2.0.0" }
 }
 ```
 
-- [ ] **Step 2: Criar `packages/api/tsconfig.json`**
+- [ ] **Step 2: `tsconfig.json`**
 
 ```json
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "module": "commonjs",
-    "moduleResolution": "node",
-    "outDir": "dist",
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "exactOptionalPropertyTypes": false
-  },
+  "compilerOptions": { "outDir": "dist", "experimentalDecorators": true, "emitDecoratorMetadata": true },
   "include": ["src"]
 }
 ```
+(Herda `module`/`moduleResolution` = NodeNext da base, para consumir `@pacific/shared` que é ESM. Runtime real do servidor exige `@pacific/shared` buildado — nota de deploy; aqui a verificação é build + testes.)
 
-- [ ] **Step 3: Criar `packages/api/nest-cli.json`**
+- [ ] **Step 3: `nest-cli.json`** → `{ "collection": "@nestjs/schematics", "sourceRoot": "src" }`
 
-```json
-{ "collection": "@nestjs/schematics", "sourceRoot": "src" }
-```
-
-- [ ] **Step 4: Criar `src/common/http-exception.filter.ts` (erro padronizado)**
+- [ ] **Step 4: `src/common/http-exception.filter.ts`**
 
 ```ts
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common';
@@ -657,41 +425,48 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const res = host.switchToHttp().getResponse<Response>();
     const status = exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
     const message = exception instanceof HttpException ? exception.getResponse() : 'Internal server error';
-    res.status(status).json({
-      error: { status, message, timestamp: new Date().toISOString() },
-    });
+    res.status(status).json({ error: { status, message, timestamp: new Date().toISOString() } });
   }
 }
 ```
 
-- [ ] **Step 5: Criar `src/common/prisma.service.ts`**
+- [ ] **Step 5: `src/common/prisma.service.ts`**
 
 ```ts
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@pacific/database';
-
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
-  async onModuleInit(): Promise<void> {
-    await this.$connect();
-  }
+  async onModuleInit(): Promise<void> { await this.$connect(); }
 }
 ```
 
-- [ ] **Step 6: Criar `src/app.module.ts`**
+- [ ] **Step 6: `src/common/pagination.ts`** (paginação obrigatória)
+
+```ts
+import { IsInt, IsOptional, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class PaginationQuery {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100)
+  limit = 20;
+  @IsOptional() @Type(() => Number) @IsInt() @Min(0)
+  offset = 0;
+}
+
+export interface Page<T> { items: T[]; total: number; limit: number; offset: number; }
+```
+
+- [ ] **Step 7: `src/app.module.ts`** (módulos das tasks seguintes serão adicionados conforme criados)
 
 ```ts
 import { Module } from '@nestjs/common';
 import { PrismaService } from './common/prisma.service.js';
-
-@Module({
-  providers: [PrismaService],
-  exports: [PrismaService],
-})
+@Module({ providers: [PrismaService], exports: [PrismaService] })
 export class AppModule {}
 ```
 
-- [ ] **Step 7: Criar `src/main.ts`**
+- [ ] **Step 8: `src/main.ts`**
 
 ```ts
 import 'reflect-metadata';
@@ -699,7 +474,6 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module.js';
 import { AllExceptionsFilter } from './common/http-exception.filter.js';
-
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
@@ -709,45 +483,29 @@ async function bootstrap(): Promise<void> {
 void bootstrap();
 ```
 
-- [ ] **Step 8: Verificar build**
+- [ ] **Step 9: Build** — Run: `npm install && npm run build -w @pacific/api` → Expected: sem erro de tipo.
 
-Run: `npm install && npm run build -w @pacific/api`
-Expected: build conclui sem erro de tipo.
-
-- [ ] **Step 9: Commit**
-
-```bash
-git add packages/api package-lock.json
-git commit -m "feat(api): bootstrap nestjs com validacao global e erro padronizado"
-```
+- [ ] **Step 10: Commit** — `git add packages/api package-lock.json && git commit -m "feat(api): bootstrap nestjs com validacao, erro padronizado e paginacao"`
 
 ---
 
-### Task 6: Auth — validação de JWT do Supabase (TDD)
+### Task 6: Auth — JWT (3 papéis) + RolesGuard (TDD)
 
-**Files:**
-- Create: `src/auth/auth.types.ts`, `src/auth/jwt.guard.ts`, `src/auth/current-user.decorator.ts`, `src/auth/auth.module.ts`
-- Test: `src/auth/jwt.guard.test.ts`
+**Files:** Create `src/auth/{auth.types.ts,jwt.guard.ts,roles.guard.ts,roles.decorator.ts,current-user.decorator.ts}`; Test: `src/auth/jwt.guard.test.ts`, `src/auth/roles.guard.test.ts`
 
-- [ ] **Step 1: Criar `src/auth/auth.types.ts`**
+- [ ] **Step 1: `src/auth/auth.types.ts`**
 
 ```ts
-import type { UserRole } from '@pacific/shared';
-
-export interface AuthUser {
-  supabaseId: string;
-  email: string;
-  role: UserRole;
-  tenantId: string | null;
-}
-
+import type { AuthUser } from '@pacific/shared';
+export type { AuthUser };
 export interface RequestWithUser {
   headers: Record<string, string | undefined>;
   user?: AuthUser;
+  tenantId?: string;
 }
 ```
 
-- [ ] **Step 2: Escrever o teste que falha — `src/auth/jwt.guard.test.ts`**
+- [ ] **Step 2: Teste que falha — `src/auth/jwt.guard.test.ts`**
 
 ```ts
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -755,163 +513,220 @@ import jwt from 'jsonwebtoken';
 import { JwtGuard } from './jwt.guard';
 import type { ExecutionContext } from '@nestjs/common';
 
-const SECRET = 'test-secret';
-
-function ctx(headers: Record<string, string | undefined>): ExecutionContext {
-  const req: { headers: typeof headers; user?: unknown } = { headers };
+const SECRET = 'seg';
+const ctx = (headers: Record<string, string | undefined>): ExecutionContext => {
+  const req = { headers };
   return { switchToHttp: () => ({ getRequest: () => req }) } as unknown as ExecutionContext;
-}
+};
 
 describe('JwtGuard', () => {
   let guard: JwtGuard;
   beforeEach(() => { guard = new JwtGuard(SECRET); });
-
-  it('rejeita quando não há token', () => {
-    expect(() => guard.canActivate(ctx({}))).toThrow();
+  it('rejeita sem token', () => { expect(() => guard.canActivate(ctx({}))).toThrow(); });
+  it('aceita token de credor e popula user', () => {
+    const t = jwt.sign({ sub: 'sb1', email: 'c@x.com', app_metadata: { role: 'CREDITOR', tenantId: 't1' } }, SECRET);
+    const c = ctx({ authorization: `Bearer ${t}` });
+    expect(guard.canActivate(c)).toBe(true);
+    expect((c.switchToHttp().getRequest() as { user?: { role: string } }).user?.role).toBe('CREDITOR');
   });
-
-  it('aceita token válido e popula req.user', () => {
-    const token = jwt.sign(
-      { sub: 'sb-1', email: 'a@b.com', app_metadata: { role: 'CREDITOR', tenantId: 't1' } },
-      SECRET,
-    );
-    const context = ctx({ authorization: `Bearer ${token}` });
-    expect(guard.canActivate(context)).toBe(true);
+  it('super-admin tem tenantId null', () => {
+    const t = jwt.sign({ sub: 'sb0', email: 'a@x.com', app_metadata: { role: 'SUPER_ADMIN' } }, SECRET);
+    const c = ctx({ authorization: `Bearer ${t}` });
+    guard.canActivate(c);
+    expect((c.switchToHttp().getRequest() as { user?: { tenantId: string | null } }).user?.tenantId).toBeNull();
   });
-
-  it('rejeita token assinado com segredo errado', () => {
-    const token = jwt.sign({ sub: 'x' }, 'outro-segredo');
-    expect(() => guard.canActivate(ctx({ authorization: `Bearer ${token}` }))).toThrow();
+  it('rejeita segredo errado', () => {
+    const t = jwt.sign({ sub: 'x' }, 'outro');
+    expect(() => guard.canActivate(ctx({ authorization: `Bearer ${t}` }))).toThrow();
   });
 });
 ```
 
-- [ ] **Step 3: Adicionar deps e rodar o teste (deve falhar)**
-
-Run: `npm i -w @pacific/api jsonwebtoken && npm i -D -w @pacific/api @types/jsonwebtoken && npm test -w @pacific/api`
-Expected: FAIL — `Cannot find module './jwt.guard'`.
+- [ ] **Step 3: Rodar (deve falhar)** — Run: `npm test -w @pacific/api` → Expected: FAIL (`./jwt.guard` inexistente).
 
 - [ ] **Step 4: Implementar `src/auth/jwt.guard.ts`**
 
 ```ts
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import jwt from 'jsonwebtoken';
-import type { AuthUser, RequestWithUser } from './auth.types.js';
+import type { AuthUser } from '@pacific/shared';
+import type { RequestWithUser } from './auth.types.js';
 
 @Injectable()
 export class JwtGuard implements CanActivate {
   constructor(private readonly secret: string = process.env.SUPABASE_JWT_SECRET ?? '') {}
-
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<RequestWithUser>();
     const header = req.headers['authorization'];
     if (!header?.startsWith('Bearer ')) throw new UnauthorizedException('Token ausente');
-    const token = header.slice('Bearer '.length);
     let payload: jwt.JwtPayload;
-    try {
-      payload = jwt.verify(token, this.secret) as jwt.JwtPayload;
-    } catch {
-      throw new UnauthorizedException('Token inválido');
-    }
+    try { payload = jwt.verify(header.slice(7), this.secret) as jwt.JwtPayload; }
+    catch { throw new UnauthorizedException('Token inválido'); }
     const meta = (payload.app_metadata ?? {}) as { role?: string; tenantId?: string };
-    const role = meta.role === 'DEBTOR' ? 'DEBTOR' : 'CREDITOR';
-    const user: AuthUser = {
+    const role: AuthUser['role'] =
+      meta.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : meta.role === 'DEBTOR' ? 'DEBTOR' : 'CREDITOR';
+    req.user = {
       supabaseId: String(payload.sub ?? ''),
       email: String(payload.email ?? ''),
       role,
-      tenantId: meta.tenantId ?? null,
+      tenantId: role === 'SUPER_ADMIN' ? null : (meta.tenantId ?? null),
     };
-    req.user = user;
     return true;
   }
 }
 ```
 
-- [ ] **Step 5: Rodar o teste e confirmar que passa**
+- [ ] **Step 5: `src/auth/roles.decorator.ts`**
 
-Run: `npm test -w @pacific/api`
-Expected: PASS (3 testes).
+```ts
+import { SetMetadata } from '@nestjs/common';
+import type { UserRole } from '@pacific/shared';
+export const ROLES_KEY = 'roles';
+export const Roles = (...roles: UserRole[]): MethodDecorator => SetMetadata(ROLES_KEY, roles);
+```
 
-- [ ] **Step 6: Criar `src/auth/current-user.decorator.ts`**
+- [ ] **Step 6: Teste que falha — `src/auth/roles.guard.test.ts`**
+
+```ts
+import { describe, it, expect } from 'vitest';
+import { Reflector } from '@nestjs/core';
+import { RolesGuard } from './roles.guard';
+import type { ExecutionContext } from '@nestjs/common';
+import type { UserRole } from '@pacific/shared';
+
+const ctx = (role: UserRole, required: UserRole[]): ExecutionContext => {
+  const reflector = new Reflector();
+  const base = { switchToHttp: () => ({ getRequest: () => ({ user: { role } }) }), getHandler: () => ({}), getClass: () => ({}) } as unknown as ExecutionContext;
+  (reflector as unknown as { get: () => UserRole[] }).get = () => required;
+  return Object.assign(base, { __reflector: reflector }) as ExecutionContext;
+};
+
+describe('RolesGuard', () => {
+  it('permite quando o papel está na lista', () => {
+    const c = ctx('CREDITOR', ['CREDITOR']);
+    const guard = new RolesGuard((c as unknown as { __reflector: Reflector }).__reflector);
+    expect(guard.canActivate(c)).toBe(true);
+  });
+  it('bloqueia quando o papel não está na lista', () => {
+    const c = ctx('DEBTOR', ['CREDITOR']);
+    const guard = new RolesGuard((c as unknown as { __reflector: Reflector }).__reflector);
+    expect(() => guard.canActivate(c)).toThrow();
+  });
+});
+```
+
+- [ ] **Step 7: Rodar (deve falhar)** — Run: `npm test -w @pacific/api` → Expected: FAIL.
+
+- [ ] **Step 8: Implementar `src/auth/roles.guard.ts`**
+
+```ts
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import type { UserRole } from '@pacific/shared';
+import { ROLES_KEY } from './roles.decorator.js';
+import type { RequestWithUser } from './auth.types.js';
+
+@Injectable()
+export class RolesGuard implements CanActivate {
+  constructor(private readonly reflector: Reflector) {}
+  canActivate(context: ExecutionContext): boolean {
+    const required = this.reflector.get<UserRole[]>(ROLES_KEY, context.getHandler()) ?? [];
+    if (required.length === 0) return true;
+    const user = context.switchToHttp().getRequest<RequestWithUser>().user;
+    if (!user || !required.includes(user.role)) throw new ForbiddenException('Papel não autorizado');
+    return true;
+  }
+}
+```
+
+- [ ] **Step 9: `src/auth/current-user.decorator.ts`**
 
 ```ts
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import type { RequestWithUser } from './auth.types.js';
-
-export const CurrentUser = createParamDecorator((_d: unknown, ctx: ExecutionContext) => {
-  return ctx.switchToHttp().getRequest<RequestWithUser>().user;
-});
+export const CurrentUser = createParamDecorator((_d: unknown, ctx: ExecutionContext) =>
+  ctx.switchToHttp().getRequest<RequestWithUser>().user);
 ```
 
-- [ ] **Step 7: Criar `src/auth/auth.module.ts`**
+- [ ] **Step 10: Rodar e passar** — Run: `npm test -w @pacific/api` → Expected: PASS.
 
-```ts
-import { Module } from '@nestjs/common';
-import { JwtGuard } from './jwt.guard.js';
-
-@Module({ providers: [{ provide: JwtGuard, useFactory: () => new JwtGuard() }], exports: [JwtGuard] })
-export class AuthModule {}
-```
-
-- [ ] **Step 8: Commit**
-
-```bash
-git add packages/api/src/auth package-lock.json
-git commit -m "feat(auth): guard de jwt do supabase com testes"
-```
+- [ ] **Step 11: Commit** — `git add packages/api/src/auth && git commit -m "feat(auth): jwt de 3 papeis e roles guard com testes"`
 
 ---
 
-### Task 7: Multi-tenancy — guard de tenant e contexto (TDD)
+### Task 7: Tenancy — contexto, guard e camada tenant-scoped (TDD)
 
-**Files:**
-- Create: `src/tenants/tenant-context.ts`, `src/tenants/tenant.guard.ts`
-- Test: `src/tenants/tenant.guard.test.ts`
+**Files:** Create `src/tenancy/{tenant-context.ts,tenant.guard.ts,tenant-datasource.resolver.ts,tenant-scoped.service.ts}`; Test: `src/tenancy/tenant-context.test.ts`, `src/tenancy/tenant.guard.test.ts`
 
-- [ ] **Step 1: Criar `src/tenants/tenant-context.ts`**
+- [ ] **Step 1: Teste que falha — `src/tenancy/tenant-context.test.ts`**
 
 ```ts
-import type { AuthUser } from '../auth/auth.types.js';
+import { describe, it, expect } from 'vitest';
+import { resolveTenantId } from './tenant-context';
+import type { AuthUser } from '@pacific/shared';
 
-export function resolveTenantId(user: AuthUser | undefined): string {
-  if (!user) throw new Error('Usuário não autenticado');
-  if (user.role !== 'CREDITOR' || !user.tenantId) throw new Error('Sem tenant de credor');
+const u = (p: Partial<AuthUser>): AuthUser => ({ supabaseId: 's', email: 'e', role: 'CREDITOR', tenantId: 't1', ...p });
+
+describe('resolveTenantId', () => {
+  it('credor usa o tenant do token', () => { expect(resolveTenantId(u({}), undefined)).toBe('t1'); });
+  it('credor sem tenant é erro', () => { expect(() => resolveTenantId(u({ tenantId: null }), undefined)).toThrow(); });
+  it('super-admin usa o header explícito', () => {
+    expect(resolveTenantId(u({ role: 'SUPER_ADMIN', tenantId: null }), 'tX')).toBe('tX');
+  });
+  it('super-admin sem header é erro', () => {
+    expect(() => resolveTenantId(u({ role: 'SUPER_ADMIN', tenantId: null }), undefined)).toThrow();
+  });
+});
+```
+
+- [ ] **Step 2: Rodar (deve falhar)** — Run: `npm test -w @pacific/api` → Expected: FAIL.
+
+- [ ] **Step 3: Implementar `src/tenancy/tenant-context.ts`**
+
+```ts
+import type { AuthUser } from '@pacific/shared';
+
+/** Resolve o tenant efetivo do request. Super-admin escolhe via header X-Tenant-Id. */
+export function resolveTenantId(user: AuthUser | undefined, headerTenantId: string | undefined): string {
+  if (!user) throw new Error('Não autenticado');
+  if (user.role === 'SUPER_ADMIN') {
+    if (!headerTenantId) throw new Error('Super-admin deve informar X-Tenant-Id');
+    return headerTenantId;
+  }
+  if (!user.tenantId) throw new Error('Usuário sem tenant');
   return user.tenantId;
 }
 ```
 
-- [ ] **Step 2: Escrever o teste que falha — `src/tenants/tenant.guard.test.ts`**
+- [ ] **Step 4: Teste que falha — `src/tenancy/tenant.guard.test.ts`**
 
 ```ts
 import { describe, it, expect } from 'vitest';
 import { TenantGuard } from './tenant.guard';
 import type { ExecutionContext } from '@nestjs/common';
-import type { AuthUser } from '../auth/auth.types';
+import type { AuthUser } from '@pacific/shared';
 
-function ctx(user?: AuthUser): ExecutionContext {
-  const req: { user?: AuthUser; tenantId?: string } = { user };
+const ctx = (user: AuthUser | undefined, headers: Record<string, string | undefined> = {}): ExecutionContext => {
+  const req = { user, headers } as { user?: AuthUser; headers: Record<string, string | undefined>; tenantId?: string };
   return { switchToHttp: () => ({ getRequest: () => req }) } as unknown as ExecutionContext;
-}
+};
 
 describe('TenantGuard', () => {
   const guard = new TenantGuard();
-  it('rejeita credor sem tenantId', () => {
-    expect(() => guard.canActivate(ctx({ supabaseId: 's', email: 'e', role: 'CREDITOR', tenantId: null }))).toThrow();
+  it('injeta req.tenantId para credor', () => {
+    const c = ctx({ supabaseId: 's', email: 'e', role: 'CREDITOR', tenantId: 't1' });
+    expect(guard.canActivate(c)).toBe(true);
+    expect((c.switchToHttp().getRequest() as { tenantId?: string }).tenantId).toBe('t1');
   });
-  it('aceita credor com tenant e injeta req.tenantId', () => {
-    const context = ctx({ supabaseId: 's', email: 'e', role: 'CREDITOR', tenantId: 't1' });
-    expect(guard.canActivate(context)).toBe(true);
-    expect((context.switchToHttp().getRequest() as { tenantId?: string }).tenantId).toBe('t1');
+  it('bloqueia super-admin sem header', () => {
+    expect(() => guard.canActivate(ctx({ supabaseId: 's', email: 'e', role: 'SUPER_ADMIN', tenantId: null }))).toThrow();
   });
 });
 ```
 
-- [ ] **Step 3: Rodar o teste (deve falhar)**
+- [ ] **Step 5: Rodar (deve falhar)** — Run: `npm test -w @pacific/api` → Expected: FAIL.
 
-Run: `npm test -w @pacific/api`
-Expected: FAIL — `Cannot find module './tenant.guard'`.
-
-- [ ] **Step 4: Implementar `src/tenants/tenant.guard.ts`**
+- [ ] **Step 6: Implementar `src/tenancy/tenant.guard.ts`**
 
 ```ts
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
@@ -921,147 +736,410 @@ import { resolveTenantId } from './tenant-context.js';
 @Injectable()
 export class TenantGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
-    const req = context.switchToHttp().getRequest<RequestWithUser & { tenantId?: string }>();
-    try {
-      req.tenantId = resolveTenantId(req.user);
-    } catch (e) {
-      throw new ForbiddenException((e as Error).message);
-    }
+    const req = context.switchToHttp().getRequest<RequestWithUser>();
+    try { req.tenantId = resolveTenantId(req.user, req.headers['x-tenant-id']); }
+    catch (e) { throw new ForbiddenException((e as Error).message); }
     return true;
   }
 }
 ```
 
-- [ ] **Step 5: Rodar o teste e confirmar que passa**
-
-Run: `npm test -w @pacific/api`
-Expected: PASS (todos os testes da api).
-
-- [ ] **Step 6: Commit**
-
-```bash
-git add packages/api/src/tenants
-git commit -m "feat(tenants): guard de multi-tenancy com escopo por credor e testes"
-```
-
----
-
-### Task 8: Row-Level Security no Postgres
-
-**Files:**
-- Create: `packages/database/src/rls.sql`
-
-- [ ] **Step 1: Criar `packages/database/src/rls.sql`**
-
-```sql
--- Habilita RLS e isola por tenant via app.current_tenant (definido por SET LOCAL na conexão da API).
-ALTER TABLE "Debtor" ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "Debt"   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE "Alert"  ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY tenant_isolation_debtor ON "Debtor"
-  USING ("tenantId" = current_setting('app.current_tenant', true));
-CREATE POLICY tenant_isolation_debt ON "Debt"
-  USING ("tenantId" = current_setting('app.current_tenant', true));
-CREATE POLICY tenant_isolation_alert ON "Alert"
-  USING ("tenantId" = current_setting('app.current_tenant', true));
-```
-
-- [ ] **Step 2: Aplicar o SQL (requer banco no ar)**
-
-Run: `psql "$DATABASE_URL" -f packages/database/src/rls.sql`
-Expected: `ALTER TABLE` / `CREATE POLICY` sem erro. (Se `psql` indisponível, aplicar via SQL editor do Supabase.)
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add packages/database/src/rls.sql
-git commit -m "feat(database): policies de RLS para isolamento por tenant"
-```
-
----
-
-### Task 9: Seed com dados fictícios realistas
-
-**Files:**
-- Create: `packages/database/seed.ts`
-
-- [ ] **Step 1: Implementar `packages/database/seed.ts`**
+- [ ] **Step 7: `src/tenancy/tenant-datasource.resolver.ts`** (ponto único de extração física futura)
 
 ```ts
-import { PrismaClient, RatePeriod } from '@prisma/client';
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../common/prisma.service.js';
+
+/**
+ * Hoje devolve o único datasource. No futuro, pode mapear tenants específicos
+ * para clients/bancos dedicados sem alterar os serviços que consomem dados.
+ */
+@Injectable()
+export class TenantDatasourceResolver {
+  constructor(private readonly prisma: PrismaService) {}
+  forTenant(_tenantId: string): PrismaService { return this.prisma; }
+}
+```
+
+- [ ] **Step 8: `src/tenancy/tenant-scoped.service.ts`** (injeta tenantId nos filtros)
+
+```ts
+import { Injectable } from '@nestjs/common';
+import { TenantDatasourceResolver } from './tenant-datasource.resolver.js';
+import type { PrismaService } from '../common/prisma.service.js';
+
+@Injectable()
+export class TenantScopedService {
+  constructor(private readonly resolver: TenantDatasourceResolver) {}
+  db(tenantId: string): PrismaService { return this.resolver.forTenant(tenantId); }
+  /** Garante o filtro de tenant em qualquer where. */
+  scope<T extends object>(tenantId: string, where: T): T & { tenantId: string } {
+    return { ...where, tenantId };
+  }
+}
+```
+
+- [ ] **Step 9: Rodar e passar** — Run: `npm test -w @pacific/api` → Expected: PASS.
+
+- [ ] **Step 10: Commit** — `git add packages/api/src/tenancy && git commit -m "feat(tenancy): contexto, guard e camada tenant-scoped com resolver de datasource"`
+
+---
+
+### Task 8: Cadastro de credor + geração de orgCode (TDD)
+
+**Files:** Create `src/creditors/{creditors.service.ts,creditors.controller.ts,dto/register-creditor.dto.ts}`; Test: `src/creditors/creditors.service.test.ts`
+
+- [ ] **Step 1: `src/creditors/dto/register-creditor.dto.ts`**
+
+```ts
+import { IsEmail, IsString, MinLength } from 'class-validator';
+export class RegisterCreditorDto {
+  @IsString() @MinLength(2) orgName!: string;
+  @IsString() supabaseId!: string;
+  @IsEmail() email!: string;
+}
+```
+
+- [ ] **Step 2: Teste que falha — `src/creditors/creditors.service.test.ts`**
+
+```ts
+import { describe, it, expect, vi } from 'vitest';
+import { CreditorsService } from './creditors.service';
+
+function fakeDb() {
+  const tenants: Array<{ id: string; orgCode: string }> = [];
+  const users: Array<{ id: string }> = [];
+  return {
+    tenant: {
+      findUnique: vi.fn(async ({ where }: { where: { orgCode: string } }) =>
+        tenants.find((t) => t.orgCode === where.orgCode) ?? null),
+      create: vi.fn(async ({ data }: { data: { orgCode: string; name: string } }) => {
+        const t = { id: `t${tenants.length + 1}`, orgCode: data.orgCode }; tenants.push(t); return t;
+      }),
+    },
+    user: { create: vi.fn(async () => { const u = { id: `u${users.length + 1}` }; users.push(u); return u; }) },
+  };
+}
+
+describe('CreditorsService.register', () => {
+  it('cria tenant com orgCode único e usuário CREDITOR', async () => {
+    const db = fakeDb();
+    const svc = new CreditorsService({ forTenant: () => db } as never);
+    const out = await svc.register({ orgName: 'Carteira X', supabaseId: 'sb1', email: 'c@x.com' });
+    expect(out.orgCode).toMatch(/^PAC-/);
+    expect(db.tenant.create).toHaveBeenCalledOnce();
+    expect(db.user.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ role: 'CREDITOR' }) }));
+  });
+});
+```
+
+- [ ] **Step 3: Rodar (deve falhar)** — Run: `npm test -w @pacific/api` → Expected: FAIL.
+
+- [ ] **Step 4: Implementar `src/creditors/creditors.service.ts`**
+
+```ts
+import { Injectable } from '@nestjs/common';
+import { generateUniqueOrgCode } from '@pacific/shared';
+import { TenantDatasourceResolver } from '../tenancy/tenant-datasource.resolver.js';
+import type { RegisterCreditorDto } from './dto/register-creditor.dto.js';
+
+@Injectable()
+export class CreditorsService {
+  constructor(private readonly resolver: TenantDatasourceResolver) {}
+  async register(dto: RegisterCreditorDto): Promise<{ tenantId: string; orgCode: string }> {
+    const db = this.resolver.forTenant('__provisioning__');
+    const orgCode = await generateUniqueOrgCode(
+      async (code) => (await db.tenant.findUnique({ where: { orgCode: code } })) !== null,
+    );
+    const tenant = await db.tenant.create({ data: { name: dto.orgName, orgCode } });
+    await db.user.create({
+      data: { supabaseId: dto.supabaseId, email: dto.email, role: 'CREDITOR', tenantId: tenant.id },
+    });
+    return { tenantId: tenant.id, orgCode };
+  }
+}
+```
+
+- [ ] **Step 5: `src/creditors/creditors.controller.ts`**
+
+```ts
+import { Body, Controller, Post } from '@nestjs/common';
+import { CreditorsService } from './creditors.service.js';
+import { RegisterCreditorDto } from './dto/register-creditor.dto.js';
+
+@Controller('auth')
+export class CreditorsController {
+  constructor(private readonly creditors: CreditorsService) {}
+  @Post('register-creditor')
+  register(@Body() dto: RegisterCreditorDto): Promise<{ tenantId: string; orgCode: string }> {
+    return this.creditors.register(dto);
+  }
+}
+```
+
+- [ ] **Step 6: Rodar e passar** — Run: `npm test -w @pacific/api` → Expected: PASS.
+
+- [ ] **Step 7: Commit** — `git add packages/api/src/creditors && git commit -m "feat(creditors): cadastro de credor com geracao de orgCode"`
+
+---
+
+### Task 9: Resgate do orgCode pelo devedor + rate limit (TDD)
+
+**Files:** Create `src/debtors/{redeem.service.ts,debtors.controller.ts,redeem-rate-limit.guard.ts,dto/redeem.dto.ts}`; Test: `src/debtors/redeem.service.test.ts`, `src/debtors/redeem-rate-limit.guard.test.ts`
+
+- [ ] **Step 1: `src/debtors/dto/redeem.dto.ts`**
+
+```ts
+import { IsString, Matches } from 'class-validator';
+import { ORG_CODE_REGEX } from '@pacific/shared';
+export class RedeemDto {
+  @IsString() @Matches(ORG_CODE_REGEX, { message: 'Código inválido' }) orgCode!: string;
+}
+```
+
+- [ ] **Step 2: Teste que falha — `src/debtors/redeem.service.test.ts`**
+
+```ts
+import { describe, it, expect, vi } from 'vitest';
+import { RedeemService } from './redeem.service';
+import { NotFoundException } from '@nestjs/common';
+
+function db(tenant: { id: string; status: string } | null) {
+  return {
+    tenant: { findUnique: vi.fn(async () => tenant) },
+    user: { findUnique: vi.fn(async () => null), create: vi.fn(async () => ({ id: 'u1' })) },
+    debtor: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({ id: 'd1' })), update: vi.fn(async () => ({ id: 'd1' })) },
+  };
+}
+
+describe('RedeemService.redeem', () => {
+  const resolver = (database: ReturnType<typeof db>) => ({ forTenant: () => database }) as never;
+
+  it('vincula devedor ao tenant do código', async () => {
+    const database = db({ id: 't1', status: 'ACTIVE' });
+    const svc = new RedeemService(resolver(database));
+    const out = await svc.redeem({ supabaseId: 'sb9', email: 'd@x.com' }, 'PAC-AAAA-BBBB');
+    expect(out.tenantId).toBe('t1');
+    expect(database.user.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ role: 'DEBTOR', tenantId: 't1' }) }));
+  });
+
+  it('código inexistente → erro genérico (não revela)', async () => {
+    const svc = new RedeemService(resolver(db(null)));
+    await expect(svc.redeem({ supabaseId: 'sb', email: 'd@x.com' }, 'PAC-ZZZZ-ZZZZ')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('resgate idempotente: usuário já vinculado retorna o vínculo', async () => {
+    const database = db({ id: 't1', status: 'ACTIVE' });
+    database.user.findUnique = vi.fn(async () => ({ id: 'u1', tenantId: 't1', role: 'DEBTOR' }));
+    const svc = new RedeemService(resolver(database));
+    const out = await svc.redeem({ supabaseId: 'sb9', email: 'd@x.com' }, 'PAC-AAAA-BBBB');
+    expect(out.tenantId).toBe('t1');
+    expect(database.user.create).not.toHaveBeenCalled();
+  });
+});
+```
+
+- [ ] **Step 3: Rodar (deve falhar)** — Run: `npm test -w @pacific/api` → Expected: FAIL.
+
+- [ ] **Step 4: Implementar `src/debtors/redeem.service.ts`**
+
+```ts
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { TenantDatasourceResolver } from '../tenancy/tenant-datasource.resolver.js';
+
+interface Identity { supabaseId: string; email: string; }
+
+@Injectable()
+export class RedeemService {
+  constructor(private readonly resolver: TenantDatasourceResolver) {}
+
+  async redeem(identity: Identity, orgCode: string): Promise<{ tenantId: string }> {
+    const db = this.resolver.forTenant('__redeem__');
+
+    // Idempotência: usuário já vinculado.
+    const existing = await db.user.findUnique({ where: { supabaseId: identity.supabaseId } });
+    if (existing?.tenantId) return { tenantId: existing.tenantId };
+
+    // Erro genérico para código inválido ou tenant inativo (não revela qual).
+    const tenant = await db.tenant.findUnique({ where: { orgCode } });
+    if (!tenant || tenant.status !== 'ACTIVE') throw new NotFoundException('Código inválido');
+
+    const user = await db.user.create({
+      data: { supabaseId: identity.supabaseId, email: identity.email, role: 'DEBTOR', tenantId: tenant.id },
+    });
+
+    // Fluxo oficial simplificado: resgate baseado APENAS no org_code (sem pré-cadastro,
+    // sem associação manual, sem casar por e-mail). Sempre cria o devedor no tenant.
+    await db.debtor.create({
+      data: { tenantId: tenant.id, userId: user.id, name: identity.email, email: identity.email, redeemedAt: new Date() },
+    });
+    return { tenantId: tenant.id };
+  }
+}
+```
+
+- [ ] **Step 5: Teste que falha — `src/debtors/redeem-rate-limit.guard.test.ts`**
+
+```ts
+import { describe, it, expect } from 'vitest';
+import { RedeemRateLimitGuard } from './redeem-rate-limit.guard';
+import type { ExecutionContext } from '@nestjs/common';
+
+const ctx = (ip: string): ExecutionContext =>
+  ({ switchToHttp: () => ({ getRequest: () => ({ ip, headers: {} }) }) }) as unknown as ExecutionContext;
+
+describe('RedeemRateLimitGuard', () => {
+  it('bloqueia após exceder o limite na janela', () => {
+    const guard = new RedeemRateLimitGuard(3, 60_000);
+    expect(guard.canActivate(ctx('1.1.1.1'))).toBe(true);
+    expect(guard.canActivate(ctx('1.1.1.1'))).toBe(true);
+    expect(guard.canActivate(ctx('1.1.1.1'))).toBe(true);
+    expect(() => guard.canActivate(ctx('1.1.1.1'))).toThrow();
+  });
+  it('chaves diferentes não interferem', () => {
+    const guard = new RedeemRateLimitGuard(1, 60_000);
+    expect(guard.canActivate(ctx('a'))).toBe(true);
+    expect(guard.canActivate(ctx('b'))).toBe(true);
+  });
+});
+```
+
+- [ ] **Step 6: Rodar (deve falhar)** — Run: `npm test -w @pacific/api` → Expected: FAIL.
+
+- [ ] **Step 7: Implementar `src/debtors/redeem-rate-limit.guard.ts`**
+
+```ts
+import { CanActivate, ExecutionContext, HttpException, HttpStatus, Injectable } from '@nestjs/common';
+
+interface Bucket { count: number; resetAt: number; }
+
+@Injectable()
+export class RedeemRateLimitGuard implements CanActivate {
+  private readonly hits = new Map<string, Bucket>();
+  constructor(
+    private readonly limit = Number(process.env.REDEEM_RATE_LIMIT ?? 10),
+    private readonly windowMs = Number(process.env.REDEEM_RATE_WINDOW_MS ?? 600_000),
+  ) {}
+  canActivate(context: ExecutionContext): boolean {
+    const req = context.switchToHttp().getRequest<{ ip?: string }>();
+    const key = req.ip ?? 'unknown';
+    const now = Date.now();
+    const b = this.hits.get(key);
+    if (!b || b.resetAt < now) { this.hits.set(key, { count: 1, resetAt: now + this.windowMs }); return true; }
+    if (b.count >= this.limit) throw new HttpException('Muitas tentativas', HttpStatus.TOO_MANY_REQUESTS);
+    b.count++;
+    return true;
+  }
+}
+```
+
+- [ ] **Step 8: `src/debtors/debtors.controller.ts`**
+
+```ts
+import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { JwtGuard } from '../auth/jwt.guard.js';
+import { CurrentUser } from '../auth/current-user.decorator.js';
+import { RedeemRateLimitGuard } from './redeem-rate-limit.guard.js';
+import { RedeemService } from './redeem.service.js';
+import { RedeemDto } from './dto/redeem.dto.js';
+import type { AuthUser } from '@pacific/shared';
+
+@Controller('auth')
+export class DebtorsController {
+  constructor(private readonly redeem: RedeemService) {}
+  @Post('redeem')
+  @UseGuards(JwtGuard, RedeemRateLimitGuard)
+  do(@CurrentUser() user: AuthUser, @Body() dto: RedeemDto): Promise<{ tenantId: string }> {
+    return this.redeem.redeem({ supabaseId: user.supabaseId, email: user.email }, dto.orgCode);
+  }
+}
+```
+
+- [ ] **Step 9: Registrar módulos no `app.module.ts`** — adicionar `CreditorsService/Controller`, `RedeemService`, `DebtorsController`, `TenantDatasourceResolver`, `TenantScopedService`, `RolesGuard` providers e `controllers: [CreditorsController, DebtorsController]`.
+
+```ts
+import { Module } from '@nestjs/common';
+import { PrismaService } from './common/prisma.service.js';
+import { TenantDatasourceResolver } from './tenancy/tenant-datasource.resolver.js';
+import { TenantScopedService } from './tenancy/tenant-scoped.service.js';
+import { CreditorsService } from './creditors/creditors.service.js';
+import { CreditorsController } from './creditors/creditors.controller.js';
+import { RedeemService } from './debtors/redeem.service.js';
+import { DebtorsController } from './debtors/debtors.controller.js';
+
+@Module({
+  controllers: [CreditorsController, DebtorsController],
+  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, RedeemService],
+  exports: [PrismaService],
+})
+export class AppModule {}
+```
+
+- [ ] **Step 10: Rodar e passar + build** — Run: `npm test -w @pacific/api && npm run build -w @pacific/api` → Expected: PASS + build ok.
+
+- [ ] **Step 11: Commit** — `git add packages/api/src && git commit -m "feat(debtors): resgate de orgCode com auto-vinculo, idempotencia e rate limit"`
+
+---
+
+### Task 10: Row-Level Security (defesa em profundidade)
+
+**Files:** Create `packages/database/src/rls.sql`
+
+- [ ] **Step 1: `packages/database/src/rls.sql`**
+
+```sql
+-- Isolamento por tenant via app.current_tenant (SET LOCAL por request na conexão da API).
+ALTER TABLE "Debtor" ENABLE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_debtor ON "Debtor"
+  USING ("tenantId" = current_setting('app.current_tenant', true));
+```
+
+- [ ] **Step 2: Aplicar** — Run: `psql "$DATABASE_URL" -f packages/database/src/rls.sql` → Expected: `ALTER TABLE` / `CREATE POLICY` (ou aplicar via SQL editor do Supabase).
+
+- [ ] **Step 3: Commit** — `git add packages/database/src/rls.sql && git commit -m "feat(database): RLS de isolamento por tenant"`
+
+---
+
+### Task 11: Seed, README e verificação final
+
+**Files:** Create `packages/database/seed.ts`, `README.md`
+
+- [ ] **Step 1: `packages/database/seed.ts`**
+
+```ts
+import { PrismaClient } from '@prisma/client';
+import { generateOrgCode } from '@pacific/shared';
 const prisma = new PrismaClient();
 
 async function main(): Promise<void> {
-  const tenant = await prisma.tenant.create({
-    data: { name: 'Carteira Demo', walletCode: 'PAC-DEMO-001' },
-  });
+  await prisma.user.create({ data: { supabaseId: 'seed-superadmin', email: 'admin@pacific.app', role: 'SUPER_ADMIN' } });
 
-  const nomes = ['Ana Souza', 'Bruno Lima', 'Carla Dias', 'Diego Alves', 'Eva Martins'];
-  for (let i = 0; i < nomes.length; i++) {
-    const debtor = await prisma.debtor.create({
-      data: { tenantId: tenant.id, name: nomes[i]!, city: 'Florianópolis', region: 'SC' },
-    });
-    const dueOffsetDays = [40, 20, 5, -3, 90][i]!;
-    await prisma.debt.create({
-      data: {
-        tenantId: tenant.id,
-        debtorId: debtor.id,
-        description: `Empréstimo ${i + 1}`,
-        principal: (5000 + i * 1500).toFixed(2),
-        rate: '0.030000',
-        ratePeriod: RatePeriod.MONTHLY,
-        startDate: new Date('2026-05-01T00:00:00Z'),
-        dueDate: new Date(Date.now() + dueOffsetDays * 86400000),
-      },
-    });
-    await prisma.locationConsent.create({ data: { debtorId: debtor.id } });
-  }
-  console.log('Seed concluído: 1 tenant, 5 devedores, 5 dívidas.');
+  const orgCode = generateOrgCode();
+  const tenant = await prisma.tenant.create({ data: { name: 'Carteira Demo', orgCode } });
+  await prisma.user.create({ data: { supabaseId: 'seed-creditor', email: 'credor@demo.app', role: 'CREDITOR', tenantId: tenant.id } });
+
+  await prisma.debtor.create({ data: { tenantId: tenant.id, name: 'Ana Souza', email: 'ana@demo.app' } });
+  await prisma.debtor.create({ data: { tenantId: tenant.id, name: 'Bruno Lima', email: 'bruno@demo.app' } });
+
+  console.log(`Seed ok. orgCode da carteira demo: ${orgCode}`);
 }
-
 main().finally(() => void prisma.$disconnect());
 ```
 
-- [ ] **Step 2: Rodar o seed (requer banco migrado)**
+- [ ] **Step 2: Rodar seed** — Run: `npm run db:seed -w @pacific/database` → Expected: imprime `Seed ok. orgCode da carteira demo: PAC-...`.
 
-Run: `npm run db:seed -w @pacific/database`
-Expected: `Seed concluído: 1 tenant, 5 devedores, 5 dívidas.`
+- [ ] **Step 3: `README.md`** com: visão, stack, pré-requisitos (Node 20+, Docker, Supabase), passos `npm install` → `cp .env.example packages/database/.env` → `docker compose up -d` → `npm run db:migrate` → aplicar `rls.sql` → `npm run db:seed`, e nota de que a localização é **simulada** (link ao spec) e o onboarding usa `orgCode`.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Verificação consolidada** — Run: `npm install && npm run lint && npm test` → Expected: lint sem erro de tipo; testes de `@pacific/shared` e `@pacific/api` passam.
 
-```bash
-git add packages/database/seed.ts
-git commit -m "feat(database): seed com dados ficticios"
-```
-
----
-
-### Task 10: README e verificação final da Fase 1
-
-**Files:**
-- Create: `README.md`
-
-- [ ] **Step 1: Criar `README.md`** com: visão do Pacific, stack, pré-requisitos (Node 20+, Docker, conta Supabase), passos `npm install` → `cp .env.example packages/database/.env` → `docker compose up -d` → `npm run db:migrate` → aplicar `rls.sql` → `npm run db:seed` → `npm run dev`, e a nota de que a localização é **simulada** (link para o spec).
-
-- [ ] **Step 2: Verificação consolidada**
-
-Run: `npm install && npm run lint && npm test`
-Expected: lint sem erros de tipo; testes de `@pacific/shared` e `@pacific/api` passam.
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add README.md
-git commit -m "docs: README com setup da fase 1"
-```
+- [ ] **Step 5: Commit** — `git add packages/database/seed.ts README.md && git commit -m "feat: seed multi-tenant, README e verificacao da fase 1"`
 
 ---
 
 ## Self-Review
 
-**1. Cobertura do spec (Fase 1):** monorepo (T1) ✓ · shared types/utils (T2) ✓ · schema completo + enums incl. `RatePeriod`/Decimal (T3) ✓ · docker + .env + migração (T4) ✓ · NestJS + validação + erro padronizado (T5) ✓ · auth Supabase JWT (T6) ✓ · multi-tenancy guard (T7) ✓ · RLS (T8) ✓ · seed (T9) ✓ · README (T10) ✓. Motor financeiro, REST de recursos, WebSocket, alertas, web e mobile são fases 2–5 (decomposição intencional).
+**1. Cobertura do escopo (Fase 1):** monorepo (T1) ✓ · tipos/utils/orgCode (T2) ✓ · modelo base 3 níveis com `tenantId`+índices (T3) ✓ · docker/env/migração (T4) ✓ · NestJS+validação+erro+paginação (T5) ✓ · auth 3 papéis + RolesGuard (T6) ✓ · tenancy guard + tenant-scoped + datasource resolver p/ extração futura (T7) ✓ · cadastro de credor + geração de orgCode (T8) ✓ · resgate com auto-vínculo + idempotência + erro genérico + rate limit (T9) ✓ · RLS (T10) ✓ · seed + README + verificação (T11) ✓.
 
-**2. Placeholders:** nenhum "TBD/TODO"; todo passo de código traz o código real.
+**2. Mitigações de segurança:** alta entropia (T2) · erro genérico no resgate (T9) · rate limit (T9) · idempotência/1 vínculo (T9, `userId @unique`) · isolamento por `tenantId` (T3/T7/T10). Rotação de `orgCode` fica como endpoint da Fase 2 (não bloqueia a validação do onboarding).
 
-**3. Consistência de tipos:** `AuthUser`/`RequestWithUser` usados igualmente em T6/T7; `DebtStatus`/`RatePeriod` iguais em `shared` (T2) e no Prisma (T3); `tenantId` injetado em `req` pelo `TenantGuard` consistente com `resolveTenantId`.
+**3. Consistência de tipos:** `AuthUser`/`UserRole` vêm de `@pacific/shared` e são reusados em auth/tenancy/controllers; `ORG_CODE_REGEX` definido em T2 e reusado no `RedeemDto` (T9); `TenantDatasourceResolver.forTenant` usado igualmente em T7/T8/T9; `app.current_tenant` (T10) coerente com a camada tenant-scoped.
