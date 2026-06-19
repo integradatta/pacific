@@ -2,6 +2,14 @@
 
 > Onde paramos e como continuar. Tudo abaixo está **na `main`** (mergeado e no GitHub).
 
+## Atualização 2026-06-19
+- ✅ **Portal do credor COMPLETO** (PR #5): telas Carteira, Vencimentos, Notificações adicionadas — nav sem 404.
+- ✅ **Supabase DB configurado:** conectado via **pooler** `aws-1-sa-east-1.pooler.supabase.com` (SP); `0_init` aplicada (todas as tabelas); RLS aplicada (forced em Debtor/Debt/Notification/DebtorLoginEvent). `packages/api/.env` e `packages/database/.env` com pooler (sessão/5432 p/ migração; transação/6543 + pgbouncer=true p/ API). Senha correta do banco: `*27Raylan7212`.
+  - **Nota Supabase:** liga RLS em toda tabela `public` por padrão → `Tenant` e `DebtorAccess` ficaram com RLS on **sem policy** (forced=false). A app conecta como o **dono** (`postgres`), que acessa tabelas não-forced normalmente (ok). Se um dia usar role não-dono, criar policies nelas.
+  - 🔴 **Rotacionar** a senha do banco / JWT secret / sb_secret (colados no chat).
+- **Falta para rodar de ponta a ponta:** (1) **cadastro de credor no web** — hoje só há `/login` (signInWithPassword); falta UI de signup no Supabase + chamar `POST /auth/register-creditor`; (2) rodar web+api localmente OU **deploy** (Vercel web + host p/ api); (3) confirmar que o JWT do credor é HS256 (o `JwtGuard` usa `SUPABASE_JWT_SECRET`) — se o projeto usar signing keys assimétricas, ajustar o guard.
+- A seção "PRÓXIMA TAREFA" abaixo (completar portal) já está **CONCLUÍDA**; próximo provável: signup do credor + deploy, ou alertas em tempo real, ou app mobile.
+
 ## O que é
 SaaS multi-tenant **acadêmico/fictício** de monitoramento/gestão de empréstimos privados (não é cobrança). Monorepo Turborepo. Repo **privado** `github.com/h2h988pn28-svg/pacific` (gh já autenticado nesta máquina).
 
