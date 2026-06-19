@@ -2,6 +2,7 @@ import { Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/c
 import { JwtGuard } from '../auth/jwt.guard.js';
 import { TenantGuard } from '../tenancy/tenant.guard.js';
 import { RolesGuard } from '../auth/roles.guard.js';
+import { PrincipalGuard } from '../auth/principal.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { TenantId } from '../tenancy/tenant-id.decorator.js';
 import { PaginationQuery, Page } from '../common/pagination.js';
@@ -9,7 +10,7 @@ import { NotificationsService } from './notifications.service.js';
 import type { Notification } from '@pacific/database';
 
 @Controller('notifications')
-@UseGuards(new JwtGuard(), TenantGuard, RolesGuard)
+@UseGuards(new JwtGuard(), PrincipalGuard, TenantGuard, RolesGuard)
 export class NotificationsController {
   constructor(private readonly notifications: NotificationsService) {}
 

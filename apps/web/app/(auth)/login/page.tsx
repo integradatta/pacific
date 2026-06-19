@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
 export default function LoginPage() {
@@ -84,6 +85,11 @@ export default function LoginPage() {
             {loading ? 'Entrando…' : 'Entrar'}
           </button>
         </form>
+
+        <p className="font-mono text-xs text-muted text-center">
+          Não tem conta?{' '}
+          <Link href="/register" className="text-sonar hover:underline">Criar carteira</Link>
+        </p>
       </div>
     </main>
   );
