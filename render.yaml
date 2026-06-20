@@ -1,0 +1,28 @@
+# Render Blueprint — API NestJS via Docker (build context = raiz do monorepo).
+# Os valores sensíveis ficam como sync:false → você preenche no painel do Render.
+services:
+  - type: web
+    name: pacific-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    autoDeploy: true
+    envVars:
+      # Prisma — runtime (pooler de TRANSAÇÃO, 6543, ?pgbouncer=true)
+      - key: DATABASE_URL
+        sync: false
+      # Prisma — migrations (pooler de SESSÃO, 5432)
+      - key: DIRECT_URL
+        sync: false
+      # Valida o JWT do credor (Supabase → Settings → API → JWT Secret)
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      # Assina/valida o JWT do devedor (link mágico)
+      - key: APP_JWT_SECRET
+        sync: false
+      # CORS — URL do site na Vercel (ex.: https://pacific-xxxx.vercel.app)
+      - key: WEB_ORIGIN
+        sync: false
+    # Render injeta PORT automaticamente; a app já o lê.
