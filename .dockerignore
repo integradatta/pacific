@@ -1,0 +1,14 @@
+# Mantém a imagem enxuta e — CRÍTICO — impede que .env com segredos entrem na imagem.
+# (Docker NÃO respeita .gitignore; estes padrões são obrigatórios.)
+**/node_modules
+**/.env
+**/.env.*
+.git
+.gitignore
+**/.next
+**/dist
+**/.turbo
+**/*.log
+**/.DS_Store
+.vercel
+docs
