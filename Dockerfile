@@ -47,7 +47,9 @@ ENV NODE_ENV=production
 # Railway/Render injetam PORT; a app lê PORT (fallback API_PORT/3333). EXPOSE é só documental.
 EXPOSE 3333
 
-# Tenta aplicar migrations pendentes (idempotente, via DIRECT_URL/sessão). Se falhar
-# (ex.: DIRECT_URL ausente/malformada), apenas avisa e sobe a API mesmo assim — o banco
-# de produção já está migrado, então uma falha aqui não deve derrubar o serviço.
-CMD ["sh","-c","npm run db:deploy -w @pacific/database || echo '[start] migrate pulado (banco provavelmente ja migrado / DIRECT_URL ausente)'; node packages/api/dist/main.js"]
+# Migrations no boot, fail-closed quando configurado:
+#  - DIRECT_URL setado  -> roda `migrate deploy`; se falhar, ABORTA (não sobe container
+#    com o banco fora do schema). Corrija a DIRECT_URL para destravar.
+#  - DIRECT_URL ausente -> pula o migrate de propósito (opt-out explícito; útil quando o
+#    banco já está migrado) e sobe a API, que em runtime usa só DATABASE_URL.
+CMD ["sh","-c","if [ -n \"$DIRECT_URL\" ]; then echo '[start] aplicando migrations...'; npm run db:deploy -w @pacific/database || { echo '[start] migrate FALHOU — abortando. Corrija a DIRECT_URL (ou remova-a para pular).'; exit 1; }; else echo '[start] DIRECT_URL ausente — pulando migrate (usando banco ja migrado).'; fi; exec node packages/api/dist/main.js"]
