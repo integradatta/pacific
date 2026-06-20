@@ -1,9 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import jwt from 'jsonwebtoken';
 
 @Injectable()
 export class DebtorTokenService {
-  constructor(private readonly secret?: string) {}
+  // @Optional: o Nest injeta undefined (não há provider de string); cai no APP_JWT_SECRET.
+  // Em teste, instancia-se com `new DebtorTokenService('segredo')`.
+  constructor(@Optional() private readonly secret?: string) {}
 
   sign(
     params: { debtorId: string; tenantId: string },

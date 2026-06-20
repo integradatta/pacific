@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, Optional, UnauthorizedException } from '@nestjs/common';
 import jwt from 'jsonwebtoken';
 import type { AuthUser } from '@pacific/shared';
 import type { RequestWithUser } from './auth.types.js';
@@ -6,7 +6,8 @@ import type { RequestWithUser } from './auth.types.js';
 @Injectable()
 export class JwtGuard implements CanActivate {
   // Segredo opcional: quando ausente, é lido de forma lazy no request (após o .env carregar).
-  constructor(private readonly secret?: string) {}
+  // @Optional para o Nest não tentar injetar uma string caso o guard entre no DI.
+  constructor(@Optional() private readonly secret?: string) {}
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest<RequestWithUser>();
     const header = req.headers['authorization'];
