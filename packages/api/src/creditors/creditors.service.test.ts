@@ -3,21 +3,23 @@ import { ConflictException } from '@nestjs/common';
 import { CreditorsService } from './creditors.service.js';
 
 function fakeDb() {
-  const tenants: Array<{ id: string; orgCode: string }> = [];
-  const users: Array<{ id: string }> = [];
+  const tenants: Array<{ id: string; name: string; orgCode: string }> = [];
+  const users: Array<{ id: string; supabaseId: string; tenantId: string }> = [];
   const db = {
     tenant: {
-      findUnique: vi.fn(async ({ where }: { where: { orgCode: string } }) =>
-        tenants.find((t) => t.orgCode === where.orgCode) ?? null),
+      findUnique: vi.fn(async ({ where }: { where: { orgCode?: string; id?: string } }) =>
+        tenants.find((t) => (where.orgCode !== undefined ? t.orgCode === where.orgCode : t.id === where.id)) ?? null),
       create: vi.fn(async ({ data }: { data: { orgCode: string; name: string } }) => {
-        const t = { id: `t${tenants.length + 1}`, orgCode: data.orgCode };
+        const t = { id: `t${tenants.length + 1}`, name: data.name, orgCode: data.orgCode };
         tenants.push(t);
         return t;
       }),
     },
     user: {
-      create: vi.fn(async () => {
-        const u = { id: `u${users.length + 1}` };
+      findUnique: vi.fn(async ({ where }: { where: { supabaseId: string } }) =>
+        users.find((u) => u.supabaseId === where.supabaseId) ?? null),
+      create: vi.fn(async ({ data }: { data: { supabaseId: string; tenantId: string } }) => {
+        const u = { id: `u${users.length + 1}`, supabaseId: data.supabaseId, tenantId: data.tenantId };
         users.push(u);
         return u;
       }),
@@ -39,7 +41,18 @@ describe('CreditorsService.register', () => {
     );
   });
 
-  it('re-registro com supabaseId duplicado (P2002) → ConflictException', async () => {
+  it('idempotente: re-chamar com o mesmo supabaseId devolve a MESMA carteira sem recriar', async () => {
+    const db = fakeDb();
+    const svc = new CreditorsService({ forTenant: () => db } as never);
+    const first = await svc.register({ orgName: 'Carteira X', supabaseId: 'sb1', email: 'c@x.com' });
+    const second = await svc.register({ orgName: 'Outro Nome', supabaseId: 'sb1', email: 'c@x.com' });
+    expect(second.tenantId).toBe(first.tenantId);
+    expect(second.orgCode).toBe(first.orgCode);
+    expect(db.tenant.create).toHaveBeenCalledOnce(); // não recria
+    expect(db.user.create).toHaveBeenCalledOnce();
+  });
+
+  it('corrida (P2002) sem registro existente → ConflictException', async () => {
     const db = fakeDb();
     db.user.create = vi.fn(async () => {
       throw Object.assign(new Error('unique violation'), { code: 'P2002' });

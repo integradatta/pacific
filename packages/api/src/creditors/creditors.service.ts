@@ -14,6 +14,12 @@ export class CreditorsService {
   constructor(private readonly resolver: TenantDatasourceResolver) {}
   async register(input: RegisterCreditorInput): Promise<{ tenantId: string; orgCode: string }> {
     const db = this.resolver.forTenant('__provisioning__');
+
+    // Idempotente: se este usuário já tem carteira, devolve a existente.
+    // Recupera contas "órfãs" (usuário no Supabase sem tenant) e torna seguro re-chamar.
+    const existing = await db.user.findUnique({ where: { supabaseId: input.supabaseId } });
+    if (existing?.tenantId) return this.tenantResult(db, existing.tenantId);
+
     const orgCode = await generateUniqueOrgCode(
       async (code) => (await db.tenant.findUnique({ where: { orgCode: code } })) !== null,
     );
@@ -28,9 +34,20 @@ export class CreditorsService {
       });
     } catch (e) {
       if ((e as { code?: string }).code === 'P2002') {
+        // Corrida: outro request criou a conta entre o findUnique e o create -> devolve a existente.
+        const raced = await db.user.findUnique({ where: { supabaseId: input.supabaseId } });
+        if (raced?.tenantId) return this.tenantResult(db, raced.tenantId);
         throw new ConflictException('Conta já registrada');
       }
       throw e;
     }
+  }
+
+  private async tenantResult(
+    db: ReturnType<TenantDatasourceResolver['forTenant']>,
+    tenantId: string,
+  ): Promise<{ tenantId: string; orgCode: string }> {
+    const tenant = await db.tenant.findUnique({ where: { id: tenantId } });
+    return { tenantId, orgCode: tenant?.orgCode ?? '' };
   }
 }

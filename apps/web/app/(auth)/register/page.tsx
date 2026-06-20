@@ -25,22 +25,38 @@ export default function RegisterPage() {
     setInfo(null);
 
     const { data, error: signErr } = await supabase().auth.signUp({ email, password });
+    let session = data?.session ?? null;
+
     if (signErr) {
-      setError('Não foi possível criar a conta. Verifique os dados e tente novamente.');
-      setLoading(false);
-      return;
+      // E-mail já cadastrado: tenta logar e concluir a carteira (recupera conta sem carteira).
+      const msg = signErr.message?.toLowerCase() ?? '';
+      const alreadyExists = signErr.status === 422 || msg.includes('already') || msg.includes('registered');
+      if (!alreadyExists) {
+        setError('Não foi possível criar a conta. Verifique os dados e tente novamente.');
+        setLoading(false);
+        return;
+      }
+      const { data: signInData, error: signInErr } = await supabase().auth.signInWithPassword({ email, password });
+      if (signInErr) {
+        setError('Este e-mail já tem conta. Confira a senha ou use "Entrar".');
+        setLoading(false);
+        return;
+      }
+      session = signInData.session;
     }
-    // Sem sessão imediata = confirmação de e-mail ativada no Supabase.
-    if (!data.session) {
+
+    // Sem sessão = confirmação de e-mail ativada no Supabase.
+    if (!session) {
       setInfo('Conta criada. Confirme seu e-mail e depois entre para concluir o cadastro da carteira.');
       setLoading(false);
       return;
     }
     try {
+      // Idempotente no backend: cria a carteira ou devolve a existente.
       await apiPost('/auth/register-creditor', { orgName });
       router.push('/dashboard');
     } catch {
-      setError('Conta criada, mas falhou ao registrar a carteira. Tente entrar novamente.');
+      setError('Não foi possível concluir o cadastro da carteira. Tente novamente.');
       setLoading(false);
     }
   }

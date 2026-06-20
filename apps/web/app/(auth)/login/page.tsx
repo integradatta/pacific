@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { apiGet } from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -25,7 +26,14 @@ export default function LoginPage() {
       return;
     }
 
-    router.push('/dashboard');
+    // Conta autenticada mas sem carteira (tenant) -> conclui o cadastro; senão, dashboard.
+    // Isso resolve o "loga mas não acessa": sem tenant, todo endpoint protegido dá 403.
+    try {
+      const me = await apiGet<{ tenantId: string | null }>('/auth/me');
+      router.push(me.tenantId ? '/dashboard' : '/register');
+    } catch {
+      router.push('/dashboard');
+    }
   }
 
   return (
