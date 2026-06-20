@@ -15,7 +15,8 @@ WORKDIR /app
 # Copia o repo (o .dockerignore exclui node_modules/.env/.git/.next/dist) e instala TUDO
 # (precisamos de devDeps: nest-cli, tsc e o CLI do Prisma usado em runtime pelas migrations).
 COPY . .
-RUN npm ci
+# --include=dev: garante nest-cli/tsc/prisma mesmo se NODE_ENV=production estiver setado no build.
+RUN npm ci --include=dev --no-audit --no-fund
 
 # 1) Gera o Prisma Client com o engine compilado para ESTE Linux (URLs dummy: generate não conecta).
 RUN DATABASE_URL="postgresql://u:p@localhost:5432/db" DIRECT_URL="postgresql://u:p@localhost:5432/db" \
