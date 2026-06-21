@@ -11,13 +11,20 @@ export function monthlyRate(rate: string, ratePeriod: 'MONTHLY' | 'ANNUAL'): Dec
   return new Decimal(1).plus(r).pow(new Decimal(1).div(12)).minus(1);
 }
 
-/** Saldo com juros compostos: principal * (1+i)^(dias/30). Antes do início ⇒ principal. */
+/**
+ * Saldo com juros compostos: principal * (1+i)^(meses). Antes do início ⇒ principal.
+ * Taxa MENSAL cobra no mínimo 1 mês de juros — pagar em menos de 30 dias não reduz
+ * proporcionalmente abaixo de um mês cheio (juros mínimo de um mês). Acima de 30 dias
+ * é proporcional/composto normalmente.
+ */
 export function balanceAt(terms: DebtTerms, asOf: Date): string {
   const principal = new Decimal(terms.principal);
   const days = daysBetween(terms.startDate, asOf);
   if (days <= 0) return principal.toFixed(2);
   const i = monthlyRate(terms.rate, terms.ratePeriod);
-  const factor = new Decimal(1).plus(i).pow(new Decimal(days).div(30));
+  let months = new Decimal(days).div(30);
+  if (terms.ratePeriod === 'MONTHLY' && months.lessThan(1)) months = new Decimal(1);
+  const factor = new Decimal(1).plus(i).pow(months);
   return principal.times(factor).toFixed(2);
 }
 

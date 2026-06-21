@@ -89,3 +89,18 @@ describe('riskLevel (score de risco)', () => {
     expect(riskLevel(0)).toBe('HIGH');
   });
 });
+
+describe('juros mínimo de 1 mês (taxa MENSAL)', () => {
+  it('pagar em 5 dias cobra 1 mês cheio (40% ⇒ 1400)', () => {
+    expect(balanceAt(terms({ rate: '0.40' }), new Date('2026-01-06T00:00:00Z'))).toBe('1400.00');
+  });
+  it('exatamente 30 dias = 1 mês (40% ⇒ 1400)', () => {
+    expect(balanceAt(terms({ rate: '0.40' }), new Date('2026-01-31T00:00:00Z'))).toBe('1400.00');
+  });
+  it('acima de 30 dias volta a ser proporcional/composto (>1400)', () => {
+    expect(Number(balanceAt(terms({ rate: '0.40' }), new Date('2026-02-15T00:00:00Z')))).toBeGreaterThan(1400); // 45 dias
+  });
+  it('taxa ANUAL não tem piso de 1 mês (proporcional abaixo de 30 dias)', () => {
+    expect(Number(balanceAt(terms({ rate: '0.40', ratePeriod: 'ANNUAL' }), new Date('2026-01-06T00:00:00Z')))).toBeLessThan(1010);
+  });
+});
