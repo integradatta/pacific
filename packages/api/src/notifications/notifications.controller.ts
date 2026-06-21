@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtGuard } from '../auth/jwt.guard.js';
 import { TenantGuard } from '../tenancy/tenant.guard.js';
 import { RolesGuard } from '../auth/roles.guard.js';
@@ -7,6 +7,7 @@ import { Roles } from '../auth/roles.decorator.js';
 import { TenantId } from '../tenancy/tenant-id.decorator.js';
 import { PaginationQuery, Page } from '../common/pagination.js';
 import { NotificationsService } from './notifications.service.js';
+import { GenerateAlertsDto } from './dto/generate-alerts.dto.js';
 import type { Notification } from '@pacific/database';
 
 @Controller('notifications')
@@ -20,8 +21,8 @@ export class NotificationsController {
   }
 
   @Post('generate') @Roles('CREDITOR')
-  generate(@TenantId() tenantId: string): Promise<{ created: number }> {
-    return this.notifications.generateDueNotifications(tenantId);
+  generate(@TenantId() tenantId: string, @Body() dto: GenerateAlertsDto): Promise<{ created: number }> {
+    return this.notifications.generateDueNotifications(tenantId, dto.types);
   }
 
   @Patch(':id/read') @Roles('CREDITOR')

@@ -33,7 +33,11 @@ enum RatePeriod {
 }
 
 enum NotificationType {
-  DUE_SOON
+  DUE_SOON // legado (mantido p/ registros antigos); a geração agora usa as réguas abaixo
+  DUE_15
+  DUE_7
+  DUE_3
+  DUE_TODAY
   OVERDUE
 }
 

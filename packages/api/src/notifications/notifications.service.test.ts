@@ -24,18 +24,31 @@ const svc = (db: ReturnType<typeof fakeDb>) =>
 const asOf = new Date('2026-02-01T00:00:00Z');
 
 describe('NotificationsService', () => {
-  it('gera OVERDUE para vencida, DUE_SOON para <=7 dias, ignora distante', async () => {
+  const typesOf = (db: ReturnType<typeof fakeDb>): string[] =>
+    (db.notification.upsert.mock.calls as unknown as Array<[{ create: { type: string } }]>).map((c) => c[0].create.type);
+
+  it('gera a régua correta por dias até o vencimento (15/7/3/0/atraso)', async () => {
     const db = fakeDb([
-      debt('a', new Date('2026-01-20T00:00:00Z')), // vencida -> OVERDUE
-      debt('b', new Date('2026-02-05T00:00:00Z')), // 4 dias -> DUE_SOON
-      debt('c', new Date('2026-06-01T00:00:00Z')), // distante -> nada
+      debt('a', new Date('2026-01-20T00:00:00Z')), // -12 -> OVERDUE
+      debt('b', new Date('2026-02-01T00:00:00Z')), //   0 -> DUE_TODAY
+      debt('c', new Date('2026-02-03T00:00:00Z')), //   2 -> DUE_3
+      debt('d', new Date('2026-02-06T00:00:00Z')), //   5 -> DUE_7
+      debt('e', new Date('2026-02-12T00:00:00Z')), //  11 -> DUE_15
+      debt('f', new Date('2026-06-01T00:00:00Z')), // distante -> nada
     ]);
-    const out = await svc(db).generateDueNotifications('t1', asOf);
-    expect(out.created).toBe(2);
-    expect(db.notification.upsert).toHaveBeenCalledTimes(2);
-    const calls = db.notification.upsert.mock.calls as unknown as Array<[{ create: { type: string } }]>;
-    const types = calls.map((c) => c[0].create.type);
-    expect(types.sort()).toEqual(['DUE_SOON', 'OVERDUE']);
+    const out = await svc(db).generateDueNotifications('t1', undefined, asOf);
+    expect(out.created).toBe(5);
+    expect(typesOf(db).sort()).toEqual(['DUE_15', 'DUE_3', 'DUE_7', 'DUE_TODAY', 'OVERDUE']);
+  });
+
+  it('respeita as réguas ativas (enabled filtra)', async () => {
+    const db = fakeDb([
+      debt('a', new Date('2026-01-20T00:00:00Z')), // OVERDUE
+      debt('b', new Date('2026-02-06T00:00:00Z')), // DUE_7
+    ]);
+    const out = await svc(db).generateDueNotifications('t1', ['OVERDUE'], asOf);
+    expect(out.created).toBe(1);
+    expect(typesOf(db)).toEqual(['OVERDUE']);
   });
   it('list filtra por tenantId e pagina', async () => {
     const db = fakeDb([]);
