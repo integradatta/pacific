@@ -20,6 +20,18 @@
   - **Validado**: `npm run lint` ✓ · `npm run build` ✓ (13/13) · screenshots headless de `/login` e `/dashboard` (skeleton) conferidos visualmente.
   - **✅ PROPAGADO a TODAS as telas (2026-06-21)**: `carteira`, `vencimentos`, `notificacoes`, `devedores`, `operacoes/nova`, `me`, `d/[token]`, `(auth)/register` e `LocationPanel` agora usam `.panel`/glass/`surface2` + botões com glow. Novas primitivas reutilizáveis: `components/States.tsx` (`ErrorState` "sinal perdido" + `EmptyState`) e `Skeleton.tsx` (`ListSkeleton`). Loadings com skeleton; estados de erro/vazio padronizados na voz da interface. Validado: `lint` ✓ · `build` ✓ (13/13) · screenshots de login/dashboard/operacoes/notificacoes conferidos. **Commitado + push para `main`** → deploy Vercel automático.
   - Itens opcionais restantes do #8: **tags** e **histórico da operação**. Possíveis próximos: tema claro/toggle (decidido fora de escopo nesta etapa), QA visual nas telas que dependem de dados reais (carteira/vencimentos/devedores/me com API).
+
+## Atualização 2026-06-21 (tarde) — #8 concluído: ETIQUETAS + HISTÓRICO da operação
+- **🔴 AÇÃO NECESSÁRIA NA SUA MÁQUINA antes/junto do deploy da API:** aplicar a migração nova `3_debt_tags` em produção, senão a API quebra (passa a ler `Debt.tags`):
+  ```bash
+  cd packages/database && npx prisma migrate deploy   # usa o .env local (pooler de sessão 5432)
+  ```
+  Migração é **aditiva e idempotente** (`ADD COLUMN IF NOT EXISTS "tags" TEXT[] NOT NULL DEFAULT '{}'`). Registros antigos ficam com `{}`.
+- **Etiquetas (tags):** coluna `Debt.tags String[] @default([])`. Normalização única e compartilhada em `@pacific/shared` (`normalizeTags`: minúsculas, trim, dedup, máx. 8, máx. 24 chars). Aceitas em `POST /debts` e `POST /debts/quick`; editáveis via **`PATCH /debts/:id/tags`**. `PortfolioRow.tags` exposto. Web: chips na Carteira, **filtro por etiqueta**, campo no cadastro (`/operacoes/nova`) e editor no detalhe. **Não** aparecem na visão do devedor (`/me`) — são internas do credor.
+- **Histórico da operação (DERIVADO, sem tabela de eventos):** **`GET /debts/:id/history`** compõe a linha do tempo a partir de dados existentes — criação, link gerado/rotacionado (`DebtorAccess`), acessos do devedor (`DebtorLoginEvent`), alertas emitidos (`Notification` por `debtId`) e "Operação venceu" (quando passou do vencimento). Ordem decrescente.
+- **Nova tela:** **`/operacoes/[id]`** (detalhe) — cabeçalho com devedor/status/editor de etiquetas, "Situação atual" (saldo/juros/projeções/risco), "Termos" e "Histórico" (timeline). `GET /debts/:id` agora retorna `DebtRecord` (inclui `debtorName`+`tags`). Linhas da Carteira/Dashboard linkam para o detalhe.
+- **e2e atualizado:** `rls-e2e.ts` e `magic-link-e2e.ts` agora aplicam **todas** as migrações (não só `0_init`) → validam a coluna `tags`.
+- **Validado:** `npm run lint` (4/4) ✓ · `npm run test` (api 61 + shared 30) ✓ · `npm run build -w @pacific/web` (14 rotas) ✓ · RLS **6/6** ✓ · magic-link **7/7** ✓. **Commitado + push `main`** (web → Vercel automático).
 - 🔴 Pendente (segurança): **rotacionar** senha do banco + `SUPABASE_JWT_SECRET` (apareceram no chat) e atualizar no Railway.
 
 ## Atualização 2026-06-19

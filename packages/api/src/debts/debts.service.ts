@@ -1,11 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Debt, Prisma } from '@pacific/database';
-import { summarize, type DebtSummary } from '@pacific/shared';
+import { summarize, normalizeTags, type DebtSummary, type DebtRecord, type DebtEvent } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 import { generateAccessToken, hashAccessToken } from '../auth/access-token.util.js';
 import type { Page } from '../common/pagination.js';
 import type { CreateDebtInput } from './dto/create-debt.dto.js';
 import type { CreateQuickDebtInput } from './dto/create-quick-debt.dto.js';
+
+type DebtWithDebtor = Debt & { debtor: { name: string } };
 
 @Injectable()
 export class DebtsService {
@@ -25,6 +27,7 @@ export class DebtsService {
           tenantId,
           debtorId: debtor.id,
           description: input.description ?? null,
+          tags: normalizeTags(input.tags ?? []),
           principal: input.principal,
           rate: input.rate,
           ratePeriod: input.ratePeriod,
@@ -46,6 +49,7 @@ export class DebtsService {
           tenantId,
           debtorId: input.debtorId,
           description: input.description ?? null,
+          tags: normalizeTags(input.tags ?? []),
           principal: input.principal,
           rate: input.rate,
           ratePeriod: input.ratePeriod,
@@ -67,8 +71,18 @@ export class DebtsService {
     });
   }
 
-  async get(tenantId: string, id: string): Promise<Debt> {
-    return this.scoped.withTenant(tenantId, (tx) => this.findOne(tx, tenantId, id));
+  /** Operação completa para a tela de detalhe (inclui nome do devedor e etiquetas). */
+  async get(tenantId: string, id: string): Promise<DebtRecord> {
+    return this.scoped.withTenant(tenantId, async (tx) => this.toRecord(await this.findOne(tx, tenantId, id)));
+  }
+
+  /** Substitui as etiquetas da operação (normalizadas) e devolve o registro atualizado. */
+  async setTags(tenantId: string, id: string, tags: string[]): Promise<DebtRecord> {
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      await this.findOne(tx, tenantId, id); // garante existência + paridade de tenant
+      await tx.debt.update({ where: { id }, data: { tags: normalizeTags(tags) } });
+      return this.toRecord(await this.findOne(tx, tenantId, id));
+    });
   }
 
   /** Cálculo automático: saldo, juros, dias, status e projeções (tenant-scoped). */
@@ -85,8 +99,66 @@ export class DebtsService {
     });
   }
 
-  private async findOne(tx: Prisma.TransactionClient, tenantId: string, id: string): Promise<Debt> {
-    const debt = await tx.debt.findFirst({ where: { id, tenantId } });
+  /**
+   * Histórico da operação — DERIVADO de dados existentes (sem tabela de eventos):
+   * criação, link de acesso (gerado/rotacionado), acessos do devedor, alertas emitidos
+   * e o vencimento (quando já passou). Ordenado do mais recente para o mais antigo.
+   */
+  async history(tenantId: string, id: string, now: Date = new Date()): Promise<DebtEvent[]> {
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      const debt = await this.findOne(tx, tenantId, id);
+      const [notifications, access, logins] = await Promise.all([
+        tx.notification.findMany({ where: { tenantId, debtId: id }, orderBy: { createdAt: 'asc' } }),
+        tx.debtorAccess.findFirst({ where: { tenantId, debtorId: debt.debtorId } }),
+        tx.debtorLoginEvent.findMany({
+          where: { tenantId, debtorId: debt.debtorId, success: true },
+          orderBy: { at: 'asc' },
+        }),
+      ]);
+
+      const events: DebtEvent[] = [
+        { at: debt.createdAt.toISOString(), kind: 'created', title: 'Operação criada' },
+      ];
+      if (access) {
+        events.push({ at: access.createdAt.toISOString(), kind: 'link', title: 'Link de acesso gerado' });
+        if (access.rotatedAt) {
+          events.push({ at: access.rotatedAt.toISOString(), kind: 'link', title: 'Link de acesso rotacionado' });
+        }
+      }
+      for (const l of logins) {
+        events.push({ at: l.at.toISOString(), kind: 'login', title: 'Devedor acessou o portal' });
+      }
+      for (const n of notifications) {
+        events.push({ at: n.createdAt.toISOString(), kind: 'notification', title: n.title, detail: n.body });
+      }
+      if (debt.dueDate.getTime() < now.getTime()) {
+        events.push({ at: debt.dueDate.toISOString(), kind: 'due', title: 'Operação venceu' });
+      }
+
+      return events.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
+    });
+  }
+
+  private toRecord(d: DebtWithDebtor): DebtRecord {
+    return {
+      id: d.id,
+      debtorId: d.debtorId,
+      debtorName: d.debtor.name,
+      description: d.description,
+      principal: d.principal.toString(),
+      rate: d.rate.toString(),
+      ratePeriod: d.ratePeriod,
+      currency: d.currency,
+      startDate: d.startDate.toISOString(),
+      dueDate: d.dueDate.toISOString(),
+      status: d.status,
+      tags: d.tags,
+      createdAt: d.createdAt.toISOString(),
+    };
+  }
+
+  private async findOne(tx: Prisma.TransactionClient, tenantId: string, id: string): Promise<DebtWithDebtor> {
+    const debt = await tx.debt.findFirst({ where: { id, tenantId }, include: { debtor: { select: { name: true } } } });
     if (!debt) throw new NotFoundException('Dívida não encontrada');
     return debt;
   }

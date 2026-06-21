@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsIn, IsNumberString, IsDateString, MinLength } from 'class-validator';
+import { IsString, IsOptional, IsIn, IsNumberString, IsDateString, MinLength, IsArray } from 'class-validator';
 
 // Cadastro simplificado: cria cliente (devedor) + operação (dívida) de uma vez.
 // rate é a fração do período (ex.: "0.05" = 5%); startDate é "agora" (não vem do form).
@@ -9,6 +9,7 @@ export interface CreateQuickDebtInput {
   ratePeriod: 'MONTHLY' | 'ANNUAL';
   dueDate: string; // ISO
   description?: string;
+  tags?: string[];
 }
 
 export class CreateQuickDebtDto implements CreateQuickDebtInput {
@@ -18,4 +19,5 @@ export class CreateQuickDebtDto implements CreateQuickDebtInput {
   @IsIn(['MONTHLY', 'ANNUAL']) ratePeriod: 'MONTHLY' | 'ANNUAL' = 'MONTHLY';
   @IsDateString() dueDate!: string;
   @IsOptional() @IsString() description?: string;
+  @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
 }

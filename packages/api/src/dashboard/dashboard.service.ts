@@ -73,6 +73,7 @@ export class DashboardService {
         recoverability: recoverabilityScore(terms, asOf),
         temperature: temperatureScore(terms, asOf),
         dueDate: d.dueDate.toISOString(),
+        tags: d.tags,
       };
     });
   }

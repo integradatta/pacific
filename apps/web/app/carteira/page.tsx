@@ -30,6 +30,13 @@ export default function CarteiraPage() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<DebtStatus | 'ALL'>('ALL');
   const [risk, setRisk] = useState<RiskLevel | 'ALL'>('ALL');
+  const [tag, setTag] = useState<string>('ALL');
+
+  // Etiquetas disponíveis: união ordenada das tags presentes na carteira.
+  const tagOptions = useMemo(
+    () => Array.from(new Set((portfolio.data ?? []).flatMap((r) => r.tags))).sort(),
+    [portfolio.data],
+  );
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -37,9 +44,10 @@ export default function CarteiraPage() {
       (r) =>
         (q === '' || r.debtorName.toLowerCase().includes(q)) &&
         (status === 'ALL' || r.status === status) &&
-        (risk === 'ALL' || riskLevel(r.recoverability) === risk),
+        (risk === 'ALL' || riskLevel(r.recoverability) === risk) &&
+        (tag === 'ALL' || r.tags.includes(tag)),
     );
-  }, [portfolio.data, search, status, risk]);
+  }, [portfolio.data, search, status, risk, tag]);
 
   return (
     <Shell title="Carteira">
@@ -69,6 +77,14 @@ export default function CarteiraPage() {
                 <option key={o.v} value={o.v}>{o.label}</option>
               ))}
             </select>
+            {tagOptions.length > 0 && (
+              <select value={tag} onChange={(e) => setTag(e.target.value)} aria-label="Filtrar por etiqueta" className={controlClass}>
+                <option value="ALL">Etiqueta: todas</option>
+                {tagOptions.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            )}
           </div>
 
           <CarteiraTable rows={rows} />

@@ -7,6 +7,7 @@ import { apiPost } from '@/lib/api';
 import { operationPreview, recoverabilityScore } from '@pacific/shared';
 import { formatBRL, venceEm } from '@/lib/format';
 import { RiskBadge } from '@/components/RiskBadge';
+import { TagInput } from '@/components/Tags';
 
 const inputClass =
   'w-full bg-surface2 border border-line rounded-lg px-3.5 py-2.5 text-text font-sans text-sm placeholder:text-muted focus:outline-none focus:border-sonar focus:shadow-glow transition-all';
@@ -21,6 +22,7 @@ export default function NovaOperacaoPage() {
   const [ratePct, setRatePct] = useState('');
   const [ratePeriod, setRatePeriod] = useState<'MONTHLY' | 'ANNUAL'>('MONTHLY');
   const [dueDate, setDueDate] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,6 +68,7 @@ export default function NovaOperacaoPage() {
         rate: rateFraction,
         ratePeriod,
         dueDate: new Date(dueDate).toISOString(),
+        tags,
       });
       router.push('/carteira');
     } catch {
@@ -112,6 +115,11 @@ export default function NovaOperacaoPage() {
           <div className="space-y-1">
             <label htmlFor="dueDate" className={labelClass}>Data de vencimento</label>
             <input id="dueDate" type="date" required min={todayISO()} value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputClass} />
+          </div>
+
+          <div className="space-y-1">
+            <span className={labelClass}>Etiquetas <span className="text-muted/60 normal-case tracking-normal">(opcional)</span></span>
+            <TagInput value={tags} onChange={setTags} />
           </div>
 
           {error && <p role="alert" className="font-mono text-xs text-status-red">{error}</p>}

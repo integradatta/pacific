@@ -5,7 +5,7 @@
  * self-view (própria dívida). Prova: resolução correta, hash no banco, token desconhecido,
  * revogação, rotação, isolamento por tenant+devedor, e auditoria isolada por RLS.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { randomBytes, createHash } from 'node:crypto';
 import EmbeddedPostgres from 'embedded-postgres';
 import pkg from 'pg';
@@ -64,7 +64,10 @@ async function main(): Promise<void> {
 
   const admin = new Client({ connectionString: SUPER_URL });
   await admin.connect();
-  await admin.query(readFileSync('packages/database/migrations/0_init/migration.sql', 'utf8'));
+  for (const name of readdirSync('packages/database/migrations').sort()) {
+    const sql = `packages/database/migrations/${name}/migration.sql`;
+    if (existsSync(sql)) await admin.query(readFileSync(sql, 'utf8'));
+  }
   await admin.query(`
     CREATE ROLE pacific_app LOGIN PASSWORD 'apppass' NOSUPERUSER;
     GRANT USAGE ON SCHEMA public TO pacific_app;

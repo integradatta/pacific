@@ -1,9 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import type { PortfolioRow } from '@pacific/shared';
 import { STATUS_COLOR, STATUS_LABEL } from '@/lib/status';
 import { formatBRL, venceEm } from '@/lib/format';
 import { RiskBadge } from './RiskBadge';
+import { TagList } from './Tags';
 
 function ScoreCell({ value, tone }: { value: number; tone: 'good' | 'urgency' }) {
   const color =
@@ -58,7 +60,12 @@ export function CarteiraTable({ rows }: { rows: PortfolioRow[] }) {
         <tbody>
           {rows.map((r) => (
             <tr key={r.id} className="border-t border-line/70 hover:bg-sonar/[0.03] transition-colors">
-              <td className="px-6 py-3.5 font-sans text-sm text-text">{r.debtorName}</td>
+              <td className="px-6 py-3.5">
+                <Link href={`/operacoes/${r.id}`} className="font-sans text-sm text-text hover:text-sonar transition-colors">
+                  {r.debtorName}
+                </Link>
+                {r.tags.length > 0 && <div className="mt-1"><TagList tags={r.tags} /></div>}
+              </td>
               <td className="px-6 py-3.5 font-mono text-sm text-text text-right tabular-nums">{formatBRL(r.balance)}</td>
               <td className="px-6 py-3.5 font-mono text-sm text-muted text-right tabular-nums">{venceEm(r.daysRemaining)}</td>
               <ScoreCell value={r.recoverability} tone="good" />

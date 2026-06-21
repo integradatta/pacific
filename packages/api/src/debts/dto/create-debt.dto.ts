@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsIn, IsNumberString, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsIn, IsNumberString, IsDateString, IsArray } from 'class-validator';
 
 export interface CreateDebtInput {
   debtorId: string;
@@ -9,6 +9,7 @@ export interface CreateDebtInput {
   currency?: string;
   startDate: string;   // ISO
   dueDate: string;     // ISO
+  tags?: string[];
 }
 
 export class CreateDebtDto implements CreateDebtInput {
@@ -20,4 +21,5 @@ export class CreateDebtDto implements CreateDebtInput {
   @IsOptional() @IsString() currency?: string;
   @IsDateString() startDate!: string;
   @IsDateString() dueDate!: string;
+  @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
 }

@@ -94,6 +94,9 @@ model Debt {
   // com Tenant é transitiva via Debtor.
   debtor      Debtor     @relation(fields: [debtorId, tenantId], references: [id, tenantId])
   description String?
+  // Etiquetas livres da operação (ex.: "negociando", "judicial"). Normalizadas no app
+  // (minúsculas, sem duplicatas, limite de quantidade/tamanho). Coluna aditiva.
+  tags        String[]   @default([])
   principal   Decimal    @db.Decimal(14, 2)
   rate        Decimal    @db.Decimal(9, 6)
   ratePeriod  RatePeriod @default(MONTHLY)

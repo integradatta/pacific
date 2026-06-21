@@ -53,4 +53,32 @@ export interface PortfolioRow {
   recoverability: number;
   temperature: number;
   dueDate: string; // ISO
+  tags: string[];
+}
+
+/** Operação completa para a tela de detalhe (dívida + nome do devedor + etiquetas). */
+export interface DebtRecord {
+  id: string;
+  debtorId: string;
+  debtorName: string;
+  description: string | null;
+  principal: string;
+  rate: string;
+  ratePeriod: 'MONTHLY' | 'ANNUAL';
+  currency: string;
+  startDate: string; // ISO
+  dueDate: string;   // ISO
+  status: DebtStatus;
+  tags: string[];
+  createdAt: string; // ISO
+}
+
+export type DebtEventKind = 'created' | 'link' | 'login' | 'notification' | 'due';
+
+/** Evento do histórico de uma operação (derivado de dados existentes; sem tabela de eventos). */
+export interface DebtEvent {
+  at: string; // ISO
+  kind: DebtEventKind;
+  title: string;
+  detail?: string;
 }

@@ -6,7 +6,7 @@
  * leitura e escrita cross-tenant falham. Replica o mecanismo de
  * TenantScopedService.withTenant (set_config local por transação).
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import EmbeddedPostgres from 'embedded-postgres';
 import pkg from 'pg';
 import { PrismaClient } from '@prisma/client';
@@ -30,6 +30,15 @@ async function withTenant<T>(prisma: PrismaClient, tenantId: string, fn: (tx: Pr
   });
 }
 
+// Aplica TODAS as migrações em ordem (0_init, 1_…, 2_…, 3_…) — espelha `prisma migrate deploy`.
+async function applyMigrations(admin: InstanceType<typeof Client>): Promise<void> {
+  const dir = 'packages/database/migrations';
+  for (const name of readdirSync(dir).sort()) {
+    const sql = `${dir}/${name}/migration.sql`;
+    if (existsSync(sql)) await admin.query(readFileSync(sql, 'utf8'));
+  }
+}
+
 async function main(): Promise<void> {
   const pg = new EmbeddedPostgres({ databaseDir: '/tmp/pacific-pg-e2e', user: 'postgres', password: 'postgres', port: PORT, persistent: false });
   await pg.initialise();
@@ -39,7 +48,7 @@ async function main(): Promise<void> {
   // 1) Schema (migration.sql) + role app + grants — via cliente superuser.
   const admin = new Client({ connectionString: SUPER_URL });
   await admin.connect();
-  await admin.query(readFileSync('packages/database/migrations/0_init/migration.sql', 'utf8'));
+  await applyMigrations(admin);
   await admin.query(`
     CREATE ROLE pacific_app LOGIN PASSWORD 'apppass' NOSUPERUSER;
     GRANT USAGE ON SCHEMA public TO pacific_app;
