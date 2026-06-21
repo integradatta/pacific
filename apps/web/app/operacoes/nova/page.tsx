@@ -4,8 +4,9 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Shell } from '@/components/Shell';
 import { apiPost } from '@/lib/api';
-import { operationPreview } from '@pacific/shared';
+import { operationPreview, recoverabilityScore } from '@pacific/shared';
 import { formatBRL, venceEm } from '@/lib/format';
+import { RiskBadge } from '@/components/RiskBadge';
 
 const inputClass =
   'w-full bg-surface border border-line rounded-lg px-3 py-2.5 text-text font-sans text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-sonar focus:border-sonar transition-colors';
@@ -29,22 +30,30 @@ export default function NovaOperacaoPage() {
     return Number.isFinite(n) ? String(n / 100) : '0';
   }, [ratePct]);
 
-  // Cálculo em tempo real (motor puro do @pacific/shared, no navegador).
-  const preview = useMemo(() => {
+  // Termos válidos (ou null) — base do cálculo em tempo real (motor puro, no navegador).
+  const terms = useMemo(() => {
     const p = Number(principal);
     if (!principal || !dueDate || !Number.isFinite(p) || p <= 0) return null;
+    return { principal: String(p), rate: rateFraction, ratePeriod, startDate: new Date(), dueDate: new Date(dueDate) };
+  }, [principal, dueDate, rateFraction, ratePeriod]);
+
+  const preview = useMemo(() => {
+    if (!terms) return null;
     try {
-      return operationPreview({
-        principal: String(p),
-        rate: rateFraction,
-        ratePeriod,
-        startDate: new Date(),
-        dueDate: new Date(dueDate),
-      });
+      return operationPreview(terms);
     } catch {
       return null;
     }
-  }, [principal, dueDate, rateFraction, ratePeriod]);
+  }, [terms]);
+
+  const recoverability = useMemo(() => {
+    if (!terms) return null;
+    try {
+      return recoverabilityScore(terms, new Date());
+    } catch {
+      return null;
+    }
+  }, [terms]);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
@@ -118,7 +127,10 @@ export default function NovaOperacaoPage() {
 
         {/* Projeção em tempo real */}
         <div className="bg-surface border border-line rounded-xl p-6">
-          <p className="font-mono text-xs text-muted uppercase tracking-widest mb-4">Projeção da operação</p>
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <p className="font-mono text-xs text-muted uppercase tracking-widest">Projeção da operação</p>
+            {recoverability !== null && <RiskBadge recoverability={recoverability} />}
+          </div>
           {!preview ? (
             <p className="font-sans text-sm text-muted">
               Preencha <span className="text-text">valor</span>, <span className="text-text">taxa</span> e{' '}

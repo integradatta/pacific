@@ -3,6 +3,7 @@
 import type { PortfolioRow } from '@pacific/shared';
 import { STATUS_COLOR, STATUS_LABEL } from '@/lib/status';
 import { formatBRL, venceEm } from '@/lib/format';
+import { RiskBadge } from './RiskBadge';
 
 function ScoreCell({ value, tone }: { value: number; tone: 'good' | 'urgency' }) {
   const color =
@@ -48,6 +49,7 @@ export function CarteiraTable({ rows }: { rows: PortfolioRow[] }) {
             <th className="text-right font-normal px-6 py-2">Vence</th>
             <th className="text-right font-normal px-6 py-2" title="Recuperabilidade (0–100)">Recup.</th>
             <th className="text-right font-normal px-6 py-2" title="Temperatura / urgência (0–100)">Temp.</th>
+            <th className="text-left font-normal px-6 py-2">Risco</th>
             <th className="text-left font-normal px-6 py-2">Status</th>
           </tr>
         </thead>
@@ -59,6 +61,7 @@ export function CarteiraTable({ rows }: { rows: PortfolioRow[] }) {
               <td className="px-6 py-3 font-mono text-sm text-muted text-right tabular-nums">{venceEm(r.daysRemaining)}</td>
               <ScoreCell value={r.recoverability} tone="good" />
               <ScoreCell value={r.temperature} tone="urgency" />
+              <td className="px-6 py-3"><RiskBadge recoverability={r.recoverability} compact /></td>
               <td className="px-6 py-3">
                 <span className="inline-flex items-center gap-2 font-mono text-xs text-muted">
                   <span className={`w-2 h-2 rounded-full ${STATUS_COLOR[r.status]}`} />

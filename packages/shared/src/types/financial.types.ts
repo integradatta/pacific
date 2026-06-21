@@ -1,5 +1,8 @@
 export type DebtStatus = 'GREEN' | 'YELLOW' | 'ORANGE' | 'RED';
 
+/** Nível de risco interno simples, derivado do score de recuperabilidade. */
+export type RiskLevel = 'LOW' | 'MEDIUM' | 'HIGH';
+
 export interface DebtTerms {
   principal: string;   // Decimal string
   rate: string;        // Decimal string (taxa do período)
@@ -32,10 +35,13 @@ export interface DebtSummary {
 }
 
 export interface DashboardKpis {
-  totalLent: string;        // soma dos principais
-  totalReceivable: string;  // soma dos saldos atuais
-  totalOverdue: string;     // soma dos saldos vencidos (status RED)
+  totalLent: string;            // soma dos principais (total investido)
+  totalReceivable: string;      // soma dos saldos atuais (valor total da carteira)
+  totalOverdue: string;         // soma dos saldos vencidos (status RED)
+  totalExpectedReturn: string;  // soma do valor final no vencimento (retorno esperado)
+  countActive: number;          // operações não vencidas
   countByStatus: Record<DebtStatus, number>;
+  riskDistribution: Record<RiskLevel, number>; // operações por nível de risco
 }
 
 export interface PortfolioRow {

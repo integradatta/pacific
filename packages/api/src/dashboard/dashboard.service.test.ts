@@ -25,6 +25,9 @@ describe('DashboardService.kpis', () => {
     expect(out.totalReceivable).toBe('3000.00'); // rate 0 ⇒ saldo = principal
     expect(out.totalOverdue).toBe('2000.00');     // a 2ª está vencida (RED)
     expect(out.countByStatus).toEqual({ GREEN: 1, YELLOW: 0, ORANGE: 0, RED: 1 });
+    expect(out.totalExpectedReturn).toBe('3000.00'); // rate 0 ⇒ valor final = principal
+    expect(out.countActive).toBe(1);                  // só a 1ª não está vencida
+    expect(out.riskDistribution).toEqual({ LOW: 2, MEDIUM: 0, HIGH: 0 }); // rate 0 ⇒ recuperabilidade alta
   });
   it('filtra por tenantId no findMany', async () => {
     const db = fakeDb();

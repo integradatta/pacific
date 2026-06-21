@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { balanceAt, deriveStatus, daysRemaining, recoverabilityScore, temperatureScore, type DashboardKpis, type DebtStatus, type PortfolioRow } from '@pacific/shared';
+import { balanceAt, deriveStatus, daysRemaining, recoverabilityScore, temperatureScore, riskLevel, type DashboardKpis, type DebtStatus, type RiskLevel, type PortfolioRow } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 
 @Injectable()
@@ -14,7 +14,10 @@ export class DashboardService {
     let totalLent = new Decimal(0);
     let totalReceivable = new Decimal(0);
     let totalOverdue = new Decimal(0);
+    let totalExpectedReturn = new Decimal(0);
+    let countActive = 0;
     const countByStatus: Record<DebtStatus, number> = { GREEN: 0, YELLOW: 0, ORANGE: 0, RED: 0 };
+    const riskDistribution: Record<RiskLevel, number> = { LOW: 0, MEDIUM: 0, HIGH: 0 };
     for (const d of debts) {
       const terms = {
         principal: d.principal.toString(),
@@ -27,14 +30,20 @@ export class DashboardService {
       const status = deriveStatus(daysRemaining(terms, asOf));
       totalLent = totalLent.plus(d.principal.toString());
       totalReceivable = totalReceivable.plus(balance);
+      totalExpectedReturn = totalExpectedReturn.plus(balanceAt(terms, terms.dueDate)); // valor final no vencimento
       if (status === 'RED') totalOverdue = totalOverdue.plus(balance);
+      else countActive += 1;
       countByStatus[status] += 1;
+      riskDistribution[riskLevel(recoverabilityScore(terms, asOf))] += 1;
     }
     return {
       totalLent: totalLent.toFixed(2),
       totalReceivable: totalReceivable.toFixed(2),
       totalOverdue: totalOverdue.toFixed(2),
+      totalExpectedReturn: totalExpectedReturn.toFixed(2),
+      countActive,
       countByStatus,
+      riskDistribution,
     };
   }
 

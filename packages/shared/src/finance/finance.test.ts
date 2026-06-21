@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { monthlyRate, balanceAt, accruedInterest, deriveStatus, daysRemaining, summarize, recoverabilityScore, temperatureScore, operationPreview } from './finance.js';
+import { monthlyRate, balanceAt, accruedInterest, deriveStatus, daysRemaining, summarize, recoverabilityScore, temperatureScore, operationPreview, riskLevel } from './finance.js';
 import type { DebtTerms } from '../types/financial.types.js';
 
 const terms = (over: Partial<DebtTerms> = {}): DebtTerms => ({
@@ -76,5 +76,16 @@ describe('operationPreview (cadastro em tempo real)', () => {
     const p = operationPreview(terms({ principal: '0', dueDate: new Date('2026-01-31T00:00:00Z') }), new Date('2026-01-01T00:00:00Z'));
     expect(p.profitabilityPct).toBe(0);
     expect(p.totalInterest).toBe('0.00');
+  });
+});
+
+describe('riskLevel (score de risco)', () => {
+  it('≥70 baixo, ≥40 médio, abaixo alto (nas bordas)', () => {
+    expect(riskLevel(100)).toBe('LOW');
+    expect(riskLevel(70)).toBe('LOW');
+    expect(riskLevel(69)).toBe('MEDIUM');
+    expect(riskLevel(40)).toBe('MEDIUM');
+    expect(riskLevel(39)).toBe('HIGH');
+    expect(riskLevel(0)).toBe('HIGH');
   });
 });

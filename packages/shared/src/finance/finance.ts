@@ -1,6 +1,6 @@
 import { Decimal } from 'decimal.js';
 import { daysBetween, daysUntil } from '../utils/date.utils.js';
-import type { DebtStatus, DebtTerms, DebtSummary, OperationPreview, Projection } from '../types/financial.types.js';
+import type { DebtStatus, DebtTerms, DebtSummary, OperationPreview, Projection, RiskLevel } from '../types/financial.types.js';
 
 const HORIZONS = [0, 30, 90, 180, 365];
 
@@ -34,6 +34,16 @@ export function deriveStatus(days: number): DebtStatus {
   if (days <= 7) return 'ORANGE';
   if (days <= 30) return 'YELLOW';
   return 'GREEN';
+}
+
+/**
+ * Nível de risco a partir do score de recuperabilidade (0–100), que já pondera
+ * atraso e carga de juros. ≥70 baixo, ≥40 médio, abaixo alto.
+ */
+export function riskLevel(recoverability: number): RiskLevel {
+  if (recoverability >= 70) return 'LOW';
+  if (recoverability >= 40) return 'MEDIUM';
+  return 'HIGH';
 }
 
 function clampPct(n: number): number {
