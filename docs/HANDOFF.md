@@ -22,15 +22,18 @@
   - Itens opcionais restantes do #8: **tags** e **histórico da operação**. Possíveis próximos: tema claro/toggle (decidido fora de escopo nesta etapa), QA visual nas telas que dependem de dados reais (carteira/vencimentos/devedores/me com API).
 
 ## Atualização 2026-06-21 (tarde) — #8 concluído: ETIQUETAS + HISTÓRICO da operação
-- **🔴 AÇÃO NECESSÁRIA NA SUA MÁQUINA antes/junto do deploy da API:** aplicar a migração nova `3_debt_tags` em produção, senão a API quebra (passa a ler `Debt.tags`):
-  ```bash
-  cd packages/database && npx prisma migrate deploy   # usa o .env local (pooler de sessão 5432)
-  ```
-  Migração é **aditiva e idempotente** (`ADD COLUMN IF NOT EXISTS "tags" TEXT[] NOT NULL DEFAULT '{}'`). Registros antigos ficam com `{}`.
+- **✅ Migração `3_debt_tags` aplicada em PROD** (pelo agente, `prisma migrate deploy`, pooler de sessão 5432). Aditiva/idempotente. Padrão p/ futuras: `cd packages/database && npx prisma migrate deploy`.
 - **Etiquetas (tags):** coluna `Debt.tags String[] @default([])`. Normalização única e compartilhada em `@pacific/shared` (`normalizeTags`: minúsculas, trim, dedup, máx. 8, máx. 24 chars). Aceitas em `POST /debts` e `POST /debts/quick`; editáveis via **`PATCH /debts/:id/tags`**. `PortfolioRow.tags` exposto. Web: chips na Carteira, **filtro por etiqueta**, campo no cadastro (`/operacoes/nova`) e editor no detalhe. **Não** aparecem na visão do devedor (`/me`) — são internas do credor.
 - **Histórico da operação (DERIVADO, sem tabela de eventos):** **`GET /debts/:id/history`** compõe a linha do tempo a partir de dados existentes — criação, link gerado/rotacionado (`DebtorAccess`), acessos do devedor (`DebtorLoginEvent`), alertas emitidos (`Notification` por `debtId`) e "Operação venceu" (quando passou do vencimento). Ordem decrescente.
 - **Nova tela:** **`/operacoes/[id]`** (detalhe) — cabeçalho com devedor/status/editor de etiquetas, "Situação atual" (saldo/juros/projeções/risco), "Termos" e "Histórico" (timeline). `GET /debts/:id` agora retorna `DebtRecord` (inclui `debtorName`+`tags`). Linhas da Carteira/Dashboard linkam para o detalhe.
 - **e2e atualizado:** `rls-e2e.ts` e `magic-link-e2e.ts` agora aplicam **todas** as migrações (não só `0_init`) → validam a coluna `tags`.
+
+## Atualização 2026-06-21 (noite) — features 3/4/5: PAGAMENTO + JUROS no display + EMPTY STATES com CTA
+- **✅ Migração `4_debt_payments` aplicada em PROD.** Colunas aditivas em `Debt`: `paidAmount Decimal(14,2) default 0`, `settledAt DateTime?`.
+- **#3 Marcar como pago (parcial/total):** `POST /debts/:id/payments` — `{ full: true }` quita; `{ amount }` abate. Quita automático quando o pago cobre o saldo bruto. **Cancela alertas pendentes** (deleta `Notification` não lidas da dívida). Idempotente se já quitada. Helper `outstanding()` em `@pacific/shared` (devido = bruto − pago, piso 0; 0 se quitada). UI no detalhe `/operacoes/[id]`: campo pré-preenchido com o devido + 1 botão (Quitar/Abater) com `confirm`. Carteira mostra "Devido" + selo **pago**; `/me` (devedor) reflete a quitação.
+- **#4 Juros acumulados no display:** já eram calculados (`balanceAt`/`summarize`); agora `DebtSummary` expõe `paidAmount`/`amountDue`/`settled` e o detalhe mostra **Valor original + Juros acumulados = Valor atual (− Pago = Devido agora)**. Dashboard: `totalReceivable`/`totalOverdue` usam o **devido** (quitadas fora); novos `totalReceived`/`countSettled` ("Recebido"/"Quitadas", só quando há quitação). `PortfolioRow` ganhou `principal`/`amountDue`/`paidAmount`/`settled`.
+- **#5 Estados vazios com CTA:** Carteira vazia mantém o texto + botão **Nova operação**; Notificações vazias mantêm o texto + botão **Gerar alertas de vencimento**. `EmptyState` aceita `action` (href/onClick).
+- **Validado:** lint 4/4 ✓ · test **api 70 + shared 32** ✓ · web build (13 rotas) ✓ · RLS 6/6 ✓ · magic-link 7/7 ✓ · **smoke test logado em prod** (criar → pagar parcial → quitar → dashboard reflete) ✓.
 - **Validado:** `npm run lint` (4/4) ✓ · `npm run test` (api 61 + shared 30) ✓ · `npm run build -w @pacific/web` (14 rotas) ✓ · RLS **6/6** ✓ · magic-link **7/7** ✓. **Commitado + push `main`** (web → Vercel automático).
 - 🔴 Pendente (segurança): **rotacionar** senha do banco + `SUPABASE_JWT_SECRET` (apareceram no chat) e atualizar no Railway.
 

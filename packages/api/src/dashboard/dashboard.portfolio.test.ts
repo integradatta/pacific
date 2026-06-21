@@ -2,8 +2,9 @@ import { describe, it, expect, vi } from 'vitest';
 import { DashboardService } from './dashboard.service.js';
 
 const start = new Date('2026-01-01T00:00:00Z');
-function pfDebt(id: string, name: string, dueDate: Date, rate = '0', principal = '1000.00', tags: string[] = []) {
-  return { id, principal: { toString: () => principal }, rate: { toString: () => rate }, ratePeriod: 'MONTHLY', startDate: start, dueDate, tags, debtor: { name } };
+const dec = (v: string) => ({ toString: () => v, toFixed: () => Number(v).toFixed(2) });
+function pfDebt(id: string, name: string, dueDate: Date, rate = '0', principal = '1000.00', tags: string[] = [], paidAmount = '0', settledAt: Date | null = null) {
+  return { id, principal: dec(principal), rate: dec(rate), ratePeriod: 'MONTHLY', startDate: start, dueDate, tags, paidAmount: dec(paidAmount), settledAt, debtor: { name } };
 }
 function pfDb(debts: ReturnType<typeof pfDebt>[]) {
   return { debt: { findMany: vi.fn(async () => debts) } };
@@ -19,7 +20,7 @@ describe('DashboardService.portfolio', () => {
     ]);
     const rows = await svc(db).portfolio('t1', new Date('2026-02-01T00:00:00Z'));
     expect(rows).toHaveLength(2);
-    expect(rows[0]).toMatchObject({ id: 'a', debtorName: 'Ana Souza', status: 'RED', balance: '1000.00', tags: ['judicial'] });
+    expect(rows[0]).toMatchObject({ id: 'a', debtorName: 'Ana Souza', status: 'RED', balance: '1000.00', amountDue: '1000.00', paidAmount: '0.00', settled: false, principal: '1000.00', tags: ['judicial'] });
     expect(rows[0]!.daysRemaining).toBeLessThan(0);
     expect(rows[1]).toMatchObject({ debtorName: 'Bruno Lima', status: 'GREEN' });
   });
@@ -27,5 +28,14 @@ describe('DashboardService.portfolio', () => {
     const db = pfDb([]);
     await svc(db).portfolio('t9', new Date('2026-02-01T00:00:00Z'));
     expect(db.debt.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { tenantId: 't9' } }));
+  });
+  it('reflete pagamento: parcial abate o devido; quitada zera', async () => {
+    const db = pfDb([
+      pfDebt('p', 'Parcial', new Date('2026-06-01T00:00:00Z'), '0', '1000.00', [], '400.00'),
+      pfDebt('q', 'Quitada', new Date('2026-06-01T00:00:00Z'), '0', '1000.00', [], '1000.00', new Date('2026-02-01T00:00:00Z')),
+    ]);
+    const rows = await svc(db).portfolio('t1', new Date('2026-02-01T00:00:00Z'));
+    expect(rows[0]).toMatchObject({ id: 'p', amountDue: '600.00', paidAmount: '400.00', settled: false });
+    expect(rows[1]).toMatchObject({ id: 'q', amountDue: '0.00', settled: true });
   });
 });

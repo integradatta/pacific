@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Decimal } from 'decimal.js';
 import type { Debt, Prisma } from '@pacific/database';
-import { summarize, normalizeTags, type DebtSummary, type DebtRecord, type DebtEvent } from '@pacific/shared';
+import { summarize, normalizeTags, balanceAt, type DebtSummary, type DebtRecord, type DebtEvent } from '@pacific/shared';
+import type { PayDebtInput } from './dto/pay-debt.dto.js';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 import { generateAccessToken, hashAccessToken } from '../auth/access-token.util.js';
 import type { Page } from '../common/pagination.js';
@@ -85,17 +87,56 @@ export class DebtsService {
     });
   }
 
-  /** Cálculo automático: saldo, juros, dias, status e projeções (tenant-scoped). */
+  /** Cálculo automático: saldo, juros, devido (− pago), dias, status e projeções (tenant-scoped). */
   async summary(tenantId: string, id: string): Promise<DebtSummary> {
     return this.scoped.withTenant(tenantId, async (tx) => {
       const debt = await this.findOne(tx, tenantId, id);
-      return summarize({
-        principal: debt.principal.toString(),
-        rate: debt.rate.toString(),
-        ratePeriod: debt.ratePeriod,
-        startDate: debt.startDate,
-        dueDate: debt.dueDate,
-      });
+      return summarize(
+        {
+          principal: debt.principal.toString(),
+          rate: debt.rate.toString(),
+          ratePeriod: debt.ratePeriod,
+          startDate: debt.startDate,
+          dueDate: debt.dueDate,
+        },
+        new Date(),
+        { paidAmount: debt.paidAmount.toString(), settledAt: debt.settledAt },
+      );
+    });
+  }
+
+  /**
+   * Registra pagamento: parcial (abate `amount` do devido) ou total (`full` ⇒ quita).
+   * Quita automaticamente se o pago alcançar o saldo bruto. Cancela os alertas pendentes
+   * (não lidos) da dívida. Idempotente sobre uma dívida já quitada.
+   */
+  async pay(tenantId: string, id: string, input: PayDebtInput, now: Date = new Date()): Promise<DebtRecord> {
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      const debt = await this.findOne(tx, tenantId, id);
+      if (debt.settledAt) return this.toRecord(debt);
+
+      const gross = new Decimal(
+        balanceAt(
+          {
+            principal: debt.principal.toString(),
+            rate: debt.rate.toString(),
+            ratePeriod: debt.ratePeriod,
+            startDate: debt.startDate,
+            dueDate: debt.dueDate,
+          },
+          now,
+        ),
+      );
+      const already = new Decimal(debt.paidAmount.toString());
+      let paid = input.full ? gross : already.plus(input.amount ?? '0');
+      if (paid.greaterThan(gross)) paid = gross; // não paga além do devido
+      const settledAt = input.full || paid.greaterThanOrEqualTo(gross) ? now : null;
+
+      await tx.debt.update({ where: { id }, data: { paidAmount: paid.toFixed(2), settledAt } });
+      // Cancela alertas pendentes (não lidos) desta dívida.
+      await tx.notification.deleteMany({ where: { tenantId, debtId: id, readAt: null } });
+
+      return this.toRecord(await this.findOne(tx, tenantId, id));
     });
   }
 
@@ -153,6 +194,8 @@ export class DebtsService {
       dueDate: d.dueDate.toISOString(),
       status: d.status,
       tags: d.tags,
+      paidAmount: d.paidAmount.toString(),
+      settledAt: d.settledAt ? d.settledAt.toISOString() : null,
       createdAt: d.createdAt.toISOString(),
     };
   }

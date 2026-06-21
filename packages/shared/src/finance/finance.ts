@@ -32,6 +32,16 @@ export function accruedInterest(terms: DebtTerms, asOf: Date): string {
   return new Decimal(balanceAt(terms, asOf)).minus(terms.principal).toFixed(2);
 }
 
+/**
+ * Valor devido agora = saldo bruto (principal + juros) menos o que já foi pago, com piso
+ * em zero. Quitada (settled) ⇒ 0. Usado no painel e na carteira como "a receber".
+ */
+export function outstanding(grossBalance: string, paidAmount: string, settled: boolean): string {
+  if (settled) return '0.00';
+  const due = new Decimal(grossBalance).minus(paidAmount || '0');
+  return Decimal.max(0, due).toFixed(2);
+}
+
 export function daysRemaining(terms: DebtTerms, asOf: Date): number {
   return daysUntil(terms.dueDate, asOf);
 }
@@ -83,11 +93,21 @@ export function projections(terms: DebtTerms, asOf: Date): Projection[] {
   });
 }
 
-export function summarize(terms: DebtTerms, asOf: Date = new Date()): DebtSummary {
+export function summarize(
+  terms: DebtTerms,
+  asOf: Date = new Date(),
+  settlement: { paidAmount?: string; settledAt?: Date | null } = {},
+): DebtSummary {
   const days = daysRemaining(terms, asOf);
+  const balance = balanceAt(terms, asOf);
+  const paidAmount = new Decimal(settlement.paidAmount || '0').toFixed(2);
+  const settled = settlement.settledAt != null;
   return {
-    balance: balanceAt(terms, asOf),
+    balance,
     accruedInterest: accruedInterest(terms, asOf),
+    paidAmount,
+    amountDue: outstanding(balance, paidAmount, settled),
+    settled,
     daysRemaining: days,
     status: deriveStatus(days),
     scores: {

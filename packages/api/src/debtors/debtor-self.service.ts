@@ -14,13 +14,17 @@ export class DebtorSelfService {
       return debts.map((d) => ({
         id: d.id,
         dueDate: d.dueDate.toISOString(),
-        summary: summarize({
-          principal: d.principal.toString(),
-          rate: d.rate.toString(),
-          ratePeriod: d.ratePeriod,
-          startDate: d.startDate,
-          dueDate: d.dueDate,
-        }),
+        summary: summarize(
+          {
+            principal: d.principal.toString(),
+            rate: d.rate.toString(),
+            ratePeriod: d.ratePeriod,
+            startDate: d.startDate,
+            dueDate: d.dueDate,
+          },
+          new Date(),
+          { paidAmount: d.paidAmount.toString(), settledAt: d.settledAt },
+        ),
       }));
     });
   }

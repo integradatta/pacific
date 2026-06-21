@@ -5,13 +5,26 @@ const farDue = new Date('2026-12-01T00:00:00Z');
 const pastDue = new Date('2026-01-10T00:00:00Z');
 const start = new Date('2026-01-01T00:00:00Z');
 
-function fakeDb() {
+const dec = (v: string) => ({ toString: () => v, toFixed: () => Number(v).toFixed(2) });
+type Raw = { principal: string; rate: string; dueDate: Date; paidAmount?: string; settledAt?: Date | null };
+function fakeDb(rows?: Raw[]) {
+  const base: Raw[] = rows ?? [
+    { principal: '1000.00', rate: '0', dueDate: farDue },
+    { principal: '2000.00', rate: '0', dueDate: pastDue },
+  ];
   return {
     debt: {
-      findMany: vi.fn(async () => [
-        { principal: '1000.00', rate: '0', ratePeriod: 'MONTHLY', startDate: start, dueDate: farDue },
-        { principal: '2000.00', rate: '0', ratePeriod: 'MONTHLY', startDate: start, dueDate: pastDue },
-      ].map((d) => ({ ...d, principal: { toString: () => d.principal }, rate: { toString: () => d.rate } }))),
+      findMany: vi.fn(async () =>
+        base.map((d) => ({
+          ratePeriod: 'MONTHLY',
+          startDate: start,
+          ...d,
+          principal: dec(d.principal),
+          rate: dec(d.rate),
+          paidAmount: dec(d.paidAmount ?? '0'),
+          settledAt: d.settledAt ?? null,
+        })),
+      ),
     },
   };
 }
@@ -33,5 +46,25 @@ describe('DashboardService.kpis', () => {
     const db = fakeDb();
     await svc(db).kpis('t9', new Date('2026-02-01T00:00:00Z'));
     expect(db.debt.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { tenantId: 't9' } }));
+  });
+  it('quitada sai de a receber/contagens e entra em recebido + countSettled', async () => {
+    const db = fakeDb([
+      { principal: '1000.00', rate: '0', dueDate: farDue },
+      { principal: '2000.00', rate: '0', dueDate: pastDue, paidAmount: '2000.00', settledAt: start },
+    ]);
+    const out = await svc(db).kpis('t1', new Date('2026-02-01T00:00:00Z'));
+    expect(out.totalLent).toBe('3000.00');       // empréstimo total não muda
+    expect(out.totalReceivable).toBe('1000.00'); // só a 1ª (a 2ª foi quitada)
+    expect(out.totalOverdue).toBe('0.00');        // a vencida foi quitada
+    expect(out.totalReceived).toBe('2000.00');
+    expect(out.countSettled).toBe(1);
+    expect(out.countByStatus).toEqual({ GREEN: 1, YELLOW: 0, ORANGE: 0, RED: 0 });
+  });
+  it('pagamento parcial abate o a receber/vencido', async () => {
+    const db = fakeDb([{ principal: '2000.00', rate: '0', dueDate: pastDue, paidAmount: '500.00' }]);
+    const out = await svc(db).kpis('t1', new Date('2026-02-01T00:00:00Z'));
+    expect(out.totalReceivable).toBe('1500.00');
+    expect(out.totalOverdue).toBe('1500.00');
+    expect(out.totalReceived).toBe('500.00');
   });
 });

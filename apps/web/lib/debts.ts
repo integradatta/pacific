@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DebtRecord, DebtSummary, DebtEvent } from '@pacific/shared';
-import { apiGet, apiPatch } from './api';
+import { apiGet, apiPatch, apiPost } from './api';
 
 export function useDebt(id: string) {
   return useQuery({ queryKey: ['debt', id], queryFn: () => apiGet<DebtRecord>(`/debts/${id}`) });
@@ -24,6 +24,22 @@ export function useSetDebtTags(id: string) {
     onSuccess: (rec) => {
       qc.setQueryData(['debt', id], rec);
       void qc.invalidateQueries({ queryKey: ['portfolio'] });
+    },
+  });
+}
+
+/** Registra pagamento (parcial: { amount } ou total: { full: true }) e atualiza tudo. */
+export function usePayDebt(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { amount?: string; full?: boolean }) => apiPost<DebtRecord>(`/debts/${id}/payments`, input),
+    onSuccess: (rec) => {
+      qc.setQueryData(['debt', id], rec);
+      void qc.invalidateQueries({ queryKey: ['debt', id, 'summary'] });
+      void qc.invalidateQueries({ queryKey: ['debt', id, 'history'] });
+      void qc.invalidateQueries({ queryKey: ['portfolio'] });
+      void qc.invalidateQueries({ queryKey: ['kpis'] });
+      void qc.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
 }

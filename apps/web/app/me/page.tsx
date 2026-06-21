@@ -14,6 +14,9 @@ interface MyDebt {
   summary: {
     balance: string;
     accruedInterest: string;
+    paidAmount: string;
+    amountDue: string;
+    settled: boolean;
     daysRemaining: number;
     status: DebtStatus;
     projections: { horizonDays: number; balance: string }[];
@@ -28,14 +31,27 @@ function DebtCard({ debt }: { debt: MyDebt }) {
     <section className="panel p-6 space-y-5">
       <div className="flex items-start justify-between">
         <div>
-          <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-1">Saldo atual</p>
-          <p className="font-mono text-3xl font-medium text-text tabular-nums">{formatBRL(s.balance)}</p>
-          <p className="font-mono text-[11px] text-muted mt-1">juros acumulados {formatBRL(s.accruedInterest)}</p>
+          <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-1">{s.settled ? 'Dívida quitada' : 'Saldo atual'}</p>
+          <p className={`font-mono text-3xl font-medium tabular-nums ${s.settled ? 'text-status-green' : 'text-text'}`}>
+            {formatBRL(s.settled ? s.balance : s.amountDue)}
+          </p>
+          <p className="font-mono text-[11px] text-muted mt-1">
+            {Number(s.paidAmount) > 0 && !s.settled
+              ? <>saldo {formatBRL(s.balance)} · pago {formatBRL(s.paidAmount)}</>
+              : <>juros acumulados {formatBRL(s.accruedInterest)}</>}
+          </p>
         </div>
-        <span className="inline-flex items-center gap-2 font-mono text-xs text-muted">
-          <span className={`w-2 h-2 rounded-full ${STATUS_COLOR[s.status]}`} />
-          {STATUS_LABEL[s.status]}
-        </span>
+        {s.settled ? (
+          <span className="inline-flex items-center gap-2 font-mono text-xs text-status-green">
+            <span className="w-2 h-2 rounded-full bg-status-green" />
+            paga
+          </span>
+        ) : (
+          <span className="inline-flex items-center gap-2 font-mono text-xs text-muted">
+            <span className={`w-2 h-2 rounded-full ${STATUS_COLOR[s.status]}`} />
+            {STATUS_LABEL[s.status]}
+          </span>
+        )}
       </div>
 
       <div className="flex items-center gap-6 border-t border-line pt-4 font-mono text-xs">

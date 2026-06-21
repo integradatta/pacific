@@ -7,6 +7,7 @@ function fakeDb(debts: Array<{ id: string }>) {
     id: d.id, debtorId: 'me', tenantId: 't1',
     principal: { toString: () => '1000.00' }, rate: { toString: () => '0' }, ratePeriod: 'MONTHLY',
     startDate: start, dueDate: new Date('2026-06-01T00:00:00Z'),
+    paidAmount: { toString: () => '0' }, settledAt: null,
   }))) } };
 }
 const svc = (db: ReturnType<typeof fakeDb>) =>

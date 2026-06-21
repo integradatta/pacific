@@ -1,13 +1,14 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import type { DebtEvent, DebtEventKind } from '@pacific/shared';
+import type { DebtEvent, DebtEventKind, DebtSummary } from '@pacific/shared';
 import { Shell } from '@/components/Shell';
 import { Skeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/States';
 import { TagInput } from '@/components/Tags';
 import { RiskBadge } from '@/components/RiskBadge';
-import { useDebt, useDebtSummary, useDebtHistory, useSetDebtTags } from '@/lib/debts';
+import { useDebt, useDebtSummary, useDebtHistory, useSetDebtTags, usePayDebt } from '@/lib/debts';
 import { formatBRL, venceEm } from '@/lib/format';
 import { STATUS_COLOR, STATUS_LABEL } from '@/lib/status';
 
@@ -64,11 +65,118 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
+// Linha do breakdown: operador (+/−/=) + rótulo + valor.
+function CalcRow({ op, label, value, strong }: { op?: '+' | '−' | '='; label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="font-mono text-[11px] uppercase tracking-wider flex items-baseline gap-1.5">
+        <span className={`w-2 text-center ${op === '=' ? 'text-sonar' : 'text-muted'}`}>{op ?? ''}</span>
+        <span className={strong ? 'text-text-dim' : 'text-muted'}>{label}</span>
+      </span>
+      <span className={`font-mono tabular-nums ${strong ? 'text-text text-base' : 'text-text-dim text-sm'}`}>{value}</span>
+    </div>
+  );
+}
+
+/**
+ * Registrar pagamento — um campo (pré-preenchido com o devido) + um botão com confirmação.
+ * Deixar o valor cheio quita (total); reduzir registra pagamento parcial.
+ */
+function PaymentBox({ amountDue, pending, onPay }: { amountDue: string; pending: boolean; onPay: (input: { amount?: string; full?: boolean }) => void }) {
+  const [amount, setAmount] = useState(amountDue);
+  const due = Number(amountDue);
+  const val = Number(amount);
+  const isFull = Number.isFinite(val) && val >= due;
+  const valid = Number.isFinite(val) && val > 0;
+
+  function submit(): void {
+    if (!valid) return;
+    const label = isFull ? 'Quitar esta operação (pagamento total)?' : `Registrar pagamento de ${formatBRL(amount)}?`;
+    if (!window.confirm(label)) return;
+    onPay(isFull ? { full: true } : { amount });
+  }
+
+  return (
+    <div className="mt-5 pt-5 border-t border-line">
+      <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-2">Registrar pagamento</p>
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-xs text-muted">R$</span>
+          <input
+            type="number" inputMode="decimal" min="0" step="0.01" value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            aria-label="Valor do pagamento"
+            className="w-full bg-surface2 border border-line rounded-lg pl-9 pr-3 py-2.5 text-text font-mono text-sm tabular-nums focus:outline-none focus:border-sonar focus:shadow-glow transition-all"
+          />
+        </div>
+        <button
+          type="button" onClick={submit} disabled={pending || !valid}
+          className="bg-sonar text-ink font-mono text-xs font-semibold uppercase tracking-widest px-4 rounded-lg shadow-[0_8px_24px_-10px_rgb(var(--sonar)/0.7)] hover:brightness-110 active:translate-y-px disabled:opacity-50 disabled:shadow-none transition-all whitespace-nowrap"
+        >
+          {pending ? 'Salvando…' : isFull ? 'Quitar' : 'Abater'}
+        </button>
+      </div>
+      <p className="font-mono text-[10px] text-muted mt-1.5">
+        {isFull ? 'valor cheio → quita a operação' : 'valor parcial → abate do total devido'}
+      </p>
+    </div>
+  );
+}
+
+function SituacaoAtual({ s, principal, pending, onPay }: { s: DebtSummary; principal: string; pending: boolean; onPay: (i: { amount?: string; full?: boolean }) => void }) {
+  const hasPaid = Number(s.paidAmount) > 0;
+  return (
+    <>
+      {s.settled ? (
+        <div className="mb-3">
+          <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full border border-status-green/40 bg-status-green/10 text-status-green">
+            <span className="w-1.5 h-1.5 rounded-full bg-status-green" /> Quitada
+          </span>
+        </div>
+      ) : null}
+      <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-1">{s.settled ? 'Valor quitado' : 'Devido agora'}</p>
+      <p className={`font-mono text-3xl font-medium tabular-nums tracking-tight ${s.settled ? 'text-status-green' : 'text-text'}`}>
+        {formatBRL(s.settled ? s.paidAmount : s.amountDue)}
+      </p>
+      <p className="font-mono text-[11px] text-muted mt-1">{venceEm(s.daysRemaining)}</p>
+
+      {/* Breakdown: original + juros = atual (− pago = devido) */}
+      <div className="mt-4 space-y-1.5">
+        <CalcRow label="Valor original" value={formatBRL(principal)} />
+        <CalcRow op="+" label="Juros acumulados" value={formatBRL(s.accruedInterest)} />
+        <CalcRow op="=" label="Valor atual" value={formatBRL(s.balance)} strong={!hasPaid} />
+        {hasPaid ? (
+          <>
+            <CalcRow op="−" label="Pago" value={formatBRL(s.paidAmount)} />
+            <CalcRow op="=" label="Devido agora" value={formatBRL(s.amountDue)} strong />
+          </>
+        ) : null}
+      </div>
+
+      {/* Projeção do saldo (bruto, sem abatimentos) */}
+      <div className="mt-5">
+        <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-2">Projeção do saldo</p>
+        <div className="grid grid-cols-5 gap-2">
+          {s.projections.map((p) => (
+            <div key={p.horizonDays} className="text-center">
+              <p className="font-mono text-[10px] text-muted">{HORIZON_LABEL[p.horizonDays] ?? `${p.horizonDays}d`}</p>
+              <p className="font-mono text-xs text-text tabular-nums mt-1">{formatBRL(p.balance)}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {!s.settled ? <PaymentBox amountDue={s.amountDue} pending={pending} onPay={onPay} /> : null}
+    </>
+  );
+}
+
 export default function OperacaoDetalhePage({ params }: { params: { id: string } }) {
   const debt = useDebt(params.id);
   const summary = useDebtSummary(params.id);
   const history = useDebtHistory(params.id);
   const setTags = useSetDebtTags(params.id);
+  const pay = usePayDebt(params.id);
 
   const loading = debt.isLoading;
 
@@ -129,22 +237,9 @@ export default function OperacaoDetalhePage({ params }: { params: { id: string }
                 ) : summary.isError || !summary.data ? (
                   <p className="font-sans text-sm text-text-dim">Cálculo indisponível.</p>
                 ) : (
-                  <>
-                    <p className="font-mono text-3xl font-medium text-text tabular-nums tracking-tight">{formatBRL(summary.data.balance)}</p>
-                    <p className="font-mono text-[11px] text-muted mt-1">juros acumulados {formatBRL(summary.data.accruedInterest)} · {venceEm(summary.data.daysRemaining)}</p>
-                    <div className="mt-5">
-                      <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-2">Projeção do saldo</p>
-                      <div className="grid grid-cols-5 gap-2">
-                        {summary.data.projections.map((p) => (
-                          <div key={p.horizonDays} className="text-center">
-                            <p className="font-mono text-[10px] text-muted">{HORIZON_LABEL[p.horizonDays] ?? `${p.horizonDays}d`}</p>
-                            <p className="font-mono text-xs text-text tabular-nums mt-1">{formatBRL(p.balance)}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </>
+                  <SituacaoAtual s={summary.data} principal={debt.data.principal} pending={pay.isPending} onPay={(i) => pay.mutate(i)} />
                 )}
+                {pay.isError ? <p role="alert" className="font-mono text-[10px] text-status-red mt-2">Não foi possível registrar o pagamento.</p> : null}
               </section>
 
               {/* Termos */}

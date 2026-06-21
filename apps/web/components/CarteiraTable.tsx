@@ -34,7 +34,13 @@ export function CarteiraTable({ rows }: { rows: PortfolioRow[] }) {
       <section className="panel p-12 text-center">
         <p className="font-mono text-2xl text-muted/60 mb-3" aria-hidden>◈</p>
         <p className="font-sans text-sm text-text-dim">Nenhuma dívida na carteira ainda.</p>
-        <p className="font-mono text-[10px] text-muted uppercase tracking-widest mt-1">cadastre uma operação para começar a monitorar</p>
+        <p className="font-mono text-[10px] text-muted uppercase tracking-widest mt-1 mb-5">cadastre uma operação para começar a monitorar</p>
+        <Link
+          href="/operacoes/nova"
+          className="inline-flex items-center gap-2 bg-sonar text-ink font-mono text-xs font-semibold uppercase tracking-widest px-4 py-2.5 rounded-lg shadow-[0_8px_24px_-10px_rgb(var(--sonar)/0.7)] hover:brightness-110 active:translate-y-px transition-all"
+        >
+          <span aria-hidden>✦</span> Nova operação
+        </Link>
       </section>
     );
   }
@@ -49,7 +55,7 @@ export function CarteiraTable({ rows }: { rows: PortfolioRow[] }) {
         <thead>
           <tr className="font-mono text-[10px] text-muted uppercase tracking-widest border-b border-line">
             <th className="text-left font-normal px-6 py-2.5">Devedor</th>
-            <th className="text-right font-normal px-6 py-2.5">Saldo</th>
+            <th className="text-right font-normal px-6 py-2.5" title="Valor devido agora (saldo com juros − pago)">Devido</th>
             <th className="text-right font-normal px-6 py-2.5">Vence</th>
             <th className="text-right font-normal px-6 py-2.5" title="Recuperabilidade (0–100)">Recup.</th>
             <th className="text-right font-normal px-6 py-2.5" title="Temperatura / urgência (0–100)">Temp.</th>
@@ -66,16 +72,25 @@ export function CarteiraTable({ rows }: { rows: PortfolioRow[] }) {
                 </Link>
                 {r.tags.length > 0 && <div className="mt-1"><TagList tags={r.tags} /></div>}
               </td>
-              <td className="px-6 py-3.5 font-mono text-sm text-text text-right tabular-nums">{formatBRL(r.balance)}</td>
-              <td className="px-6 py-3.5 font-mono text-sm text-muted text-right tabular-nums">{venceEm(r.daysRemaining)}</td>
+              <td className={`px-6 py-3.5 font-mono text-sm text-right tabular-nums ${r.settled ? 'text-muted' : 'text-text'}`}>
+                {formatBRL(r.amountDue)}
+              </td>
+              <td className="px-6 py-3.5 font-mono text-sm text-muted text-right tabular-nums">{r.settled ? '—' : venceEm(r.daysRemaining)}</td>
               <ScoreCell value={r.recoverability} tone="good" />
               <ScoreCell value={r.temperature} tone="urgency" />
               <td className="px-6 py-3.5"><RiskBadge recoverability={r.recoverability} compact /></td>
               <td className="px-6 py-3.5">
-                <span className="inline-flex items-center gap-2 font-mono text-xs text-muted">
-                  <span className={`w-2 h-2 rounded-full ${STATUS_COLOR[r.status]}`} />
-                  {STATUS_LABEL[r.status]}
-                </span>
+                {r.settled ? (
+                  <span className="inline-flex items-center gap-2 font-mono text-xs text-status-green">
+                    <span className="w-2 h-2 rounded-full bg-status-green" />
+                    pago
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-2 font-mono text-xs text-muted">
+                    <span className={`w-2 h-2 rounded-full ${STATUS_COLOR[r.status]}`} />
+                    {STATUS_LABEL[r.status]}
+                  </span>
+                )}
               </td>
             </tr>
           ))}

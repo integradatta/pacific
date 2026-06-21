@@ -10,6 +10,7 @@ import { DebtsService } from './debts.service.js';
 import { CreateDebtDto } from './dto/create-debt.dto.js';
 import { CreateQuickDebtDto } from './dto/create-quick-debt.dto.js';
 import { UpdateDebtTagsDto } from './dto/update-debt-tags.dto.js';
+import { PayDebtDto } from './dto/pay-debt.dto.js';
 import type { Debt } from '@pacific/database';
 import type { DebtSummary, DebtRecord, DebtEvent } from '@pacific/shared';
 
@@ -59,5 +60,11 @@ export class DebtsController {
     @Body() dto: UpdateDebtTagsDto,
   ): Promise<DebtRecord> {
     return this.debts.setTags(tenantId, id, dto.tags);
+  }
+
+  // Registra pagamento (parcial: { amount } ou total: { full: true }).
+  @Post(':id/payments') @Roles('CREDITOR')
+  pay(@TenantId() tenantId: string, @Param('id') id: string, @Body() dto: PayDebtDto): Promise<DebtRecord> {
+    return this.debts.pay(tenantId, id, dto);
   }
 }

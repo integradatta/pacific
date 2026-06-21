@@ -104,6 +104,10 @@ model Debt {
   startDate   DateTime
   dueDate     DateTime
   status      DebtStatus @default(GREEN)
+  // Pagamentos: total abatido e quando foi quitada (paga em total). Devido agora =
+  // saldo bruto − paidAmount (piso 0); settledAt != null ⇒ quitada (devido 0).
+  paidAmount  Decimal    @default(0) @db.Decimal(14, 2)
+  settledAt   DateTime?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 

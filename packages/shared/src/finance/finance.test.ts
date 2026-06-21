@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { monthlyRate, balanceAt, accruedInterest, deriveStatus, daysRemaining, summarize, recoverabilityScore, temperatureScore, operationPreview, riskLevel } from './finance.js';
+import { monthlyRate, balanceAt, accruedInterest, deriveStatus, daysRemaining, summarize, recoverabilityScore, temperatureScore, operationPreview, riskLevel, outstanding } from './finance.js';
 import type { DebtTerms } from '../types/financial.types.js';
 
 const terms = (over: Partial<DebtTerms> = {}): DebtTerms => ({
@@ -30,6 +30,21 @@ describe('motor financeiro (Decimal.js)', () => {
     expect(deriveStatus(daysRemaining(terms({ dueDate: new Date('2026-02-20T00:00:00Z') }), asOf))).toBe('YELLOW');  // <=30
     expect(deriveStatus(daysRemaining(terms({ dueDate: new Date('2026-02-05T00:00:00Z') }), asOf))).toBe('ORANGE');  // <=7
     expect(deriveStatus(daysRemaining(terms({ dueDate: new Date('2026-01-20T00:00:00Z') }), asOf))).toBe('RED');     // vencido
+  });
+  it('outstanding = bruto − pago (piso 0); quitada ⇒ 0', () => {
+    expect(outstanding('1000.00', '0', false)).toBe('1000.00');
+    expect(outstanding('1000.00', '400', false)).toBe('600.00');
+    expect(outstanding('1000.00', '1200', false)).toBe('0.00'); // não fica negativo
+    expect(outstanding('1000.00', '0', true)).toBe('0.00');     // quitada
+  });
+  it('summarize reflete pagamento parcial e quitação', () => {
+    const s = summarize(terms({ rate: '0' }), new Date('2026-06-01T00:00:00Z'), { paidAmount: '300' });
+    expect(s.amountDue).toBe('700.00');
+    expect(s.paidAmount).toBe('300.00');
+    expect(s.settled).toBe(false);
+    const q = summarize(terms({ rate: '0' }), new Date('2026-06-01T00:00:00Z'), { paidAmount: '1000', settledAt: new Date() });
+    expect(q.settled).toBe(true);
+    expect(q.amountDue).toBe('0.00');
   });
   it('summarize devolve projeções nos horizontes 0/30/90/180/365', () => {
     const s = summarize(terms(), new Date('2026-01-01T00:00:00Z'));

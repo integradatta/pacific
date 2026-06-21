@@ -135,7 +135,12 @@ export default function NotificacoesPage() {
         ) : notifs.isError ? (
           <ErrorState message="Não foi possível carregar as notificações." />
         ) : items.length === 0 ? (
-          <EmptyState glyph="◎" title="Nenhum alerta no radar." hint="cadastre operações com vencimento próximo e gere os alertas" />
+          <EmptyState
+            glyph="◎"
+            title="Nenhum alerta no radar."
+            hint="cadastre operações com vencimento próximo e gere os alertas"
+            action={{ label: 'Gerar alertas de vencimento', onClick: () => void generate.mutateAsync(activeTypes()), pending: generate.isPending }}
+          />
         ) : (
           <div className="space-y-2">
             {items.map((n) => (

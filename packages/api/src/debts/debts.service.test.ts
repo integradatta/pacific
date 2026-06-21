@@ -17,6 +17,8 @@ function debtRow(over: Record<string, unknown> = {}) {
     startDate: new Date('2026-05-01T00:00:00Z'),
     dueDate: new Date('2026-07-01T00:00:00Z'),
     status: 'GREEN',
+    paidAmount: dec('0'),
+    settledAt: null,
     createdAt: new Date('2026-05-01T00:00:00Z'),
     debtor: { name: 'Cliente A' },
     ...over,
@@ -31,7 +33,7 @@ function fakeDb() {
     },
     debtorAccess: { create: vi.fn(async () => ({})), findFirst: vi.fn(async () => null) },
     debtorLoginEvent: { findMany: vi.fn(async () => []) },
-    notification: { findMany: vi.fn(async () => []) },
+    notification: { findMany: vi.fn(async () => []), deleteMany: vi.fn(async () => ({ count: 0 })) },
     debt: {
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'debt1', ...data })),
       update: vi.fn(async () => ({})),
@@ -132,6 +134,50 @@ describe('DebtsService', () => {
     });
     it('history de outro tenant → NotFound', async () => {
       await expect(svc(fakeDb()).history('t2', 'debt1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('pay (pagamento)', () => {
+    const NOW = new Date('2026-06-01T00:00:00Z');
+    const zeroRate = (db: ReturnType<typeof fakeDb>) => {
+      db.debt.findFirst = vi.fn(async () => debtRow({ rate: dec('0') })) as never; // gross = principal = 1000.00
+    };
+
+    it('total (full) quita: paidAmount = saldo bruto e settledAt setado', async () => {
+      const db = fakeDb(); zeroRate(db);
+      await svc(db).pay('t1', 'debt1', { full: true }, NOW);
+      expect(db.debt.update).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: 'debt1' }, data: expect.objectContaining({ paidAmount: '1000.00', settledAt: NOW }) }),
+      );
+    });
+    it('parcial abate sem quitar (settledAt null)', async () => {
+      const db = fakeDb(); zeroRate(db);
+      await svc(db).pay('t1', 'debt1', { amount: '300' }, NOW);
+      expect(db.debt.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { paidAmount: '300.00', settledAt: null } }),
+      );
+    });
+    it('parcial que cobre o bruto quita automaticamente', async () => {
+      const db = fakeDb(); zeroRate(db);
+      await svc(db).pay('t1', 'debt1', { amount: '1000' }, NOW);
+      expect(db.debt.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { paidAmount: '1000.00', settledAt: NOW } }),
+      );
+    });
+    it('cancela alertas pendentes (não lidos) da dívida', async () => {
+      const db = fakeDb(); zeroRate(db);
+      await svc(db).pay('t1', 'debt1', { full: true }, NOW);
+      expect(db.notification.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 't1', debtId: 'debt1', readAt: null } });
+    });
+    it('já quitada é idempotente (não atualiza nem mexe em alertas)', async () => {
+      const db = fakeDb();
+      db.debt.findFirst = vi.fn(async () => debtRow({ settledAt: new Date('2026-05-20T00:00:00Z') })) as never;
+      await svc(db).pay('t1', 'debt1', { full: true }, NOW);
+      expect(db.debt.update).not.toHaveBeenCalled();
+      expect(db.notification.deleteMany).not.toHaveBeenCalled();
+    });
+    it('pagamento em dívida de outro tenant → NotFound', async () => {
+      await expect(svc(fakeDb()).pay('t2', 'debt1', { full: true }, NOW)).rejects.toBeInstanceOf(NotFoundException);
     });
   });
 });

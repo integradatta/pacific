@@ -26,8 +26,11 @@ export interface OperationPreview {
 export interface DebtScores { recoverability: number; temperature: number; }
 
 export interface DebtSummary {
-  balance: string;
-  accruedInterest: string;
+  balance: string;          // saldo bruto: principal + juros acumulados até a data
+  accruedInterest: string;  // só os juros acumulados
+  paidAmount: string;       // total já pago (abatimentos registrados)
+  amountDue: string;        // devido agora = bruto − pago (piso 0; 0 se quitada)
+  settled: boolean;         // operação quitada (paga em total)
   daysRemaining: number;
   status: DebtStatus;
   scores: DebtScores;
@@ -36,18 +39,24 @@ export interface DebtSummary {
 
 export interface DashboardKpis {
   totalLent: string;            // soma dos principais (total investido)
-  totalReceivable: string;      // soma dos saldos atuais (valor total da carteira)
-  totalOverdue: string;         // soma dos saldos vencidos (status RED)
-  totalExpectedReturn: string;  // soma do valor final no vencimento (retorno esperado)
-  countActive: number;          // operações não vencidas
-  countByStatus: Record<DebtStatus, number>;
-  riskDistribution: Record<RiskLevel, number>; // operações por nível de risco
+  totalReceivable: string;      // soma do devido agora das operações em aberto (a receber)
+  totalOverdue: string;         // soma do devido agora das operações vencidas em aberto
+  totalExpectedReturn: string;  // soma do valor final no vencimento (operações em aberto)
+  totalReceived: string;        // soma do que já foi pago (abatimentos + quitações)
+  countActive: number;          // operações em aberto não vencidas
+  countSettled: number;         // operações quitadas (pagas em total)
+  countByStatus: Record<DebtStatus, number>; // só operações em aberto
+  riskDistribution: Record<RiskLevel, number>; // operações em aberto por nível de risco
 }
 
 export interface PortfolioRow {
   id: string;
   debtorName: string;
-  balance: string;
+  principal: string;   // valor original emprestado
+  balance: string;     // saldo bruto atual (principal + juros acumulados)
+  amountDue: string;   // devido agora (bruto − pago; 0 se quitada)
+  paidAmount: string;  // total já pago
+  settled: boolean;    // quitada
   daysRemaining: number;
   status: DebtStatus;
   recoverability: number;
@@ -70,6 +79,8 @@ export interface DebtRecord {
   dueDate: string;   // ISO
   status: DebtStatus;
   tags: string[];
+  paidAmount: string;        // total já pago
+  settledAt: string | null;  // ISO quando quitada; null se em aberto
   createdAt: string; // ISO
 }
 

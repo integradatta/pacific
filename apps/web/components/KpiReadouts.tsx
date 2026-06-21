@@ -39,10 +39,18 @@ export function KpiReadouts({ kpis }: { kpis: DashboardKpis }) {
       {/* Valores */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Readout label="Total investido" value={formatBRL(kpis.totalLent)} />
-        <Readout label="Valor da carteira" value={formatBRL(kpis.totalReceivable)} />
+        <Readout label="A receber" value={formatBRL(kpis.totalReceivable)} />
         <Readout label="Retorno esperado" value={formatBRL(kpis.totalExpectedReturn)} />
         <Readout label="Vencido" value={formatBRL(kpis.totalOverdue)} accent={Number(kpis.totalOverdue) > 0} />
       </div>
+
+      {/* Pagamentos recebidos — só quando há atividade de quitação */}
+      {(kpis.countSettled > 0 || Number(kpis.totalReceived) > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Readout label="Recebido" value={formatBRL(kpis.totalReceived)} />
+          <Readout label="Quitadas" value={String(kpis.countSettled)} />
+        </div>
+      )}
 
       {/* Contagens + distribuições */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
