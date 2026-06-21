@@ -84,7 +84,7 @@ export interface DebtRecord {
   createdAt: string; // ISO
 }
 
-export type DebtEventKind = 'created' | 'link' | 'login' | 'notification' | 'due';
+export type DebtEventKind = 'created' | 'link' | 'login' | 'notification' | 'due' | 'paid';
 
 /** Evento do histórico de uma operação (derivado de dados existentes; sem tabela de eventos). */
 export interface DebtEvent {

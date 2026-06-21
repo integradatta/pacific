@@ -21,6 +21,7 @@ const EVENT_GLYPH: Record<DebtEventKind, string> = {
   login: '◉',
   notification: '◎',
   due: '◷',
+  paid: '✓',
 };
 
 function fmtDateTime(iso: string): string {
@@ -39,7 +40,7 @@ function Timeline({ events }: { events: DebtEvent[] }) {
         <li key={`${e.at}-${i}`} className="relative flex gap-4 pb-5 last:pb-0">
           <span
             className={`relative z-10 shrink-0 w-6 h-6 rounded-full border border-line bg-surface2 flex items-center justify-center text-[11px] ${
-              e.kind === 'due' ? 'text-status-red' : 'text-sonar'
+              e.kind === 'due' ? 'text-status-red' : e.kind === 'paid' ? 'text-status-green' : 'text-sonar'
             }`}
             aria-hidden
           >

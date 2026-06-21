@@ -124,6 +124,12 @@ describe('DebtsService', () => {
       const events = await svc(db).history('t1', 'debt1', new Date('2026-08-01T00:00:00Z'));
       expect(events.some((e) => e.kind === 'due')).toBe(true);
     });
+    it('inclui "Operação quitada" quando há settledAt', async () => {
+      const db = fakeDb();
+      db.debt.findFirst = vi.fn(async () => debtRow({ settledAt: new Date('2026-06-15T00:00:00Z') })) as never;
+      const events = await svc(db).history('t1', 'debt1', new Date('2026-06-20T00:00:00Z'));
+      expect(events.some((e) => e.kind === 'paid' && e.title === 'Operação quitada')).toBe(true);
+    });
     it('filtra notificações e acessos por tenant + dívida/devedor', async () => {
       const db = fakeDb();
       await svc(db).history('t1', 'debt1', new Date('2026-06-01T00:00:00Z'));

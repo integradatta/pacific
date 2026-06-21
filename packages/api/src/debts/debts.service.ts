@@ -176,6 +176,9 @@ export class DebtsService {
       if (debt.dueDate.getTime() < now.getTime()) {
         events.push({ at: debt.dueDate.toISOString(), kind: 'due', title: 'Operação venceu' });
       }
+      if (debt.settledAt) {
+        events.push({ at: debt.settledAt.toISOString(), kind: 'paid', title: 'Operação quitada' });
+      }
 
       return events.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
     });
