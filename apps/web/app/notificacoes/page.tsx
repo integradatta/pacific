@@ -9,6 +9,8 @@ import {
   TYPE_DOT,
   type AlertRuleType,
 } from '@/lib/notifications';
+import { ListSkeleton } from '@/components/Skeleton';
+import { ErrorState, EmptyState } from '@/components/States';
 
 const RULES_KEY = 'pacific:alert-rules';
 const AUTO_KEY = 'pacific:alert-auto';
@@ -78,7 +80,7 @@ export default function NotificacoesPage() {
     <Shell title="Notificações">
       <div className="space-y-6 max-w-3xl">
         {/* Painel de automação */}
-        <div className="bg-surface border border-line rounded-xl p-5 space-y-4">
+        <div className="panel p-5 space-y-4">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="font-display text-sm text-text">Automação de alertas</p>
@@ -91,7 +93,7 @@ export default function NotificacoesPage() {
               role="switch"
               aria-checked={auto}
               onClick={toggleAuto}
-              className={`relative w-11 h-6 rounded-full transition-colors shrink-0 focus:outline-none focus:ring-2 focus:ring-sonar ${auto ? 'bg-sonar' : 'bg-line'}`}
+              className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${auto ? 'bg-sonar shadow-[0_0_12px_-2px_rgb(var(--sonar)/0.7)]' : 'bg-surface2 border border-line'}`}
             >
               <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-ink transition-transform ${auto ? 'translate-x-5' : ''}`} />
             </button>
@@ -104,8 +106,8 @@ export default function NotificacoesPage() {
                 type="button"
                 onClick={() => toggleRule(r.type)}
                 aria-pressed={enabled[r.type]}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg border font-mono text-[11px] tracking-wider transition-colors focus:outline-none focus:ring-2 focus:ring-sonar ${
-                  enabled[r.type] ? 'border-sonar/40 bg-sonar/5 text-text' : 'border-line text-muted hover:text-text'
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg border font-mono text-[11px] tracking-wider transition-colors ${
+                  enabled[r.type] ? 'border-sonar/40 bg-sonar/[0.07] text-text' : 'border-line bg-surface2 text-muted hover:text-text'
                 }`}
               >
                 <span className={`w-2 h-2 rounded-full ${r.dot} ${enabled[r.type] ? '' : 'opacity-30'}`} />
@@ -120,7 +122,7 @@ export default function NotificacoesPage() {
               type="button"
               onClick={() => void generate.mutateAsync(activeTypes())}
               disabled={generate.isPending}
-              className="bg-sonar text-ink font-mono text-xs font-medium uppercase tracking-widest py-2 px-4 rounded-lg hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-sonar disabled:opacity-50"
+              className="bg-sonar text-ink font-mono text-xs font-semibold uppercase tracking-widest py-2 px-4 rounded-lg shadow-[0_8px_24px_-10px_rgb(var(--sonar)/0.7)] hover:brightness-110 active:translate-y-px disabled:opacity-50 disabled:shadow-none transition-all"
             >
               {generate.isPending ? 'Gerando…' : 'Gerar agora'}
             </button>
@@ -129,23 +131,17 @@ export default function NotificacoesPage() {
 
         {/* Lista */}
         {notifs.isLoading ? (
-          <div className="bg-surface border border-line rounded-xl p-10 text-center">
-            <p className="font-mono text-sm text-muted animate-pulse">Carregando…</p>
-          </div>
+          <ListSkeleton rows={4} />
         ) : notifs.isError ? (
-          <div className="bg-surface border border-status-red/40 rounded-xl p-8" role="alert">
-            <p className="font-mono text-sm text-status-red">Não foi possível carregar as notificações.</p>
-          </div>
+          <ErrorState message="Não foi possível carregar as notificações." />
         ) : items.length === 0 ? (
-          <div className="bg-surface border border-line rounded-xl p-10 text-center">
-            <p className="font-mono text-sm text-muted">Nenhum alerta. Cadastre operações com vencimento próximo e gere os alertas.</p>
-          </div>
+          <EmptyState glyph="◎" title="Nenhum alerta no radar." hint="cadastre operações com vencimento próximo e gere os alertas" />
         ) : (
           <div className="space-y-2">
             {items.map((n) => (
               <div
                 key={n.id}
-                className={`bg-surface border rounded-xl p-4 flex items-start justify-between gap-4 ${n.readAt ? 'border-line' : 'border-sonar/30'}`}
+                className={`panel p-4 flex items-start justify-between gap-4 ${n.readAt ? '' : 'border-sonar/30'}`}
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">

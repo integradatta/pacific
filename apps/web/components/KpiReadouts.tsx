@@ -9,9 +9,9 @@ const RISK_ORDER: RiskLevel[] = ['LOW', 'MEDIUM', 'HIGH'];
 
 function Readout({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className="bg-surface border border-line rounded-xl p-5">
+    <div className="panel panel-hover p-5">
       <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-2">{label}</p>
-      <p className={`font-mono text-2xl font-medium tabular-nums ${accent ? 'text-status-red' : 'text-text'}`}>{value}</p>
+      <p className={`font-mono text-2xl font-medium tabular-nums tracking-tight ${accent ? 'text-status-red' : 'text-text'}`}>{value}</p>
     </div>
   );
 }
@@ -50,7 +50,7 @@ export function KpiReadouts({ kpis }: { kpis: DashboardKpis }) {
         <Readout label="Operações vencidas" value={String(kpis.countByStatus.RED)} accent={kpis.countByStatus.RED > 0} />
 
         {/* Status da carteira */}
-        <div className="bg-surface border border-line rounded-xl p-5">
+        <div className="panel p-5">
           <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-2">Status da carteira</p>
           <DistBar total={total} segments={STATUS_ORDER.map((k) => ({ key: k, n: kpis.countByStatus[k], cls: STATUS_COLOR[k] }))} />
           <div className="flex gap-3 mt-2 flex-wrap">
@@ -64,7 +64,7 @@ export function KpiReadouts({ kpis }: { kpis: DashboardKpis }) {
         </div>
 
         {/* Distribuição por risco */}
-        <div className="bg-surface border border-line rounded-xl p-5">
+        <div className="panel p-5">
           <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-2">Distribuição por risco</p>
           <DistBar total={totalRisk} segments={RISK_ORDER.map((k) => ({ key: k, n: kpis.riskDistribution[k], cls: RISK_META[k].dot }))} />
           <div className="flex gap-3 mt-2 flex-wrap">

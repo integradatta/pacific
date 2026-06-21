@@ -2,8 +2,103 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { color-scheme: dark; }
-html, body { background: #0A0E17; color: #E8ECF4; }
-body { font-family: var(--font-sans); }
-::selection { background: #2BE5C2; color: #0A0E17; }
-@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+/* ── Tokens (canais RGB para casar com tailwind.config `rgb(var() / alpha)`) ── */
+:root {
+  color-scheme: dark;
+
+  --ink: 7 10 17; /* canvas */
+  --surface: 14 19 32; /* card */
+  --surface-2: 20 27 42; /* aninhado / input / hover */
+  --line: 32 40 58; /* hairline */
+  --line-strong: 44 55 76; /* hairline em foco/hover */
+  --text: 233 237 245;
+  --text-dim: 155 166 188; /* secundário */
+  --muted: 107 119 144; /* rótulos / dados frios */
+  --sonar: 43 229 194; /* acento */
+  --green: 54 179 126;
+  --yellow: 229 192 75;
+  --orange: 240 138 60;
+  --red: 240 85 106;
+}
+
+html,
+body {
+  background-color: rgb(var(--ink));
+  color: rgb(var(--text));
+}
+
+/* Ambiente: glow radial sonar no topo — profundidade sem ruído. */
+body {
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  background-image:
+    radial-gradient(1100px 560px at 16% -12%, rgb(var(--sonar) / 0.06), transparent 60%),
+    radial-gradient(820px 480px at 102% -6%, rgb(80 130 220 / 0.05), transparent 58%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: rgb(var(--sonar));
+  color: rgb(var(--ink));
+}
+
+/* Foco consistente e visível (piso de qualidade). */
+:focus-visible {
+  outline: 2px solid rgb(var(--sonar));
+  outline-offset: 2px;
+}
+
+@layer components {
+  /* Painel premium: gradiente sutil de topo + hairline + sombra projetada. */
+  .panel {
+    position: relative;
+    border-radius: 0.75rem;
+    border: 1px solid rgb(var(--line));
+    background-color: rgb(var(--surface));
+    background-image: linear-gradient(180deg, rgb(255 255 255 / 0.025), transparent 96px);
+    box-shadow: 0 1px 0 0 rgb(255 255 255 / 0.04) inset, 0 14px 34px -22px rgb(0 0 0 / 0.95);
+  }
+
+  .panel-hover {
+    transition:
+      border-color 0.2s ease,
+      box-shadow 0.2s ease,
+      transform 0.2s ease;
+  }
+  .panel-hover:hover {
+    border-color: rgb(var(--line-strong));
+    box-shadow: 0 1px 0 0 rgb(255 255 255 / 0.07) inset, 0 22px 46px -24px rgb(0 0 0 / 1);
+  }
+
+  /* Glass: nav e topbar sobre o canvas. */
+  .glass {
+    background-color: rgb(var(--surface) / 0.72);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+  }
+
+  /* Skeleton com shimmer. */
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background-color: rgb(var(--surface-2));
+    border-radius: 0.5rem;
+  }
+  .skeleton::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.07), transparent);
+    animation: shimmer 1.5s ease-in-out infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

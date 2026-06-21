@@ -5,6 +5,8 @@ import { usePortfolio } from '@/lib/hooks';
 import type { PortfolioRow } from '@pacific/shared';
 import { formatBRL, venceEm } from '@/lib/format';
 import { STATUS_COLOR } from '@/lib/status';
+import { ListSkeleton } from '@/components/Skeleton';
+import { ErrorState } from '@/components/States';
 
 const BUCKETS: { label: string; test: (d: number) => boolean; accent: string }[] = [
   { label: 'Vencidos', test: (d) => d < 0, accent: 'text-status-red' },
@@ -16,7 +18,7 @@ const BUCKETS: { label: string; test: (d: number) => boolean; accent: string }[]
 
 function Row({ r }: { r: PortfolioRow }) {
   return (
-    <div className="flex items-center justify-between px-4 py-2.5 border-t border-line">
+    <div className="flex items-center justify-between px-4 py-2.5 border-t border-line/70 hover:bg-sonar/[0.03] transition-colors">
       <div className="flex items-center gap-3 min-w-0">
         <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_COLOR[r.status]}`} />
         <span className="font-sans text-sm text-text truncate">{r.debtorName}</span>
@@ -36,19 +38,15 @@ export default function VencimentosPage() {
   return (
     <Shell title="Radar de Vencimentos">
       {portfolio.isLoading ? (
-        <div className="bg-surface border border-line rounded-xl p-10 text-center">
-          <p className="font-mono text-sm text-muted animate-pulse">Carregando…</p>
-        </div>
+        <div className="max-w-3xl"><ListSkeleton rows={4} /></div>
       ) : portfolio.isError ? (
-        <div className="bg-surface border border-status-red/40 rounded-xl p-8" role="alert">
-          <p className="font-mono text-sm text-status-red">Não foi possível carregar os vencimentos.</p>
-        </div>
+        <div className="max-w-3xl"><ErrorState message="Não foi possível carregar os vencimentos." /></div>
       ) : (
         <div className="space-y-4 max-w-3xl">
           {BUCKETS.map((b) => {
             const items = rows.filter((r) => b.test(r.daysRemaining));
             return (
-              <section key={b.label} className="bg-surface border border-line rounded-xl overflow-hidden">
+              <section key={b.label} className="panel overflow-hidden">
                 <div className="px-4 py-3 border-b border-line flex items-baseline justify-between">
                   <h2 className={`font-mono text-[11px] uppercase tracking-widest ${b.accent}`}>{b.label}</h2>
                   <span className="font-mono text-[10px] text-muted tabular-nums">{items.length}</span>

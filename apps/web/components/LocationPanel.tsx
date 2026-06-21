@@ -4,7 +4,7 @@
 // Sem mapa real, sem rede, sem rastreamento. Apenas comunica o recurso futuro e a postura ética.
 export function LocationPanel() {
   return (
-    <section className="bg-surface border border-line rounded-xl overflow-hidden">
+    <section className="panel overflow-hidden">
       <div className="px-6 py-4 border-b border-line flex items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-lg font-semibold text-text tracking-tight">Localização</h2>
@@ -19,7 +19,7 @@ export function LocationPanel() {
         {/* Pré-visualização inerte (sem mapa/dados reais) */}
         <div
           aria-hidden="true"
-          className="h-36 rounded-lg border border-dashed border-line bg-line/20 flex items-center justify-center"
+          className="h-36 rounded-lg border border-dashed border-line bg-surface2 flex items-center justify-center"
         >
           <span className="font-mono text-xs text-muted">◍ pré-visualização indisponível</span>
         </div>

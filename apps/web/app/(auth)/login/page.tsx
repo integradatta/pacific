@@ -37,18 +37,24 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-ink flex items-center justify-center px-4">
-      <div className="w-full max-w-sm bg-surface border border-line rounded-xl p-8 space-y-6">
+    <main className="min-h-screen flex items-center justify-center px-4">
+      <div className="w-full max-w-sm panel p-8 space-y-7 animate-rise">
         {/* Brand */}
-        <div className="space-y-1">
-          <p className="font-mono text-xs text-muted uppercase tracking-widest">torre de controle</p>
+        <div className="space-y-1.5">
+          <p className="font-mono text-[11px] text-muted uppercase tracking-[0.2em] flex items-center gap-1.5">
+            <span className="relative flex w-1.5 h-1.5">
+              <span className="absolute inline-flex w-full h-full rounded-full bg-sonar/60 animate-ping2" />
+              <span className="relative inline-flex w-1.5 h-1.5 rounded-full bg-sonar" />
+            </span>
+            torre de controle
+          </p>
           <h1 className="font-display text-3xl font-semibold text-text tracking-tight">PACIFIC</h1>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-          <div className="space-y-1">
-            <label htmlFor="email" className="block font-mono text-xs text-muted uppercase tracking-wider">
+          <div className="space-y-1.5">
+            <label htmlFor="email" className="block font-mono text-[11px] text-muted uppercase tracking-wider">
               E-mail
             </label>
             <input
@@ -58,13 +64,13 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-surface border border-line rounded-lg px-3 py-2.5 text-text font-sans text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-sonar focus:border-sonar transition-colors"
+              className="w-full bg-surface2 border border-line rounded-lg px-3.5 py-2.5 text-text font-sans text-sm placeholder:text-muted focus:outline-none focus:border-sonar focus:shadow-glow transition-all"
               placeholder="voce@empresa.com"
             />
           </div>
 
-          <div className="space-y-1">
-            <label htmlFor="password" className="block font-mono text-xs text-muted uppercase tracking-wider">
+          <div className="space-y-1.5">
+            <label htmlFor="password" className="block font-mono text-[11px] text-muted uppercase tracking-wider">
               Senha
             </label>
             <input
@@ -74,7 +80,7 @@ export default function LoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-surface border border-line rounded-lg px-3 py-2.5 text-text font-sans text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-sonar focus:border-sonar transition-colors"
+              className="w-full bg-surface2 border border-line rounded-lg px-3.5 py-2.5 text-text font-sans text-sm placeholder:text-muted focus:outline-none focus:border-sonar focus:shadow-glow transition-all"
               placeholder="••••••••"
             />
           </div>
@@ -88,7 +94,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-sonar text-ink font-mono text-sm font-medium uppercase tracking-widest py-2.5 rounded-lg hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-sonar focus:ring-offset-2 focus:ring-offset-surface disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+            className="w-full bg-sonar text-ink font-mono text-sm font-semibold uppercase tracking-widest py-2.5 rounded-lg shadow-[0_8px_24px_-10px_rgb(var(--sonar)/0.7)] hover:brightness-110 active:translate-y-px disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition-all"
           >
             {loading ? 'Entrando…' : 'Entrar'}
           </button>

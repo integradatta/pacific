@@ -5,6 +5,8 @@ import type { DebtStatus } from '@pacific/shared';
 import { debtorApiGet } from '@/lib/debtor';
 import { formatBRL, venceEm } from '@/lib/format';
 import { STATUS_COLOR, STATUS_LABEL } from '@/lib/status';
+import { Skeleton } from '@/components/Skeleton';
+import { ErrorState, EmptyState } from '@/components/States';
 
 interface MyDebt {
   id: string;
@@ -23,7 +25,7 @@ const HORIZON_LABEL: Record<number, string> = { 0: 'Hoje', 30: '30 dias', 90: '9
 function DebtCard({ debt }: { debt: MyDebt }) {
   const s = debt.summary;
   return (
-    <section className="bg-surface border border-line rounded-xl p-6 space-y-5">
+    <section className="panel p-6 space-y-5">
       <div className="flex items-start justify-between">
         <div>
           <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-1">Saldo atual</p>
@@ -60,25 +62,28 @@ export default function MePage() {
   const q = useQuery({ queryKey: ['me-debts'], queryFn: () => debtorApiGet<MyDebt[]>('/debtor/me/debts') });
 
   return (
-    <main className="min-h-screen bg-ink px-4 py-10">
-      <div className="max-w-md mx-auto space-y-6">
+    <main className="min-h-screen px-4 py-10">
+      <div className="max-w-md mx-auto space-y-6 animate-rise">
         <header className="space-y-1">
-          <p className="font-mono text-[10px] text-muted uppercase tracking-widest">Pacific</p>
+          <p className="font-mono text-[10px] text-muted uppercase tracking-[0.2em]">Pacific</p>
           <h1 className="font-display text-2xl font-semibold text-text tracking-tight">Sua dívida</h1>
         </header>
 
         {q.isLoading ? (
-          <div className="bg-surface border border-line rounded-xl p-10 text-center">
-            <p className="font-mono text-sm text-muted tracking-wider animate-pulse">Carregando…</p>
+          <div className="panel p-6 space-y-5">
+            <Skeleton className="h-3 w-24 rounded" />
+            <Skeleton className="h-9 w-44 rounded" />
+            <Skeleton className="h-px w-full" />
+            <div className="grid grid-cols-5 gap-2">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-8 rounded" />
+              ))}
+            </div>
           </div>
         ) : q.isError ? (
-          <div className="bg-surface border border-status-red/40 rounded-xl p-8" role="alert">
-            <p className="font-mono text-sm text-status-red">Não foi possível carregar. Abra novamente o link do seu credor.</p>
-          </div>
+          <ErrorState message="Não foi possível carregar. Abra novamente o link do seu credor." />
         ) : (q.data ?? []).length === 0 ? (
-          <div className="bg-surface border border-line rounded-xl p-10 text-center">
-            <p className="font-mono text-sm text-muted">Nenhuma dívida registrada.</p>
-          </div>
+          <EmptyState glyph="◇" title="Nenhuma dívida registrada." />
         ) : (
           (q.data ?? []).map((d) => <DebtCard key={d.id} debt={d} />)
         )}

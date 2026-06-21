@@ -9,7 +9,7 @@ import { formatBRL, venceEm } from '@/lib/format';
 import { RiskBadge } from '@/components/RiskBadge';
 
 const inputClass =
-  'w-full bg-surface border border-line rounded-lg px-3 py-2.5 text-text font-sans text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-sonar focus:border-sonar transition-colors';
+  'w-full bg-surface2 border border-line rounded-lg px-3.5 py-2.5 text-text font-sans text-sm placeholder:text-muted focus:outline-none focus:border-sonar focus:shadow-glow transition-all';
 const labelClass = 'block font-mono text-xs text-muted uppercase tracking-wider';
 
 const todayISO = (): string => new Date().toISOString().slice(0, 10);
@@ -78,7 +78,7 @@ export default function NovaOperacaoPage() {
     <Shell title="Nova Operação">
       <div className="grid gap-6 md:grid-cols-2 max-w-4xl">
         {/* Formulário */}
-        <form onSubmit={handleSubmit} className="bg-surface border border-line rounded-xl p-6 space-y-4" noValidate>
+        <form onSubmit={handleSubmit} className="panel p-6 space-y-4" noValidate>
           <div className="space-y-1">
             <label htmlFor="clientName" className={labelClass}>Nome do cliente</label>
             <input id="clientName" required value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Ex.: João da Silva" className={inputClass} />
@@ -100,7 +100,7 @@ export default function NovaOperacaoPage() {
                     type="button"
                     onClick={() => setRatePeriod(p)}
                     aria-pressed={ratePeriod === p}
-                    className={`px-3 font-mono text-[11px] uppercase tracking-wider transition-colors ${ratePeriod === p ? 'bg-sonar text-ink' : 'bg-surface text-muted hover:text-text'}`}
+                    className={`px-3 font-mono text-[11px] uppercase tracking-wider transition-colors ${ratePeriod === p ? 'bg-sonar text-ink' : 'bg-surface2 text-muted hover:text-text'}`}
                   >
                     {p === 'MONTHLY' ? 'mês' : 'ano'}
                   </button>
@@ -119,14 +119,14 @@ export default function NovaOperacaoPage() {
           <button
             type="submit"
             disabled={loading || !preview || clientName.trim() === ''}
-            className="w-full bg-sonar text-ink font-mono text-sm font-medium uppercase tracking-widest py-2.5 rounded-lg hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-sonar focus:ring-offset-2 focus:ring-offset-surface disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+            className="w-full bg-sonar text-ink font-mono text-sm font-semibold uppercase tracking-widest py-2.5 rounded-lg shadow-[0_8px_24px_-10px_rgb(var(--sonar)/0.7)] hover:brightness-110 active:translate-y-px disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition-all"
           >
             {loading ? 'Salvando…' : 'Cadastrar operação'}
           </button>
         </form>
 
         {/* Projeção em tempo real */}
-        <div className="bg-surface border border-line rounded-xl p-6">
+        <div className="panel p-6 self-start">
           <div className="flex items-center justify-between gap-3 mb-4">
             <p className="font-mono text-xs text-muted uppercase tracking-widest">Projeção da operação</p>
             {recoverability !== null && <RiskBadge recoverability={recoverability} />}

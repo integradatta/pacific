@@ -5,6 +5,7 @@ import { useKpis, usePortfolio } from '@/lib/hooks';
 import { HorizonteVencimentos } from '@/components/HorizonteVencimentos';
 import { KpiReadouts } from '@/components/KpiReadouts';
 import { CarteiraTable } from '@/components/CarteiraTable';
+import { DashboardSkeleton } from '@/components/Skeleton';
 
 export default function DashboardPage() {
   const kpis = useKpis();
@@ -15,12 +16,11 @@ export default function DashboardPage() {
   return (
     <Shell title="Torre de Controle">
       {loading ? (
-        <div className="bg-surface border border-line rounded-xl p-10 flex items-center justify-center min-h-48">
-          <p className="font-mono text-sm text-muted tracking-wider animate-pulse">Conectando à carteira…</p>
-        </div>
+        <DashboardSkeleton />
       ) : error ? (
-        <div className="bg-surface border border-status-red/40 rounded-xl p-8" role="alert">
-          <p className="font-mono text-sm text-status-red">
+        <div className="panel p-8 border-status-red/40" role="alert">
+          <p className="font-mono text-[10px] text-status-red uppercase tracking-widest mb-1.5">sinal perdido</p>
+          <p className="font-sans text-sm text-text-dim">
             Não foi possível carregar a carteira. Verifique a conexão e tente novamente.
           </p>
         </div>

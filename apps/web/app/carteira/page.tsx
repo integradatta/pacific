@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react';
 import { Shell } from '@/components/Shell';
 import { usePortfolio } from '@/lib/hooks';
 import { CarteiraTable } from '@/components/CarteiraTable';
+import { ListSkeleton } from '@/components/Skeleton';
+import { ErrorState } from '@/components/States';
 import { riskLevel, type DebtStatus, type RiskLevel } from '@pacific/shared';
 
 const STATUS_OPTS: { v: DebtStatus | 'ALL'; label: string }[] = [
@@ -21,7 +23,7 @@ const RISK_OPTS: { v: RiskLevel | 'ALL'; label: string }[] = [
 ];
 
 const controlClass =
-  'bg-surface border border-line rounded-lg px-3 py-2 text-text font-mono text-xs focus:outline-none focus:ring-2 focus:ring-sonar';
+  'bg-surface2 border border-line rounded-lg px-3 py-2 text-text font-mono text-xs focus:outline-none focus:border-sonar focus:shadow-glow transition-all';
 
 export default function CarteiraPage() {
   const portfolio = usePortfolio();
@@ -42,13 +44,9 @@ export default function CarteiraPage() {
   return (
     <Shell title="Carteira">
       {portfolio.isLoading ? (
-        <div className="bg-surface border border-line rounded-xl p-10 text-center">
-          <p className="font-mono text-sm text-muted animate-pulse">Carregando…</p>
-        </div>
+        <ListSkeleton />
       ) : portfolio.isError ? (
-        <div className="bg-surface border border-status-red/40 rounded-xl p-8" role="alert">
-          <p className="font-mono text-sm text-status-red">Não foi possível carregar a carteira.</p>
-        </div>
+        <ErrorState message="Não foi possível carregar a carteira." />
       ) : (
         <div className="space-y-4">
           {/* Busca + filtros */}
