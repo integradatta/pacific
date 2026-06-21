@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { Shell } from '@/components/Shell';
 import { useDebtors, useDebtorMutations } from '@/lib/debtors';
+import { LocationPanel } from '@/components/LocationPanel';
 
 function LinkReveal({ link, onClose }: { link: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
@@ -172,6 +173,8 @@ export default function DevedoresPage() {
             </table>
           </section>
         )}
+
+        <LocationPanel />
       </div>
     </Shell>
   );

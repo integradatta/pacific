@@ -72,6 +72,10 @@ model Debtor {
   user       User?     @relation(fields: [userId], references: [id])
   name       String
   email      String?
+  // Ponto de extensão INERTE p/ um futuro módulo de localização (opcional, voluntário,
+  // SIMULADO). Nenhum código grava/lê isto: sem rastreamento real de pessoas. Ver
+  // @pacific/shared/location (contratos) e o painel "Em desenvolvimento" no web.
+  lastLocation String?
   redeemedAt DateTime?
   createdAt  DateTime  @default(now())
   debts      Debt[]
