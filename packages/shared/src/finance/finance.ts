@@ -1,6 +1,6 @@
 import { Decimal } from 'decimal.js';
 import { daysBetween, daysUntil } from '../utils/date.utils.js';
-import type { DebtStatus, DebtTerms, DebtSummary, Projection } from '../types/financial.types.js';
+import type { DebtStatus, DebtTerms, DebtSummary, OperationPreview, Projection } from '../types/financial.types.js';
 
 const HORIZONS = [0, 30, 90, 180, 365];
 
@@ -78,5 +78,25 @@ export function summarize(terms: DebtTerms, asOf: Date = new Date()): DebtSummar
       temperature: temperatureScore(terms, asOf),
     },
     projections: projections(terms, asOf),
+  };
+}
+
+/**
+ * Prévia de uma operação no cadastro — os 5 números mostrados em tempo real:
+ * valor final (no vencimento), juros totais, rentabilidade %, retorno esperado e dias restantes.
+ */
+export function operationPreview(terms: DebtTerms, asOf: Date = new Date()): OperationPreview {
+  const finalValue = balanceAt(terms, terms.dueDate);
+  const principal = new Decimal(terms.principal);
+  const totalInterest = new Decimal(finalValue).minus(principal);
+  const profitabilityPct = principal.isZero()
+    ? 0
+    : Math.round(totalInterest.div(principal).times(100).toNumber() * 100) / 100;
+  return {
+    finalValue,
+    totalInterest: totalInterest.toFixed(2),
+    profitabilityPct,
+    expectedReturn: finalValue,
+    daysRemaining: daysRemaining(terms, asOf),
   };
 }

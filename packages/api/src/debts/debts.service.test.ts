@@ -4,7 +4,11 @@ import { NotFoundException } from '@nestjs/common';
 
 function fakeDb() {
   return {
-    debtor: { findFirst: vi.fn(async () => ({ id: 'd1', tenantId: 't1' })) },
+    debtor: {
+      findFirst: vi.fn(async () => ({ id: 'd1', tenantId: 't1' })),
+      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'dq', ...data })),
+    },
+    debtorAccess: { create: vi.fn(async () => ({})) },
     debt: {
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'debt1', ...data })),
       findMany: vi.fn(async () => [{ id: 'debt1' }]),
@@ -38,5 +42,15 @@ describe('DebtsService', () => {
   });
   it('get de outro tenant → NotFound', async () => {
     await expect(svc(fakeDb()).get('t2', 'debt1')).rejects.toBeInstanceOf(NotFoundException);
+  });
+  it('createQuick cria cliente + acesso + dívida no mesmo tenant (atômico)', async () => {
+    const db = fakeDb();
+    const out = await svc(db).createQuick('t1', {
+      clientName: 'Cliente A', principal: '1000.00', rate: '0.050000', ratePeriod: 'MONTHLY', dueDate: '2026-07-01T00:00:00Z',
+    });
+    expect(db.debtor.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ tenantId: 't1', name: 'Cliente A' }) }));
+    expect(db.debtorAccess.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ tenantId: 't1', debtorId: 'dq' }) }));
+    expect(db.debt.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ tenantId: 't1', debtorId: 'dq', principal: '1000.00' }) }));
+    expect(out).toEqual({ debtorId: 'dq', debtId: 'debt1' });
   });
 });

@@ -10,6 +10,15 @@ export interface DebtTerms {
 
 export interface Projection { horizonDays: number; balance: string; }
 
+/** Prévia de uma operação ao cadastrar (cálculo em tempo real no cliente). */
+export interface OperationPreview {
+  finalValue: string;       // valor final no vencimento (principal + juros)
+  totalInterest: string;    // juros totais
+  profitabilityPct: number; // rentabilidade: juros / principal * 100
+  expectedReturn: string;   // retorno esperado (= valor final a receber)
+  daysRemaining: number;    // dias até o vencimento
+}
+
 /** Scores 0–100. recoverability = potencial de recuperação; temperature = urgência temporal. */
 export interface DebtScores { recoverability: number; temperature: number; }
 

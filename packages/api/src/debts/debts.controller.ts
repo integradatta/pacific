@@ -8,6 +8,7 @@ import { TenantId } from '../tenancy/tenant-id.decorator.js';
 import { PaginationQuery, Page } from '../common/pagination.js';
 import { DebtsService } from './debts.service.js';
 import { CreateDebtDto } from './dto/create-debt.dto.js';
+import { CreateQuickDebtDto } from './dto/create-quick-debt.dto.js';
 import type { Debt } from '@pacific/database';
 import type { DebtSummary } from '@pacific/shared';
 
@@ -19,6 +20,15 @@ export class DebtsController {
   @Post() @Roles('CREDITOR')
   create(@TenantId() tenantId: string, @Body() dto: CreateDebtDto): Promise<Debt> {
     return this.debts.create(tenantId, dto);
+  }
+
+  // Cadastro simplificado: cria cliente + operação numa transação.
+  @Post('quick') @Roles('CREDITOR')
+  createQuick(
+    @TenantId() tenantId: string,
+    @Body() dto: CreateQuickDebtDto,
+  ): Promise<{ debtorId: string; debtId: string }> {
+    return this.debts.createQuick(tenantId, dto);
   }
 
   @Get() @Roles('CREDITOR')

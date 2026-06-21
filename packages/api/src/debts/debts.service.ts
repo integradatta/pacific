@@ -2,12 +2,40 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Debt, Prisma } from '@pacific/database';
 import { summarize, type DebtSummary } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
+import { generateAccessToken, hashAccessToken } from '../auth/access-token.util.js';
 import type { Page } from '../common/pagination.js';
 import type { CreateDebtInput } from './dto/create-debt.dto.js';
+import type { CreateQuickDebtInput } from './dto/create-quick-debt.dto.js';
 
 @Injectable()
 export class DebtsService {
   constructor(private readonly scoped: TenantScopedService) {}
+
+  /**
+   * Cadastro simplificado: cria cliente (devedor) + acesso + operação (dívida) atomicamente.
+   * Mantém o devedor consistente com /devedores (link gerável depois via rotate-link).
+   */
+  async createQuick(tenantId: string, input: CreateQuickDebtInput): Promise<{ debtorId: string; debtId: string }> {
+    const tokenHash = hashAccessToken(generateAccessToken());
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      const debtor = await tx.debtor.create({ data: { tenantId, name: input.clientName } });
+      await tx.debtorAccess.create({ data: { debtorId: debtor.id, tenantId, tokenHash } });
+      const debt = await tx.debt.create({
+        data: {
+          tenantId,
+          debtorId: debtor.id,
+          description: input.description ?? null,
+          principal: input.principal,
+          rate: input.rate,
+          ratePeriod: input.ratePeriod,
+          currency: 'BRL',
+          startDate: new Date(),
+          dueDate: new Date(input.dueDate),
+        },
+      });
+      return { debtorId: debtor.id, debtId: debt.id };
+    });
+  }
 
   async create(tenantId: string, input: CreateDebtInput): Promise<Debt> {
     return this.scoped.withTenant(tenantId, async (tx) => {

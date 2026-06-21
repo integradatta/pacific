@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { monthlyRate, balanceAt, accruedInterest, deriveStatus, daysRemaining, summarize, recoverabilityScore, temperatureScore } from './finance.js';
+import { monthlyRate, balanceAt, accruedInterest, deriveStatus, daysRemaining, summarize, recoverabilityScore, temperatureScore, operationPreview } from './finance.js';
 import type { DebtTerms } from '../types/financial.types.js';
 
 const terms = (over: Partial<DebtTerms> = {}): DebtTerms => ({
@@ -60,5 +60,21 @@ describe('scores (0–100)', () => {
     expect(typeof s.scores.recoverability).toBe('number');
     expect(s.scores.temperature).toBeGreaterThanOrEqual(0);
     expect(s.scores.temperature).toBeLessThanOrEqual(100);
+  });
+});
+
+describe('operationPreview (cadastro em tempo real)', () => {
+  it('1000 a 10%/mês por 30 dias: final 1100, juros 100, rentab. 10%, 30 dias', () => {
+    const p = operationPreview(terms({ dueDate: new Date('2026-01-31T00:00:00Z') }), new Date('2026-01-01T00:00:00Z'));
+    expect(p.finalValue).toBe('1100.00');
+    expect(p.totalInterest).toBe('100.00');
+    expect(p.profitabilityPct).toBe(10);
+    expect(p.expectedReturn).toBe('1100.00');
+    expect(p.daysRemaining).toBe(30);
+  });
+  it('principal zero ⇒ rentabilidade 0 (sem divisão por zero)', () => {
+    const p = operationPreview(terms({ principal: '0', dueDate: new Date('2026-01-31T00:00:00Z') }), new Date('2026-01-01T00:00:00Z'));
+    expect(p.profitabilityPct).toBe(0);
+    expect(p.totalInterest).toBe('0.00');
   });
 });
