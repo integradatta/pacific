@@ -3,6 +3,7 @@
 import { type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useNotifications } from '@/lib/notifications';
 
 interface NavItem {
   href: string;
@@ -27,6 +28,8 @@ interface ShellProps {
 
 export function Shell({ title, orgCode = 'ORG-000', children }: ShellProps) {
   const pathname = usePathname();
+  const notifs = useNotifications();
+  const unread = (notifs.data?.items ?? []).filter((n) => !n.readAt).length;
 
   return (
     <div className="min-h-screen bg-ink flex">
@@ -94,6 +97,18 @@ export function Shell({ title, orgCode = 'ORG-000', children }: ShellProps) {
         <header className="bg-surface border-b border-line px-6 py-4 flex items-center justify-between md:mt-0 mt-12">
           <h1 className="font-display text-xl font-semibold text-text">{title}</h1>
           <div className="flex items-center gap-3">
+            <Link
+              href="/notificacoes"
+              aria-label={unread > 0 ? `Notificações, ${unread} não lidas` : 'Notificações'}
+              className="relative w-8 h-8 rounded-full bg-line flex items-center justify-center text-muted hover:text-sonar transition-colors focus:outline-none focus:ring-2 focus:ring-sonar"
+            >
+              <span aria-hidden="true" className="text-base leading-none">◎</span>
+              {unread > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full bg-status-red text-ink text-[9px] font-mono font-medium flex items-center justify-center tabular-nums">
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              )}
+            </Link>
             <span className="font-mono text-xs text-muted bg-line px-2.5 py-1 rounded-md tracking-wider uppercase">
               {orgCode}
             </span>
