@@ -2,6 +2,18 @@
 
 > Onde paramos e como continuar. Tudo abaixo está **na `main`** (mergeado e no GitHub).
 
+## Atualização 2026-06-21 — DEPLOY no ar + Sprint de produto
+- **Repositório agora:** `github.com/integradatta/pacific` (movido de h2h988pn28-svg). `origin` já aponta pra lá.
+- **DEPLOY funcionando (ponta a ponta):**
+  - **Web:** Vercel, projeto `pacific-web` → `https://pacific-web-chi.vercel.app` (Root Directory `apps/web`). `next.config` tem `extensionAlias` (.js→.ts) p/ resolver imports NodeNext do `@pacific/shared` no webpack.
+  - **API:** Railway, serviço `pacific-api` → `https://pacific-api-production.up.railway.app`. Build pelo **Dockerfile** da raiz (monorepo). `railway.json`/`render.yaml` versionados.
+  - **Variáveis no Railway:** `DATABASE_URL` (6543 pgbouncer), `SUPABASE_JWT_SECRET`, `APP_JWT_SECRET`, `WEB_ORIGIN`, `REDEEM_*`. **`DIRECT_URL` foi REMOVIDA de propósito** → o `CMD` do container **pula o migrate** no boot (fail-closed quando DIRECT_URL existe). **Migrações são aplicadas manualmente** com `cd packages/database && npx prisma migrate deploy` (usa o `.env` local com pooler de sessão 5432). Já apliquei `1_alert_milestones` e `2_debtor_location` em prod.
+  - **Vercel env:** `NEXT_PUBLIC_API_URL=https://pacific-api-production.up.railway.app` (+ SUPABASE url/anon).
+- **Correções de deploy que entraram:** scanner do Railway exigia `next ≥ 14.2.35` (CVEs) — atualizado; `--include=dev` no `npm ci`; **JwtGuard verifica JWT do Supabase por JWKS (ES256)** — o projeto usa signing keys assimétricas, não HS256 (era o 401 do `register-creditor`); Supabase **"Enable email provider" ligado** (signups estavam off).
+- **Sprint de produto entregue (commits na main):** **#1** login/acesso pós-auth (register-creditor idempotente, `GET /auth/me`, recuperação de conta órfã) · **#2** cadastro simplificado `/operacoes/nova` + cálculo em tempo real (`operationPreview`) + `POST /debts/quick` · **#3** score de risco (`riskLevel` LOW/MEDIUM/HIGH; `RiskBadge`) · **#7** dashboard ampliado (retorno esperado, ativas/vencidas, distribuição por risco) · **#4** alertas automáticos réguas 15/7/3/0/atraso + painel (localStorage) · **#8 (parcial)** busca+filtros na Carteira + badge de notificações · **#3-GPS** preparação inerte (`Debtor.lastLocation` + `LocationPanel` "Em desenvolvimento", **sem rastreamento real**) · **regra de negócio:** juros **mínimo de 1 mês** para taxa mensal (`balanceAt`).
+- **🟦 PRÓXIMA TAREFA: etapa #6 — Aparência premium** (Stripe/Linear/Mercury) + **dark mode** + skeleton loading. O usuário pediu para usar a **skill `frontend-design`** (reativada em `~/.claude/settings.json`; carrega após reiniciar o Claude Code). Itens opcionais restantes do #8: **tags** e **histórico da operação**.
+- 🔴 Pendente (segurança): **rotacionar** senha do banco + `SUPABASE_JWT_SECRET` (apareceram no chat) e atualizar no Railway.
+
 ## Atualização 2026-06-19
 - ✅ **Portal do credor COMPLETO** (PR #5): telas Carteira, Vencimentos, Notificações adicionadas — nav sem 404.
 - ✅ **Supabase DB configurado:** conectado via **pooler** `aws-1-sa-east-1.pooler.supabase.com` (SP); `0_init` aplicada (todas as tabelas); RLS aplicada (forced em Debtor/Debt/Notification/DebtorLoginEvent). `packages/api/.env` e `packages/database/.env` com pooler (sessão/5432 p/ migração; transação/6543 + pgbouncer=true p/ API). Senha correta do banco: `*27Raylan7212`.
