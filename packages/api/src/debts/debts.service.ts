@@ -128,7 +128,8 @@ export class DebtsService {
         ),
       );
       const already = new Decimal(debt.paidAmount.toString());
-      let paid = input.full ? gross : already.plus(input.amount ?? '0');
+      const delta = Decimal.max(0, new Decimal(input.amount ?? '0')); // ignora valores negativos
+      let paid = input.full ? gross : already.plus(delta);
       if (paid.greaterThan(gross)) paid = gross; // não paga além do devido
       const settledAt = input.full || paid.greaterThanOrEqualTo(gross) ? now : null;
 

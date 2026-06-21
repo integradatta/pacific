@@ -164,6 +164,13 @@ describe('DebtsService', () => {
         expect.objectContaining({ data: { paidAmount: '1000.00', settledAt: NOW } }),
       );
     });
+    it('ignora amount negativo (não reduz o pago)', async () => {
+      const db = fakeDb(); db.debt.findFirst = vi.fn(async () => debtRow({ rate: dec('0'), paidAmount: dec('200') })) as never;
+      await svc(db).pay('t1', 'debt1', { amount: '-500' }, NOW);
+      expect(db.debt.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { paidAmount: '200.00', settledAt: null } }), // permanece 200
+      );
+    });
     it('cancela alertas pendentes (não lidos) da dívida', async () => {
       const db = fakeDb(); zeroRate(db);
       await svc(db).pay('t1', 'debt1', { full: true }, NOW);
