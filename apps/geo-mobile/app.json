@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Geo Grupo",
+    "slug": "geo-grupo",
+    "scheme": "geogrupo",
+    "version": "0.1.0",
+    "platforms": ["ios", "android"],
+    "ios": {
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Mostramos sua localização no mapa do grupo enquanto você usa o app.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Para compartilhar sua localização com o grupo em segundo plano, com seu consentimento.",
+        "UIBackgroundModes": ["location"]
+      }
+    },
+    "android": {
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION"
+      ]
+    },
+    "plugins": [
+      ["expo-location", { "isAndroidBackgroundLocationEnabled": true }]
+    ]
+  }
+}
