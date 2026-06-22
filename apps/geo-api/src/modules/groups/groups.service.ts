@@ -9,13 +9,17 @@ import {
 } from '@pacific/geo-shared';
 import { GEO_DB, type GeoDb, type Querier } from '../../common/geo-db.js';
 import { enforce, type Principal } from '../../common/principal.js';
+import { REALTIME, type RealtimePublisher } from '../../realtime/realtime.js';
 
 interface GroupRow { id: string; tenant_id: string; group_type: GroupType; name: string; status_notification_enabled: boolean; status_notification_consensus: string[]; }
 interface MemberRow { id: string; group_id: string; user_id: string; role: MemberRole; status: string; sharing_status: string; }
 
 @Injectable()
 export class GroupsService {
-  constructor(@Inject(GEO_DB) private readonly db: GeoDb) {}
+  constructor(
+    @Inject(GEO_DB) private readonly db: GeoDb,
+    @Inject(REALTIME) private readonly realtime: RealtimePublisher,
+  ) {}
 
   async createGroup(p: Principal, input: { groupType: GroupType; name: string }): Promise<GroupRow> {
     return this.db.withTenant(p.tenantId, async (q) => {
@@ -77,6 +81,7 @@ export class GroupsService {
       );
       await q.query(`UPDATE geo.group_invite SET accepted_at = now() WHERE token = $1`, [token]);
       await this.logConsent(q, p.tenantId, group_id, p.userId, null, 'active', p.userId, 'invite_accepted');
+      this.realtime.broadcast(group_id, 'member_joined', { userId: p.userId, role: invited_role });
       return { groupId: group_id, role: invited_role };
     });
   }
@@ -171,6 +176,7 @@ export class GroupsService {
       [status, member.id],
     );
     await this.logConsent(q, tenantId, groupId, member.user_id, member.sharing_status, 'revoked', by, reason);
+    this.realtime.broadcast(groupId, 'member_left', { userId: member.user_id, reason });
   }
   private async logConsent(q: Querier, tenantId: string, groupId: string, userId: string, prev: string | null, next: string, by: string, reason: string): Promise<void> {
     await q.query(

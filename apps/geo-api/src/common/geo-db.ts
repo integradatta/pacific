@@ -8,6 +8,12 @@ export interface Querier {
 /** Acesso ao banco com escopo de tenant (RLS via app.current_tenant por transação). */
 export interface GeoDb {
   withTenant<T>(tenantId: string, fn: (q: Querier) => Promise<T>): Promise<T>;
+  /**
+   * Query global SEM escopo de tenant — só para JOBS de manutenção (purge/agregação/DBSCAN).
+   * Requer conexão com role que ignora RLS (BYPASSRLS / service role do Supabase). NUNCA usar
+   * em caminho de request de usuário.
+   */
+  adminQuery<R = Record<string, unknown>>(text: string, params?: unknown[]): Promise<{ rows: R[]; rowCount: number | null }>;
 }
 
 export const GEO_DB = Symbol('GEO_DB');
@@ -33,5 +39,10 @@ export class GeoDbPg implements GeoDb {
     } finally {
       client.release();
     }
+  }
+
+  async adminQuery<R = Record<string, unknown>>(text: string, params: unknown[] = []): Promise<{ rows: R[]; rowCount: number | null }> {
+    const r = await this.pool.query(text, params);
+    return { rows: r.rows as R[], rowCount: r.rowCount };
   }
 }

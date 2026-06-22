@@ -4,6 +4,7 @@ import { LocationsService } from './locations.service.js';
 import type { GeoDb, Querier } from '../../common/geo-db.js';
 import type { GeofencingService } from '../geofencing/geofencing.service.js';
 import type { IncomingPoint } from '@pacific/geo-shared';
+import { NoopRealtime } from '../../realtime/realtime.js';
 
 const P = { userId: 'u1', tenantId: 't1', roles: [] };
 const NOW = new Date('2026-06-22T12:00:00Z');
@@ -23,10 +24,10 @@ function mkDb(opts: { sharingGroups: string[] }) {
       return { rows: [] as never[], rowCount: 0 };
     }),
   };
-  const db: GeoDb = { withTenant: async (_t, fn) => fn(q) };
+  const db: GeoDb = { withTenant: async (_t, fn) => fn(q), adminQuery: async () => ({ rows: [], rowCount: 0 }) };
   return { db, inserts };
 }
-const svc = (db: GeoDb) => new LocationsService(db, fakeGeofencing);
+const svc = (db: GeoDb) => new LocationsService(db, fakeGeofencing, new NoopRealtime());
 
 describe('LocationsService.ingest', () => {
   it('403 se não há compartilhamento ativo em nenhum grupo', async () => {

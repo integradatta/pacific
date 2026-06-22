@@ -15,7 +15,7 @@ function mkDb(opts: { role: string; count: number }) {
       return { rows: [] as never[], rowCount: 0 };
     }),
   };
-  const db: GeoDb = { withTenant: async (_t, fn) => fn(q) };
+  const db: GeoDb = { withTenant: async (_t, fn) => fn(q), adminQuery: async () => ({ rows: [], rowCount: 0 }) };
   return db;
 }
 const svc = (db: GeoDb) => new GeofencingService(db);

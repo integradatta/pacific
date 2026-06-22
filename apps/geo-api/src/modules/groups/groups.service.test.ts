@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { HttpException } from '@nestjs/common';
 import { GroupsService } from './groups.service.js';
 import type { GeoDb, Querier } from '../../common/geo-db.js';
+import { NoopRealtime } from '../../realtime/realtime.js';
 
 const P = { userId: 'u-self', tenantId: 't1', roles: [] };
 
@@ -13,9 +14,9 @@ function mkDb(handler: (sql: string, params: unknown[]) => { rows: unknown[] }):
       return { rows: rows as never[], rowCount: rows.length };
     }),
   };
-  return { withTenant: async (_t, fn) => fn(q) };
+  return { withTenant: async (_t, fn) => fn(q), adminQuery: async () => ({ rows: [], rowCount: 0 }) };
 }
-const svc = (db: GeoDb) => new GroupsService(db);
+const svc = (db: GeoDb) => new GroupsService(db, new NoopRealtime());
 
 describe('GroupsService.createGroup', () => {
   it('supervised → notificação on; cria admin', async () => {

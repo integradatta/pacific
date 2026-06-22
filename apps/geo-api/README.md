@@ -8,7 +8,7 @@ vêm do JWT). Spec: [`../../docs/superpowers/specs/2026-06-21-gps-spec.md`](../.
 - ✅ **Increment 1** — `packages/geo-shared`: lógica pura de domínio + 39 testes (regras de grupo/papéis, consentimento, geofence anti-bounce, validação de pontos, geocoding, notificações).
 - ✅ **Increment 2** — migrations SQL do schema `geo` (PostGIS, enums, tabelas, índices GiST, RLS). **Este diretório.**
 - ✅ **Increment 3** — app NestJS: guards (JWT assumindo claim `tenant_id`, rate-limit in-memory), `GeoDb` tenant-scoped (RLS via `app.current_tenant`), módulos `groups`/`sharing`/`locations`/`geofencing` (REST + DTOs) consumindo o `geo-shared`. **18 testes** (regras com DB mockado) + typecheck ✓.
-- ⏳ **Increment 4** — WebSocket gateway + jobs (agregação 6h, DBSCAN, purge, cache de geocoding).
+- ✅ **Increment 4** — tempo real + jobs: `LocationsGateway` (socket.io, namespace `/ws/locations`, rooms por grupo, JWT no handshake) via `RealtimePublisher` (serviços publicam `location_update`/`geofence_alert`/`status_change`/`member_joined|left`); `JobsService` (@Cron) agregação 6h + DBSCAN diário + purge com **degradação por storage** (`retentionPlan` no geo-shared) + limpeza de cache; `GET /api/v1/admin/storage-status`. SQL espacial/cron valida no Supabase.
 - ⏳ **Increments 5–7** — mobile RN, dashboard web, FCM (precisam de device/Firebase p/ validar).
 
 > A camada espacial (SQL PostGIS) é exercida só contra o Supabase; a lógica de regras está

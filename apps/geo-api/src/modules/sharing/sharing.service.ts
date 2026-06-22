@@ -2,12 +2,16 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { applySharingAction, consentReason, type MemberRole, type SharingStatus, type SharingAction } from '@pacific/geo-shared';
 import { GEO_DB, type GeoDb, type Querier } from '../../common/geo-db.js';
 import { enforce, type Principal } from '../../common/principal.js';
+import { REALTIME, type RealtimePublisher } from '../../realtime/realtime.js';
 
 interface MemberRow { id: string; user_id: string; role: MemberRole; sharing_status: SharingStatus; }
 
 @Injectable()
 export class SharingService {
-  constructor(@Inject(GEO_DB) private readonly db: GeoDb) {}
+  constructor(
+    @Inject(GEO_DB) private readonly db: GeoDb,
+    @Inject(REALTIME) private readonly realtime: RealtimePublisher,
+  ) {}
 
   /** Ação do usuário sobre o próprio compartilhamento (pause/resume/revoke). */
   async setOwnSharing(p: Principal, groupId: string, action: 'pause' | 'resume' | 'revoke'): Promise<{ status: SharingStatus }> {
@@ -43,6 +47,7 @@ export class SharingService {
        VALUES ($1,$2,$3,$4,$5,$6,$7)`,
       [groupId, userId, tenantId, member.sharing_status, nextState, consentReason(action), by],
     );
+    this.realtime.broadcast(groupId, 'status_change', { userId, status: nextState });
     return { status: nextState };
   }
 }
