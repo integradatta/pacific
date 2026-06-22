@@ -45,6 +45,11 @@ export class SuperAdminController {
     return this.admin.listUsers();
   }
 
+  @Post('users/:id/password-reset') @Roles('SUPER_ADMIN')
+  resetPassword(@CurrentUser() u: AuthUser, @Param('id') id: string): Promise<void> {
+    return this.admin.requestPasswordReset(actorOf(u), id);
+  }
+
   @Get('audit') @Roles('SUPER_ADMIN')
   audit(@Query('limit') limit?: string): Promise<AdminAuditEntry[]> {
     return this.admin.auditLog(limit ? Number(limit) : undefined);

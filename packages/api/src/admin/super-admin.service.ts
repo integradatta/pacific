@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { AdminAuditEntry, AdminTenantRow, AdminUserRow, TenantApproval } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
+import { AUTH_ADMIN, type AuthAdmin } from './auth-admin.js';
 
 export interface Actor {
   supabaseId: string;
@@ -11,7 +12,10 @@ export interface Actor {
 // AdminAuditLog ficam fora da RLS, então o owner acessa normalmente. Toda mutação é auditada.
 @Injectable()
 export class SuperAdminService {
-  constructor(private readonly scoped: TenantScopedService) {}
+  constructor(
+    private readonly scoped: TenantScopedService,
+    @Inject(AUTH_ADMIN) private readonly authAdmin: AuthAdmin,
+  ) {}
   private get db() {
     return this.scoped.raw();
   }
@@ -44,6 +48,14 @@ export class SuperAdminService {
   }
   reactivateTenant(actor: Actor, id: string): Promise<void> {
     return this.mutateTenant(actor, id, { status: 'ACTIVE' }, 'tenant.reactivate');
+  }
+
+  /** Dispara reset de senha (NÃO expõe senha — hash é irrecuperável). Audita o ato. */
+  async requestPasswordReset(actor: Actor, userId: string): Promise<void> {
+    const user = await this.db.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Usuário não encontrado');
+    await this.authAdmin.sendPasswordReset(user.email);
+    await this.audit(actor, 'user.password_reset', 'user', userId, { email: user.email });
   }
 
   async listUsers(): Promise<AdminUserRow[]> {

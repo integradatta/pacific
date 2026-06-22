@@ -13,11 +13,16 @@ function fakeDb() {
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) => (where.id === 't1' ? { id: 't1' } : null)),
       update: vi.fn(async () => ({})),
     },
-    user: { findMany: vi.fn(async () => [{ id: 'u1', email: 'c@x.com', role: 'CREDITOR', tenantId: 't1', createdAt: new Date('2026-06-02T00:00:00Z') }]) },
+    user: {
+      findMany: vi.fn(async () => [{ id: 'u1', email: 'c@x.com', role: 'CREDITOR', tenantId: 't1', createdAt: new Date('2026-06-02T00:00:00Z') }]),
+      findUnique: vi.fn(async ({ where }: { where: { id: string } }) => (where.id === 'u1' ? { id: 'u1', email: 'c@x.com' } : null)),
+    },
     adminAuditLog: { create: vi.fn(async () => ({})), findMany: vi.fn(async () => []) },
   };
 }
-const svc = (db: ReturnType<typeof fakeDb>) => new SuperAdminService({ raw: () => db } as never);
+const mkAuthAdmin = () => ({ sendPasswordReset: vi.fn(async () => {}) });
+const svc = (db: ReturnType<typeof fakeDb>, authAdmin = mkAuthAdmin()) =>
+  new SuperAdminService({ raw: () => db } as never, authAdmin as never);
 
 describe('SuperAdminService', () => {
   it('listTenants mapeia approval/status + userCount', async () => {
@@ -46,5 +51,15 @@ describe('SuperAdminService', () => {
     await expect(svc(db).approveTenant(ACTOR, 'nope')).rejects.toBeInstanceOf(NotFoundException);
     expect(db.tenant.update).not.toHaveBeenCalled();
     expect(db.adminAuditLog.create).not.toHaveBeenCalled();
+  });
+  it('requestPasswordReset dispara reset (não expõe senha) e audita', async () => {
+    const db = fakeDb();
+    const authAdmin = mkAuthAdmin();
+    await svc(db, authAdmin).requestPasswordReset(ACTOR, 'u1');
+    expect(authAdmin.sendPasswordReset).toHaveBeenCalledWith('c@x.com');
+    expect(db.adminAuditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: 'user.password_reset', targetId: 'u1' }) }));
+  });
+  it('reset de usuário inexistente → NotFound', async () => {
+    await expect(svc(fakeDb()).requestPasswordReset(ACTOR, 'nope')).rejects.toBeInstanceOf(NotFoundException);
   });
 });
