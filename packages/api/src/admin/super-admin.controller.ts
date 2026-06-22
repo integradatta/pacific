@@ -4,7 +4,7 @@ import { PrincipalGuard } from '../auth/principal.guard.js';
 import { RolesGuard } from '../auth/roles.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
-import type { AuthUser, AdminAuditEntry, AdminTenantRow, AdminUserRow, TenantApproval } from '@pacific/shared';
+import type { AuthUser, AdminAccessLinkRow, AdminAuditEntry, AdminCreditorRow, AdminOverview, AdminTenantRow, AdminUserRow, TenantApproval } from '@pacific/shared';
 import { SuperAdminService, type Actor } from './super-admin.service.js';
 
 const actorOf = (u: AuthUser): Actor => ({ supabaseId: u.supabaseId, email: u.email });
@@ -14,6 +14,26 @@ const actorOf = (u: AuthUser): Actor => ({ supabaseId: u.supabaseId, email: u.em
 @UseGuards(new JwtGuard(), PrincipalGuard, RolesGuard)
 export class SuperAdminController {
   constructor(private readonly admin: SuperAdminService) {}
+
+  @Get('overview') @Roles('SUPER_ADMIN')
+  overview(): Promise<AdminOverview> {
+    return this.admin.overview();
+  }
+
+  @Get('creditors') @Roles('SUPER_ADMIN')
+  creditors(): Promise<AdminCreditorRow[]> {
+    return this.admin.creditors();
+  }
+
+  @Get('access-links') @Roles('SUPER_ADMIN')
+  accessLinks(@Query('limit') limit?: string): Promise<AdminAccessLinkRow[]> {
+    return this.admin.accessLinks(limit ? Number(limit) : undefined);
+  }
+
+  @Post('access-links/:id/revoke') @Roles('SUPER_ADMIN')
+  revokeLink(@CurrentUser() u: AuthUser, @Param('id') id: string): Promise<void> {
+    return this.admin.revokeLink(actorOf(u), id);
+  }
 
   @Get('tenants') @Roles('SUPER_ADMIN')
   tenants(@Query('approval') approval?: TenantApproval): Promise<AdminTenantRow[]> {
@@ -51,7 +71,12 @@ export class SuperAdminController {
   }
 
   @Get('audit') @Roles('SUPER_ADMIN')
-  audit(@Query('limit') limit?: string): Promise<AdminAuditEntry[]> {
-    return this.admin.auditLog(limit ? Number(limit) : undefined);
+  audit(
+    @Query('action') action?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('limit') limit?: string,
+  ): Promise<AdminAuditEntry[]> {
+    return this.admin.auditLog({ action, from, to, limit: limit ? Number(limit) : undefined });
   }
 }

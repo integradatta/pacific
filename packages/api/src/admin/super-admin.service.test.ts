@@ -18,11 +18,23 @@ function fakeDb() {
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) => (where.id === 'u1' ? { id: 'u1', email: 'c@x.com' } : null)),
     },
     adminAuditLog: { create: vi.fn(async () => ({})), findMany: vi.fn(async () => []) },
+    debtorAccess: {
+      findMany: vi.fn(async () => [{ id: 'l1', debtorId: 'd1', tenantId: 't1', active: true, lastSeenAt: null, rotatedAt: null, createdAt: new Date('2026-06-03T00:00:00Z') }]),
+      findUnique: vi.fn(async ({ where }: { where: { id: string } }) => (where.id === 'l1' ? { id: 'l1', debtorId: 'd1' } : null)),
+      update: vi.fn(async () => ({})),
+    },
+    debtorLoginEvent: { count: vi.fn(async () => 3) },
   };
 }
 const mkAuthAdmin = () => ({ sendPasswordReset: vi.fn(async () => {}) });
-const svc = (db: ReturnType<typeof fakeDb>, authAdmin = mkAuthAdmin()) =>
-  new SuperAdminService({ raw: () => db } as never, authAdmin as never);
+const KPIS = { totalLent: '1000.00', totalReceivable: '600.00', totalReceived: '400.00', countActive: 1, countSettled: 1, countByStatus: { GREEN: 1, YELLOW: 0, ORANGE: 0, RED: 1 }, riskDistribution: { LOW: 1, MEDIUM: 0, HIGH: 0 } };
+const mkDash = () => ({ kpis: vi.fn(async () => KPIS) });
+const svc = (db: ReturnType<typeof fakeDb>, authAdmin = mkAuthAdmin(), dashboard = mkDash()) =>
+  new SuperAdminService(
+    { raw: () => db, withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db) } as never,
+    dashboard as never,
+    authAdmin as never,
+  );
 
 describe('SuperAdminService', () => {
   it('listTenants mapeia approval/status + userCount', async () => {
@@ -61,5 +73,37 @@ describe('SuperAdminService', () => {
   });
   it('reset de usuário inexistente → NotFound', async () => {
     await expect(svc(fakeDb()).requestPasswordReset(ACTOR, 'nope')).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('overview agrega KPIs dos tenants aprovados+ativos', async () => {
+    const db = fakeDb();
+    db.tenant.findMany = vi.fn(async () => [
+      { id: 't1', status: 'ACTIVE', approval: 'APPROVED', createdAt: new Date('2026-06-01T00:00:00Z') },
+      { id: 't2', status: 'ACTIVE', approval: 'APPROVED', createdAt: new Date('2026-06-01T00:00:00Z') },
+      { id: 't3', status: 'SUSPENDED', approval: 'APPROVED', createdAt: new Date('2026-06-01T00:00:00Z') },
+    ]) as never;
+    const o = await svc(db).overview(new Date('2026-07-01T12:00:00Z'));
+    expect(o).toMatchObject({ creditorsTotal: 3, creditorsActive: 2, creditorsBlocked: 1 });
+    expect(o.volumeLent).toBe('2000.00'); // 2 tenants × 1000
+    expect(o.outstanding).toBe('1200.00'); // 2 × 600
+    expect(o.operationsOverdue).toBe(2); // 2 × RED=1
+    expect(o.loginsToday).toBe(6); // 2 × 3
+  });
+
+  it('accessLinks lista os links', async () => {
+    const rows = await svc(fakeDb()).accessLinks();
+    expect(rows[0]).toMatchObject({ id: 'l1', debtorId: 'd1', active: true });
+  });
+  it('revokeLink desativa + audita; inexistente → NotFound', async () => {
+    const db = fakeDb();
+    await svc(db).revokeLink(ACTOR, 'l1');
+    expect(db.debtorAccess.update).toHaveBeenCalledWith({ where: { id: 'l1' }, data: { active: false } });
+    expect(db.adminAuditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: 'link.revoke' }) }));
+    await expect(svc(fakeDb()).revokeLink(ACTOR, 'nope')).rejects.toBeInstanceOf(NotFoundException);
+  });
+  it('auditLog aplica filtro de ação', async () => {
+    const db = fakeDb();
+    await svc(db).auditLog({ action: 'tenant.approve', limit: 10 });
+    expect(db.adminAuditLog.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ action: { contains: 'tenant.approve' } }), take: 10 }));
   });
 });
