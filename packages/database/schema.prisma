@@ -32,6 +32,12 @@ enum RatePeriod {
   ANNUAL
 }
 
+enum ConsentState {
+  NEVER
+  GRANTED
+  REVOKED
+}
+
 enum NotificationType {
   DUE_SOON // legado (mantido p/ registros antigos); a geração agora usa as réguas abaixo
   DUE_15
@@ -72,17 +78,39 @@ model Debtor {
   user       User?     @relation(fields: [userId], references: [id])
   name       String
   email      String?
-  // Ponto de extensão INERTE p/ um futuro módulo de localização (opcional, voluntário,
-  // SIMULADO). Nenhum código grava/lê isto: sem rastreamento real de pessoas. Ver
-  // @pacific/shared/location (contratos) e o painel "Em desenvolvimento" no web.
+  // Localização legada (string inerte) — mantida por compatibilidade; o histórico real
+  // vai para LocationPing. O compartilhamento é por CONSENTIMENTO explícito e revogável
+  // (modelo voluntário tipo Life360): só grava posição quando locationConsent = GRANTED.
   lastLocation String?
+  locationConsent   ConsentState @default(NEVER)
+  locationConsentAt DateTime?
+  locationRevokedAt DateTime?
   redeemedAt DateTime?
   createdAt  DateTime  @default(now())
   debts      Debt[]
+  locationPings LocationPing[]
 
   @@unique([id, tenantId])
   @@index([tenantId])
   @@index([tenantId, email])
+}
+
+// Posição compartilhada VOLUNTARIAMENTE pelo próprio devedor (consentimento GRANTED).
+// FK composta (debtorId, tenantId) garante paridade de tenant. Sob RLS (forced).
+model LocationPing {
+  id         String   @id @default(uuid())
+  tenantId   String
+  debtorId   String
+  debtor     Debtor   @relation(fields: [debtorId, tenantId], references: [id, tenantId])
+  lat        Float
+  lng        Float
+  accuracy   Float?
+  battery    Int?
+  recordedAt DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([debtorId, recordedAt])
 }
 
 model Debt {

@@ -17,10 +17,12 @@ import { DebtorExchangeService } from './auth/debtor-exchange.service.js';
 import { DebtorTokenService } from './auth/debtor-token.service.js';
 import { DebtorSelfController } from './debtors/debtor-self.controller.js';
 import { DebtorSelfService } from './debtors/debtor-self.service.js';
+import { LocationController } from './location/location.controller.js';
+import { LocationService } from './location/location.service.js';
 
 @Module({
-  controllers: [CreditorsController, DebtorProvisioningController, DebtsController, DashboardController, NotificationsController, DebtorExchangeController, DebtorSelfController],
-  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, DebtorsAdminService, DebtsService, DashboardService, NotificationsService, DebtorExchangeService, DebtorTokenService, DebtorSelfService],
+  controllers: [CreditorsController, DebtorProvisioningController, DebtsController, DashboardController, NotificationsController, DebtorExchangeController, DebtorSelfController, LocationController],
+  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, DebtorsAdminService, DebtsService, DashboardService, NotificationsService, DebtorExchangeService, DebtorTokenService, DebtorSelfService, LocationService],
   exports: [PrismaService],
 })
 export class AppModule {}
