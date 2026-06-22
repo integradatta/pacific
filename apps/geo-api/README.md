@@ -7,8 +7,12 @@ vêm do JWT). Spec: [`../../docs/superpowers/specs/2026-06-21-gps-spec.md`](../.
 ## Status da construção (incremental, em `feat/geo-module`)
 - ✅ **Increment 1** — `packages/geo-shared`: lógica pura de domínio + 39 testes (regras de grupo/papéis, consentimento, geofence anti-bounce, validação de pontos, geocoding, notificações).
 - ✅ **Increment 2** — migrations SQL do schema `geo` (PostGIS, enums, tabelas, índices GiST, RLS). **Este diretório.**
-- ⏳ **Increment 3** — app NestJS (guards JWT/tenant/roles, módulos groups/locations/geofencing/consent, REST, throttler).
-- ⏳ **Increments 4–7** — WebSocket + jobs (agregação 6h/DBSCAN/purge), mobile RN, dashboard web, FCM.
+- ✅ **Increment 3** — app NestJS: guards (JWT assumindo claim `tenant_id`, rate-limit in-memory), `GeoDb` tenant-scoped (RLS via `app.current_tenant`), módulos `groups`/`sharing`/`locations`/`geofencing` (REST + DTOs) consumindo o `geo-shared`. **18 testes** (regras com DB mockado) + typecheck ✓.
+- ⏳ **Increment 4** — WebSocket gateway + jobs (agregação 6h, DBSCAN, purge, cache de geocoding).
+- ⏳ **Increments 5–7** — mobile RN, dashboard web, FCM (precisam de device/Firebase p/ validar).
+
+> A camada espacial (SQL PostGIS) é exercida só contra o Supabase; a lógica de regras está
+> coberta por testes com DB mockado aqui + os 39 testes puros do `@pacific/geo-shared`.
 
 ## Migrations (`./migrations`)
 Raw SQL (PostGIS não é tipado pelo Prisma). Ordem:
