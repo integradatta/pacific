@@ -9,6 +9,8 @@ const NAV = [
   { href: '/admin/credores', label: 'Credores', icon: '◍' },
   { href: '/admin/aprovacoes', label: 'Aprovações', icon: '✓' },
   { href: '/admin/links', label: 'Links de acesso', icon: '⚷' },
+  { href: '/admin/sessoes', label: 'Sessões', icon: '◉' },
+  { href: '/admin/monitoramento', label: 'Monitoramento', icon: '◬' },
   { href: '/admin/auditoria', label: 'Auditoria', icon: '◷' },
   { href: '/admin/seguranca', label: 'Segurança', icon: '⊘' },
   { href: '/admin/executivo', label: 'Executivo', icon: '◆' },

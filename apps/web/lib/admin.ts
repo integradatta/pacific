@@ -1,8 +1,15 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AdminTenantRow, AdminUserRow, AdminAuditEntry, AdminOverview, AdminCreditorRow, AdminAccessLinkRow, TenantApproval } from '@pacific/shared';
+import type { AdminTenantRow, AdminUserRow, AdminAuditEntry, AdminOverview, AdminCreditorRow, AdminAccessLinkRow, AdminEventRow, PlatformEventType, TenantApproval } from '@pacific/shared';
 import { apiGet, apiPost } from './api';
+
+export function useAdminEvents(type?: PlatformEventType) {
+  return useQuery({
+    queryKey: ['admin', 'events', type ?? 'all'],
+    queryFn: () => apiGet<AdminEventRow[]>(`/admin/events${type ? `?type=${type}` : ''}`),
+  });
+}
 
 export function useAdminOverview() {
   return useQuery({ queryKey: ['admin', 'overview'], queryFn: () => apiGet<AdminOverview>('/admin/overview') });

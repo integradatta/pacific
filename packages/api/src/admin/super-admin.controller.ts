@@ -4,8 +4,9 @@ import { PrincipalGuard } from '../auth/principal.guard.js';
 import { RolesGuard } from '../auth/roles.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
-import type { AuthUser, AdminAccessLinkRow, AdminAuditEntry, AdminCreditorRow, AdminOverview, AdminTenantRow, AdminUserRow, TenantApproval } from '@pacific/shared';
+import type { AuthUser, AdminAccessLinkRow, AdminAuditEntry, AdminCreditorRow, AdminEventRow, AdminOverview, AdminTenantRow, AdminUserRow, ActorType, PlatformEventType, TenantApproval } from '@pacific/shared';
 import { SuperAdminService, type Actor } from './super-admin.service.js';
+import { TrackingService } from '../tracking/tracking.service.js';
 
 const actorOf = (u: AuthUser): Actor => ({ supabaseId: u.supabaseId, email: u.email });
 
@@ -13,7 +14,20 @@ const actorOf = (u: AuthUser): Actor => ({ supabaseId: u.supabaseId, email: u.em
 @Controller('admin')
 @UseGuards(new JwtGuard(), PrincipalGuard, RolesGuard)
 export class SuperAdminController {
-  constructor(private readonly admin: SuperAdminService) {}
+  constructor(
+    private readonly admin: SuperAdminService,
+    private readonly tracking: TrackingService,
+  ) {}
+
+  @Get('events') @Roles('SUPER_ADMIN')
+  events(
+    @Query('type') type?: PlatformEventType,
+    @Query('actorType') actorType?: ActorType,
+    @Query('tenantId') tenantId?: string,
+    @Query('limit') limit?: string,
+  ): Promise<AdminEventRow[]> {
+    return this.tracking.list({ type, actorType, tenantId, limit: limit ? Number(limit) : undefined });
+  }
 
   @Get('overview') @Roles('SUPER_ADMIN')
   overview(): Promise<AdminOverview> {

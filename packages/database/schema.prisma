@@ -38,6 +38,24 @@ enum RatePeriod {
   ANNUAL
 }
 
+enum PlatformEventType {
+  LOGIN
+  LOGOUT
+  LOGIN_FAILED
+  LINK_USED
+  LINK_CREATED
+  LINK_ROTATED
+  ACCESS_REVOKED
+  ACCESS_REACTIVATED
+  OPERATION_CREATED
+  OPERATION_UPDATED
+  OPERATION_PAID
+  CLIENT_CREATED
+  TENANT_APPROVED
+  TENANT_SUSPENDED
+  IMPORTANT
+}
+
 enum NotificationType {
   DUE_SOON // legado (mantido p/ registros antigos); a geração agora usa as réguas abaixo
   DUE_15
@@ -58,6 +76,26 @@ model Tenant {
   createdAt DateTime       @default(now())
   users     User[]
   debtors   Debtor[]
+}
+
+// Log unificado de eventos da plataforma (login/logout, uso de links, operações, clientes,
+// revogações, eventos importantes). Append-only, GLOBAL (sem RLS) — o super-admin lê cross-tenant
+// e filtra por tenantId/tipo/data. tenantId nulo = evento de plataforma (super-admin/sistema).
+model PlatformEvent {
+  id         String            @id @default(uuid())
+  tenantId   String?
+  actorType  String // CREDITOR | DEBTOR | SUPER_ADMIN | SYSTEM
+  actorId    String?
+  type       PlatformEventType
+  targetType String?
+  targetId   String?
+  detail     Json?
+  ip         String?
+  at         DateTime          @default(now())
+
+  @@index([at])
+  @@index([tenantId, at])
+  @@index([type, at])
 }
 
 // Auditoria das ações do super-admin (aprovar/suspender/etc.). Append-only. Sem RLS (global).

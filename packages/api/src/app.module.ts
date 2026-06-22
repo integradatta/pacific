@@ -20,10 +20,12 @@ import { DebtorSelfService } from './debtors/debtor-self.service.js';
 import { SuperAdminController } from './admin/super-admin.controller.js';
 import { SuperAdminService } from './admin/super-admin.service.js';
 import { AUTH_ADMIN, createAuthAdmin } from './admin/auth-admin.js';
+import { TrackingService } from './tracking/tracking.service.js';
+import { EventsController } from './tracking/events.controller.js';
 
 @Module({
-  controllers: [CreditorsController, DebtorProvisioningController, DebtsController, DashboardController, NotificationsController, DebtorExchangeController, DebtorSelfController, SuperAdminController],
-  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, DebtorsAdminService, DebtsService, DashboardService, NotificationsService, DebtorExchangeService, DebtorTokenService, DebtorSelfService, SuperAdminService, { provide: AUTH_ADMIN, useFactory: createAuthAdmin }],
+  controllers: [CreditorsController, DebtorProvisioningController, DebtsController, DashboardController, NotificationsController, DebtorExchangeController, DebtorSelfController, SuperAdminController, EventsController],
+  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, DebtorsAdminService, DebtsService, DashboardService, NotificationsService, DebtorExchangeService, DebtorTokenService, DebtorSelfService, SuperAdminService, TrackingService, { provide: AUTH_ADMIN, useFactory: createAuthAdmin }],
   exports: [PrismaService],
 })
 export class AppModule {}

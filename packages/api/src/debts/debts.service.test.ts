@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { DebtsService } from './debts.service.js';
+import { TrackingService } from '../tracking/tracking.service.js';
 import { NotFoundException } from '@nestjs/common';
 
 const dec = (v: string) => ({ toString: () => v });
@@ -33,6 +34,7 @@ function fakeDb() {
     },
     debtorAccess: { create: vi.fn(async () => ({})), findFirst: vi.fn(async () => null) },
     debtorLoginEvent: { findMany: vi.fn(async () => []) },
+    platformEvent: { create: vi.fn(async () => ({})) },
     notification: { findMany: vi.fn(async () => []), deleteMany: vi.fn(async () => ({ count: 0 })) },
     debt: {
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'debt1', ...data })),
@@ -45,8 +47,9 @@ function fakeDb() {
   };
 }
 // withTenant executa o callback com o db fake como "tx" (a transação real só roda em runtime).
+const tracking = new TrackingService({ raw: () => ({}) } as never);
 const svc = (db: ReturnType<typeof fakeDb>) =>
-  new DebtsService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db) } as never);
+  new DebtsService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db) } as never, tracking);
 const base = { principal: '1000.00', rate: '0.030000', ratePeriod: 'MONTHLY' as const, startDate: '2026-05-01T00:00:00Z', dueDate: '2026-07-01T00:00:00Z' };
 
 describe('DebtsService', () => {

@@ -4,6 +4,7 @@ import type { Debt, Prisma } from '@pacific/database';
 import { summarize, normalizeTags, balanceAt, type DebtSummary, type DebtRecord, type DebtEvent } from '@pacific/shared';
 import type { PayDebtInput } from './dto/pay-debt.dto.js';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
+import { TrackingService } from '../tracking/tracking.service.js';
 import { generateAccessToken, hashAccessToken } from '../auth/access-token.util.js';
 import type { Page } from '../common/pagination.js';
 import type { CreateDebtInput } from './dto/create-debt.dto.js';
@@ -13,7 +14,10 @@ type DebtWithDebtor = Debt & { debtor: { name: string } };
 
 @Injectable()
 export class DebtsService {
-  constructor(private readonly scoped: TenantScopedService) {}
+  constructor(
+    private readonly scoped: TenantScopedService,
+    private readonly tracking: TrackingService,
+  ) {}
 
   /**
    * Cadastro simplificado: cria cliente (devedor) + acesso + operação (dívida) atomicamente.
@@ -38,6 +42,8 @@ export class DebtsService {
           dueDate: new Date(input.dueDate),
         },
       });
+      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'CLIENT_CREATED', targetType: 'debtor', targetId: debtor.id, detail: { name: input.clientName } });
+      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'OPERATION_CREATED', targetType: 'debt', targetId: debt.id });
       return { debtorId: debtor.id, debtId: debt.id };
     });
   }
@@ -46,7 +52,7 @@ export class DebtsService {
     return this.scoped.withTenant(tenantId, async (tx) => {
       const debtor = await tx.debtor.findFirst({ where: { id: input.debtorId, tenantId } });
       if (!debtor) throw new NotFoundException('Devedor não encontrado neste tenant');
-      return tx.debt.create({
+      const debt = await tx.debt.create({
         data: {
           tenantId,
           debtorId: input.debtorId,
@@ -60,6 +66,8 @@ export class DebtsService {
           dueDate: new Date(input.dueDate),
         },
       });
+      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'OPERATION_CREATED', targetType: 'debt', targetId: debt.id });
+      return debt;
     });
   }
 
@@ -83,6 +91,7 @@ export class DebtsService {
     return this.scoped.withTenant(tenantId, async (tx) => {
       await this.findOne(tx, tenantId, id); // garante existência + paridade de tenant
       await tx.debt.update({ where: { id }, data: { tags: normalizeTags(tags) } });
+      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'OPERATION_UPDATED', targetType: 'debt', targetId: id, detail: { field: 'tags' } });
       return this.toRecord(await this.findOne(tx, tenantId, id));
     });
   }
@@ -136,6 +145,7 @@ export class DebtsService {
       await tx.debt.update({ where: { id }, data: { paidAmount: paid.toFixed(2), settledAt } });
       // Cancela alertas pendentes (não lidos) desta dívida.
       await tx.notification.deleteMany({ where: { tenantId, debtId: id, readAt: null } });
+      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'OPERATION_PAID', targetType: 'debt', targetId: id, detail: { paidAmount: paid.toFixed(2), settled: settledAt != null } });
 
       return this.toRecord(await this.findOne(tx, tenantId, id));
     });

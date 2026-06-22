@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { DebtorsAdminService } from './debtors-admin.service.js';
+import { TrackingService } from '../tracking/tracking.service.js';
 import { NotFoundException } from '@nestjs/common';
 
 function fakeDb() {
@@ -18,10 +19,12 @@ function fakeDb() {
       findMany: vi.fn(async () => [{ id: 'e1', success: true, at: new Date() }]),
       count: vi.fn(async () => 1),
     },
+    platformEvent: { create: vi.fn(async () => ({})) },
   };
 }
+const tracking = new TrackingService({ raw: () => ({}) } as never);
 const svc = (db: ReturnType<typeof fakeDb>) =>
-  new DebtorsAdminService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db) } as never);
+  new DebtorsAdminService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db) } as never, tracking);
 
 describe('DebtorsAdminService', () => {
   it('create: cria devedor + acesso (tokenHash) e devolve link /d/<token> uma vez', async () => {

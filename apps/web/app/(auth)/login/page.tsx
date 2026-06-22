@@ -4,7 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { apiGet } from '@/lib/api';
+import { apiGet, apiPost } from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -30,6 +30,7 @@ export default function LoginPage() {
     // Isso resolve o "loga mas não acessa": sem tenant, todo endpoint protegido dá 403.
     try {
       const me = await apiGet<{ role: string; tenantId: string | null; approved: boolean }>('/auth/me');
+      void apiPost('/events/session', { type: 'login' }).catch(() => undefined); // tracking (best-effort)
       if (me.role === 'SUPER_ADMIN') router.push('/admin');
       else if (!me.tenantId) router.push('/register');
       else if (!me.approved) router.push('/pendente');

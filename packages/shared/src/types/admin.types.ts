@@ -59,6 +59,38 @@ export interface AdminCreditorRow {
   walletValue: string; // a receber (Decimal string)
 }
 
+export type PlatformEventType =
+  | 'LOGIN'
+  | 'LOGOUT'
+  | 'LOGIN_FAILED'
+  | 'LINK_USED'
+  | 'LINK_CREATED'
+  | 'LINK_ROTATED'
+  | 'ACCESS_REVOKED'
+  | 'ACCESS_REACTIVATED'
+  | 'OPERATION_CREATED'
+  | 'OPERATION_UPDATED'
+  | 'OPERATION_PAID'
+  | 'CLIENT_CREATED'
+  | 'TENANT_APPROVED'
+  | 'TENANT_SUSPENDED'
+  | 'IMPORTANT';
+
+export type ActorType = 'CREDITOR' | 'DEBTOR' | 'SUPER_ADMIN' | 'SYSTEM';
+
+/** Evento da plataforma (feed de atividade/monitoramento do super-admin). */
+export interface AdminEventRow {
+  id: string;
+  tenantId: string | null;
+  actorType: ActorType;
+  actorId: string | null;
+  type: PlatformEventType;
+  targetType: string | null;
+  targetId: string | null;
+  detail: unknown;
+  at: string;
+}
+
 /** Link de acesso de devedor (magic link). status derivado de active/rotatedAt. */
 export interface AdminAccessLinkRow {
   id: string;

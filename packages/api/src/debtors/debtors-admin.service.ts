@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
+import { TrackingService } from '../tracking/tracking.service.js';
 import { generateAccessToken, hashAccessToken } from '../auth/access-token.util.js';
 import type { Page } from '../common/pagination.js';
 
@@ -7,7 +8,10 @@ export interface DebtorListItem { id: string; name: string; active: boolean; las
 
 @Injectable()
 export class DebtorsAdminService {
-  constructor(private readonly scoped: TenantScopedService) {}
+  constructor(
+    private readonly scoped: TenantScopedService,
+    private readonly tracking: TrackingService,
+  ) {}
 
   private link(token: string): string {
     return `${process.env.WEB_ORIGIN ?? 'http://localhost:3000'}/d/${token}`;
@@ -19,6 +23,8 @@ export class DebtorsAdminService {
     const debtorId = await this.scoped.withTenant(tenantId, async (tx) => {
       const debtor = await tx.debtor.create({ data: { tenantId, name } });
       await tx.debtorAccess.create({ data: { debtorId: debtor.id, tenantId, tokenHash } });
+      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'CLIENT_CREATED', targetType: 'debtor', targetId: debtor.id, detail: { name } });
+      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'LINK_CREATED', targetType: 'debtor', targetId: debtor.id });
       return debtor.id;
     });
     return { debtorId, accessLink: this.link(token) };
@@ -28,6 +34,7 @@ export class DebtorsAdminService {
     await this.scoped.withTenant(tenantId, async (tx) => {
       const res = await tx.debtorAccess.updateMany({ where: { debtorId, tenantId }, data: { active } });
       if (res.count === 0) throw new NotFoundException('Devedor não encontrado');
+      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: active ? 'ACCESS_REACTIVATED' : 'ACCESS_REVOKED', targetType: 'debtor', targetId: debtorId });
     });
   }
 
@@ -40,6 +47,7 @@ export class DebtorsAdminService {
         data: { tokenHash, rotatedAt: new Date(), active: true },
       });
       if (res.count === 0) throw new NotFoundException('Devedor não encontrado');
+      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'LINK_ROTATED', targetType: 'debtor', targetId: debtorId });
     });
     return { accessLink: this.link(token) };
   }
