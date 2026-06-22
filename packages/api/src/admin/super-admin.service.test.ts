@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { SuperAdminService } from './super-admin.service.js';
-import { NotFoundException } from '@nestjs/common';
+import { HttpException, NotFoundException } from '@nestjs/common';
 
 const ACTOR = { supabaseId: 'sa-1', email: 'admin@pacific.dev' };
 
@@ -10,25 +10,31 @@ function fakeDb() {
       findMany: vi.fn(async () => [
         { id: 't1', name: 'Carteira A', orgCode: 'PAC-A', status: 'ACTIVE', approval: 'PENDING', createdAt: new Date('2026-06-01T00:00:00Z'), _count: { users: 2 } },
       ]),
-      findUnique: vi.fn(async ({ where }: { where: { id: string } }) => (where.id === 't1' ? { id: 't1' } : null)),
+      findUnique: vi.fn(async ({ where }: { where: { id: string } }) => (where.id === 't1' ? { id: 't1', orgCode: 'PAC-A' } : null)),
       update: vi.fn(async () => ({})),
+      delete: vi.fn(async () => ({})),
     },
     user: {
-      findMany: vi.fn(async () => [{ id: 'u1', email: 'c@x.com', role: 'CREDITOR', tenantId: 't1', createdAt: new Date('2026-06-02T00:00:00Z') }]),
+      findMany: vi.fn(async () => [{ id: 'u1', email: 'c@x.com', role: 'CREDITOR', tenantId: 't1', supabaseId: 'sb-u1', createdAt: new Date('2026-06-02T00:00:00Z') }]),
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) => (where.id === 'u1' ? { id: 'u1', email: 'c@x.com' } : null)),
+      deleteMany: vi.fn(async () => ({ count: 1 })),
     },
     adminAuditLog: { create: vi.fn(async () => ({})), findMany: vi.fn(async () => []) },
     debtorAccess: {
       findMany: vi.fn(async () => [{ id: 'l1', debtorId: 'd1', tenantId: 't1', active: true, lastSeenAt: null, rotatedAt: null, createdAt: new Date('2026-06-03T00:00:00Z') }]),
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) => (where.id === 'l1' ? { id: 'l1', debtorId: 'd1' } : null)),
       update: vi.fn(async () => ({})),
+      deleteMany: vi.fn(async () => ({ count: 1 })),
     },
-    debtorLoginEvent: { count: vi.fn(async () => 3) },
+    debt: { deleteMany: vi.fn(async () => ({ count: 2 })) },
+    debtor: { deleteMany: vi.fn(async () => ({ count: 1 })) },
+    notification: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    debtorLoginEvent: { count: vi.fn(async () => 3), deleteMany: vi.fn(async () => ({ count: 0 })) },
   };
 }
-const mkAuthAdmin = () => ({ sendPasswordReset: vi.fn(async () => {}) });
+const mkAuthAdmin = () => ({ sendPasswordReset: vi.fn(async () => {}), setBlocked: vi.fn(async () => {}), deleteUser: vi.fn(async () => {}) });
 const KPIS = { totalLent: '1000.00', totalReceivable: '600.00', totalReceived: '400.00', countActive: 1, countSettled: 1, countByStatus: { GREEN: 1, YELLOW: 0, ORANGE: 0, RED: 1 }, riskDistribution: { LOW: 1, MEDIUM: 0, HIGH: 0 } };
-const mkDash = () => ({ kpis: vi.fn(async () => KPIS) });
+const mkDash = () => ({ kpis: vi.fn(async () => KPIS), portfolio: vi.fn(async () => [{ id: 'op1' }]) });
 const svc = (db: ReturnType<typeof fakeDb>, authAdmin = mkAuthAdmin(), dashboard = mkDash()) =>
   new SuperAdminService(
     { raw: () => db, withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db) } as never,
@@ -105,5 +111,38 @@ describe('SuperAdminService', () => {
     const db = fakeDb();
     await svc(db).auditLog({ action: 'tenant.approve', limit: 10 });
     expect(db.adminAuditLog.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ action: { contains: 'tenant.approve' } }), take: 10 }));
+  });
+
+  it('setCreditorBlocked bane usuários no Supabase + suspende tenant + audita', async () => {
+    const db = fakeDb();
+    const authAdmin = mkAuthAdmin();
+    await svc(db, authAdmin).setCreditorBlocked(ACTOR, 't1', true);
+    expect(authAdmin.setBlocked).toHaveBeenCalledWith('sb-u1', true);
+    expect(db.tenant.update).toHaveBeenCalledWith({ where: { id: 't1' }, data: { status: 'SUSPENDED' } });
+    expect(db.adminAuditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: 'tenant.block' }) }));
+  });
+
+  it('tenantOperations devolve a carteira (portfolio)', async () => {
+    expect(await svc(fakeDb()).tenantOperations('t1')).toEqual([{ id: 'op1' }]);
+  });
+
+  describe('deleteTenant', () => {
+    it('exige orgCode correto (senão 400, sem apagar)', async () => {
+      const db = fakeDb();
+      const err = await svc(db).deleteTenant(ACTOR, 't1', 'ERRADO').catch((e) => e);
+      expect((err as HttpException).getStatus()).toBe(400);
+      expect(db.tenant.delete).not.toHaveBeenCalled();
+    });
+    it('com confirmação correta, apaga dados + tenant + usuários do Supabase + audita', async () => {
+      const db = fakeDb();
+      const authAdmin = mkAuthAdmin();
+      await svc(db, authAdmin).deleteTenant(ACTOR, 't1', 'PAC-A');
+      expect(db.debt.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 't1' } });
+      expect(db.debtor.deleteMany).toHaveBeenCalled();
+      expect(db.user.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 't1' } });
+      expect(db.tenant.delete).toHaveBeenCalledWith({ where: { id: 't1' } });
+      expect(authAdmin.deleteUser).toHaveBeenCalledWith('sb-u1');
+      expect(db.adminAuditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: 'tenant.delete' }) }));
+    });
   });
 });

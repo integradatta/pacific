@@ -1,4 +1,4 @@
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
 import type { AdminAccessLinkRow, AdminAuditEntry, AdminCreditorRow, AdminOverview, AdminTenantRow, AdminUserRow, TenantApproval } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
@@ -149,6 +149,57 @@ export class SuperAdminService {
   }
   reactivateTenant(actor: Actor, id: string): Promise<void> {
     return this.mutateTenant(actor, id, { status: 'ACTIVE' }, 'tenant.reactivate');
+  }
+
+  /** Operações (carteira) de qualquer credor — visão global, RLS-safe via DashboardService. */
+  async tenantOperations(tenantId: string) {
+    return this.dashboard.portfolio(tenantId);
+  }
+
+  /**
+   * Bloqueia/desbloqueia um credor: bane os usuários no Supabase (impede login/refresh — efetivo
+   * como force-logout no TTL do token) e marca o tenant SUSPENDED/ACTIVE. Audita.
+   */
+  async setCreditorBlocked(actor: Actor, tenantId: string, blocked: boolean): Promise<void> {
+    const tenant = await this.db.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) throw new NotFoundException('Credor não encontrado');
+    const users = await this.db.user.findMany({ where: { tenantId, role: 'CREDITOR' }, select: { supabaseId: true } });
+    for (const u of users) await this.authAdmin.setBlocked(u.supabaseId, blocked);
+    await this.db.tenant.update({ where: { id: tenantId }, data: { status: blocked ? 'SUSPENDED' : 'ACTIVE' } });
+    await this.audit(actor, blocked ? 'tenant.block' : 'tenant.unblock', 'tenant', tenantId, { users: users.length });
+  }
+
+  /** Força logout de um usuário específico (ban no Supabase). Audita. */
+  async forceLogout(actor: Actor, supabaseId: string): Promise<void> {
+    await this.authAdmin.setBlocked(supabaseId, true);
+    await this.authAdmin.setBlocked(supabaseId, false); // re-permite login futuro; sessões atuais caem no TTL
+    await this.audit(actor, 'user.force_logout', 'user', supabaseId, {});
+  }
+
+  /**
+   * EXCLUI um credor e todos os seus dados (fluxo seguro: exige confirmação do orgCode).
+   * Destrutivo e irreversível. Mantém AdminAuditLog (trilha). Audita a exclusão.
+   */
+  async deleteTenant(actor: Actor, tenantId: string, confirmOrgCode: string): Promise<void> {
+    const tenant = await this.db.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) throw new NotFoundException('Credor não encontrado');
+    if (confirmOrgCode !== tenant.orgCode) {
+      throw new BadRequestException('Confirmação não confere. Digite o código da organização para excluir.');
+    }
+    const users = await this.db.user.findMany({ where: { tenantId }, select: { supabaseId: true } });
+    // Dados sob RLS: apaga dentro do contexto do tenant (ordem segura de FKs).
+    await this.scoped.withTenant(tenantId, async (tx) => {
+      await tx.debt.deleteMany({ where: { tenantId } });
+      await tx.debtor.deleteMany({ where: { tenantId } });
+      await tx.notification.deleteMany({ where: { tenantId } });
+      await tx.debtorLoginEvent.deleteMany({ where: { tenantId } });
+    });
+    // Tabelas fora da RLS:
+    await this.db.debtorAccess.deleteMany({ where: { tenantId } });
+    await this.db.user.deleteMany({ where: { tenantId } });
+    await this.db.tenant.delete({ where: { id: tenantId } });
+    for (const u of users) await this.authAdmin.deleteUser(u.supabaseId).catch(() => undefined);
+    await this.audit(actor, 'tenant.delete', 'tenant', tenantId, { orgCode: tenant.orgCode, users: users.length });
   }
 
   /** Dispara reset de senha (NÃO expõe senha — hash é irrecuperável). Audita o ato. */

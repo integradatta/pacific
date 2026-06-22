@@ -1,8 +1,8 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AdminTenantRow, AdminUserRow, AdminAuditEntry, AdminOverview, AdminCreditorRow, AdminAccessLinkRow, AdminEventRow, PlatformEventType, TenantApproval } from '@pacific/shared';
-import { apiGet, apiPost } from './api';
+import type { AdminTenantRow, AdminUserRow, AdminAuditEntry, AdminOverview, AdminCreditorRow, AdminAccessLinkRow, AdminEventRow, PlatformEventType, PortfolioRow, TenantApproval } from '@pacific/shared';
+import { apiGet, apiPost, apiDelete } from './api';
 
 export function useAdminEvents(type?: PlatformEventType) {
   return useQuery({
@@ -53,15 +53,30 @@ export function useAdminAudit() {
   return useQuery({ queryKey: ['admin', 'audit'], queryFn: () => apiGet<AdminAuditEntry[]>('/admin/audit') });
 }
 
-export type TenantAction = 'approve' | 'reject' | 'suspend' | 'reactivate';
+export type TenantAction = 'approve' | 'reject' | 'suspend' | 'reactivate' | 'block' | 'unblock';
+
+function invalidateAdmin(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: ['admin', 'tenants'] });
+  void qc.invalidateQueries({ queryKey: ['admin', 'creditors'] });
+  void qc.invalidateQueries({ queryKey: ['admin', 'audit'] });
+}
 
 export function useTenantAction() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, action }: { id: string; action: TenantAction }) => apiPost<void>(`/admin/tenants/${id}/${action}`),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['admin', 'tenants'] });
-      void qc.invalidateQueries({ queryKey: ['admin', 'audit'] });
-    },
+    onSuccess: () => invalidateAdmin(qc),
   });
+}
+
+export function useDeleteTenant() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, confirmOrgCode }: { id: string; confirmOrgCode: string }) => apiDelete<void>(`/admin/tenants/${id}`, { confirmOrgCode }),
+    onSuccess: () => invalidateAdmin(qc),
+  });
+}
+
+export function useTenantOperations(id: string) {
+  return useQuery({ queryKey: ['admin', 'operations', id], queryFn: () => apiGet<PortfolioRow[]>(`/admin/tenants/${id}/operations`) });
 }

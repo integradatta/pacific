@@ -1,4 +1,5 @@
-import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { IsString } from 'class-validator';
 import { JwtGuard } from '../auth/jwt.guard.js';
 import { PrincipalGuard } from '../auth/principal.guard.js';
 import { RolesGuard } from '../auth/roles.guard.js';
@@ -9,6 +10,10 @@ import { SuperAdminService, type Actor } from './super-admin.service.js';
 import { TrackingService } from '../tracking/tracking.service.js';
 
 const actorOf = (u: AuthUser): Actor => ({ supabaseId: u.supabaseId, email: u.email });
+
+export class DeleteTenantDto {
+  @IsString() confirmOrgCode!: string;
+}
 
 // Painel do administrador máximo. Só SUPER_ADMIN. Cross-tenant.
 @Controller('admin')
@@ -72,6 +77,31 @@ export class SuperAdminController {
   @Post('tenants/:id/reactivate') @Roles('SUPER_ADMIN')
   reactivate(@CurrentUser() u: AuthUser, @Param('id') id: string): Promise<void> {
     return this.admin.reactivateTenant(actorOf(u), id);
+  }
+
+  @Post('tenants/:id/block') @Roles('SUPER_ADMIN')
+  block(@CurrentUser() u: AuthUser, @Param('id') id: string): Promise<void> {
+    return this.admin.setCreditorBlocked(actorOf(u), id, true);
+  }
+
+  @Post('tenants/:id/unblock') @Roles('SUPER_ADMIN')
+  unblock(@CurrentUser() u: AuthUser, @Param('id') id: string): Promise<void> {
+    return this.admin.setCreditorBlocked(actorOf(u), id, false);
+  }
+
+  @Delete('tenants/:id') @Roles('SUPER_ADMIN')
+  remove(@CurrentUser() u: AuthUser, @Param('id') id: string, @Body() dto: DeleteTenantDto): Promise<void> {
+    return this.admin.deleteTenant(actorOf(u), id, dto.confirmOrgCode);
+  }
+
+  @Get('tenants/:id/operations') @Roles('SUPER_ADMIN')
+  operations(@Param('id') id: string) {
+    return this.admin.tenantOperations(id);
+  }
+
+  @Post('users/:id/force-logout') @Roles('SUPER_ADMIN')
+  forceLogout(@CurrentUser() u: AuthUser, @Param('id') id: string): Promise<void> {
+    return this.admin.forceLogout(actorOf(u), id);
   }
 
   @Get('users') @Roles('SUPER_ADMIN')

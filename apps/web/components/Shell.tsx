@@ -4,6 +4,7 @@ import { type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useNotifications } from '@/lib/notifications';
+import { LogoutButton } from '@/components/LogoutButton';
 
 interface NavItem {
   href: string;
@@ -137,6 +138,7 @@ export function Shell({ title, orgCode = 'ORG-000', children }: ShellProps) {
             >
               ◉
             </div>
+            <LogoutButton />
           </div>
         </header>
 

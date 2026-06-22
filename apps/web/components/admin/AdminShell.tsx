@@ -3,6 +3,7 @@
 import { type ReactNode, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
+import { LogoutButton } from '@/components/LogoutButton';
 
 const NAV = [
   { href: '/admin', label: 'Visão geral', icon: '◈' },
@@ -79,6 +80,7 @@ export function AdminShell({ title, children }: { title: string; children: React
             />
           </form>
           <div aria-label="Administrador" className="w-9 h-9 rounded-full bg-iris/15 border border-iris/40 flex items-center justify-center text-iris text-sm shrink-0">◉</div>
+          <LogoutButton />
         </header>
         <main className="flex-1 p-6 animate-rise">{children}</main>
       </div>
