@@ -11,6 +11,7 @@ export interface MeResponse {
   email: string;
   role: AuthUser['role'];
   tenantId: string | null; // null = autenticado mas ainda sem carteira (precisa concluir o cadastro)
+  approved: boolean; // credor com tenant aprovado E ativo (super-admin/devedor: sempre true)
 }
 
 @Controller('auth')
@@ -32,6 +33,6 @@ export class CreditorsController {
   @Get('me')
   @UseGuards(new JwtGuard(), PrincipalGuard)
   me(@CurrentUser() user: AuthUser): MeResponse {
-    return { supabaseId: user.supabaseId, email: user.email, role: user.role, tenantId: user.tenantId };
+    return { supabaseId: user.supabaseId, email: user.email, role: user.role, tenantId: user.tenantId, approved: user.tenantApproved ?? true };
   }
 }

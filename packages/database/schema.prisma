@@ -20,6 +20,12 @@ enum TenantStatus {
   SUSPENDED
 }
 
+enum TenantApproval {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum DebtStatus {
   GREEN
   YELLOW
@@ -42,13 +48,30 @@ enum NotificationType {
 }
 
 model Tenant {
-  id        String       @id @default(uuid())
+  id        String         @id @default(uuid())
   name      String
-  orgCode   String       @unique
-  status    TenantStatus @default(ACTIVE)
-  createdAt DateTime     @default(now())
+  orgCode   String         @unique
+  status    TenantStatus   @default(ACTIVE)
+  // Gate de aprovação pelo super-admin. Tenants antigos = APPROVED (default, não quebram);
+  // novos credores entram PENDING e só operam após aprovação.
+  approval  TenantApproval @default(APPROVED)
+  createdAt DateTime       @default(now())
   users     User[]
   debtors   Debtor[]
+}
+
+// Auditoria das ações do super-admin (aprovar/suspender/etc.). Append-only. Sem RLS (global).
+model AdminAuditLog {
+  id              String   @id @default(uuid())
+  actorSupabaseId String
+  actorEmail      String?
+  action          String
+  targetType      String
+  targetId        String
+  detail          Json?
+  createdAt       DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 model User {

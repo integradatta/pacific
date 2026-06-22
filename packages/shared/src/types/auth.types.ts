@@ -5,4 +5,5 @@ export interface AuthUser {
   role: UserRole;
   tenantId: string | null; // null apenas para SUPER_ADMIN
   debtorId?: string; // presente quando o sujeito é um devedor (login por link)
+  tenantApproved?: boolean; // credor: tenant aprovado pelo super-admin E ativo
 }
