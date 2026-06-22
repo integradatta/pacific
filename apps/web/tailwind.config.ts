@@ -18,6 +18,7 @@ const config: Config = {
         'text-dim': v('--text-dim'),
         muted: v('--muted'),
         sonar: v('--sonar'),
+        iris: v('--iris'),
         status: {
           green: v('--green'),
           yellow: v('--yellow'),

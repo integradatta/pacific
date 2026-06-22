@@ -1,8 +1,35 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AdminTenantRow, AdminUserRow, AdminAuditEntry, TenantApproval } from '@pacific/shared';
+import type { AdminTenantRow, AdminUserRow, AdminAuditEntry, AdminOverview, AdminCreditorRow, AdminAccessLinkRow, TenantApproval } from '@pacific/shared';
 import { apiGet, apiPost } from './api';
+
+export function useAdminOverview() {
+  return useQuery({ queryKey: ['admin', 'overview'], queryFn: () => apiGet<AdminOverview>('/admin/overview') });
+}
+
+export function useAdminCreditors() {
+  return useQuery({ queryKey: ['admin', 'creditors'], queryFn: () => apiGet<AdminCreditorRow[]>('/admin/creditors') });
+}
+
+export function useAdminLinks() {
+  return useQuery({ queryKey: ['admin', 'links'], queryFn: () => apiGet<AdminAccessLinkRow[]>('/admin/access-links') });
+}
+
+export function useRevokeLink() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiPost<void>(`/admin/access-links/${id}/revoke`),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin', 'links'] }),
+  });
+}
+
+export function useAdminAuditFiltered(action?: string) {
+  return useQuery({
+    queryKey: ['admin', 'audit', action ?? 'all'],
+    queryFn: () => apiGet<AdminAuditEntry[]>(`/admin/audit${action ? `?action=${encodeURIComponent(action)}` : ''}`),
+  });
+}
 
 export function useAdminTenants(approval?: TenantApproval) {
   return useQuery({
