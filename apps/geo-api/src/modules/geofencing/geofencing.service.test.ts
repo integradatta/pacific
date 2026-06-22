@@ -33,3 +33,50 @@ describe('GeofencingService.create', () => {
     expect(out.id).toBe('gf1');
   });
 });
+
+describe('GeofencingService.detectForPoint', () => {
+  const NOW = new Date('2026-06-22T12:00:00Z'); // quarta, 12:00 UTC
+  // q com 1 geofence (raio 1000m, distância configurável), último evento e captura de INSERTs.
+  function detectQ(opts: { distance: number; alertType?: string; lastEvent?: string | null; monitored?: string[]; schedule?: unknown }) {
+    const inserts: unknown[][] = [];
+    const q: Querier = {
+      query: vi.fn(async (sql: string, params: unknown[] = []) => {
+        if (sql.includes('FROM geo.geofence WHERE group_id')) {
+          return { rows: [{ id: 'gf1', name: 'Escola', radius_meters: 1000, alert_type: opts.alertType ?? 'both', monitored_members: opts.monitored ?? [], schedule: opts.schedule ?? null, distance: opts.distance }] as never[], rowCount: 1 };
+        }
+        if (sql.includes('FROM geo.geofence_event')) {
+          return { rows: (opts.lastEvent ? [{ event_type: opts.lastEvent }] : []) as never[], rowCount: opts.lastEvent ? 1 : 0 };
+        }
+        if (sql.includes('INSERT INTO geo.geofence_event')) inserts.push(params);
+        return { rows: [] as never[], rowCount: 0 };
+      }),
+    };
+    const db: GeoDb = { withTenant: async (_t, fn) => fn(q), adminQuery: async () => ({ rows: [], rowCount: 0 }) };
+    return { q, db, inserts };
+  }
+  const run = (h: ReturnType<typeof detectQ>) =>
+    new GeofencingService(h.db).detectForPoint(h.q, 't1', 'g1', 'u1', { lat: -23.5, lng: -46.6 }, NOW);
+
+  it('gera "enter" ao cruzar para dentro (estava fora) e grava evento', async () => {
+    const h = detectQ({ distance: 700, lastEvent: 'exit' });
+    const events = await run(h);
+    expect(events).toEqual([{ geofenceId: 'gf1', geofenceName: 'Escola', eventType: 'enter' }]);
+    expect(h.inserts).toHaveLength(1);
+  });
+  it('banda morta (histerese) não gera evento', async () => {
+    const events = await run(detectQ({ distance: 1000, lastEvent: 'exit' }));
+    expect(events).toHaveLength(0);
+  });
+  it('respeita monitored_members (usuário fora da lista é ignorado)', async () => {
+    const events = await run(detectQ({ distance: 700, lastEvent: 'exit', monitored: ['outro'] }));
+    expect(events).toHaveLength(0);
+  });
+  it('respeita alert_type (on_exit não dispara em entrada)', async () => {
+    const events = await run(detectQ({ distance: 700, lastEvent: 'exit', alertType: 'on_exit' }));
+    expect(events).toHaveLength(0);
+  });
+  it('fora da janela de horário não dispara', async () => {
+    const events = await run(detectQ({ distance: 700, lastEvent: 'exit', schedule: { days: [3], start: '20:00', end: '23:00' } }));
+    expect(events).toHaveLength(0); // 12:00 fora de 20–23h
+  });
+});
