@@ -29,8 +29,11 @@ export default function LoginPage() {
     // Conta autenticada mas sem carteira (tenant) -> conclui o cadastro; senão, dashboard.
     // Isso resolve o "loga mas não acessa": sem tenant, todo endpoint protegido dá 403.
     try {
-      const me = await apiGet<{ tenantId: string | null }>('/auth/me');
-      router.push(me.tenantId ? '/dashboard' : '/register');
+      const me = await apiGet<{ role: string; tenantId: string | null; approved: boolean }>('/auth/me');
+      if (me.role === 'SUPER_ADMIN') router.push('/admin');
+      else if (!me.tenantId) router.push('/register');
+      else if (!me.approved) router.push('/pendente');
+      else router.push('/dashboard');
     } catch {
       router.push('/dashboard');
     }
