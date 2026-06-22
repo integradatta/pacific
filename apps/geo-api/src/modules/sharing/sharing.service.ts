@@ -3,6 +3,7 @@ import { applySharingAction, consentReason, type MemberRole, type SharingStatus,
 import { GEO_DB, type GeoDb, type Querier } from '../../common/geo-db.js';
 import { enforce, type Principal } from '../../common/principal.js';
 import { REALTIME, type RealtimePublisher } from '../../realtime/realtime.js';
+import { NotificationsService } from '../../notifications/notifications.service.js';
 
 interface MemberRow { id: string; user_id: string; role: MemberRole; sharing_status: SharingStatus; }
 
@@ -11,6 +12,7 @@ export class SharingService {
   constructor(
     @Inject(GEO_DB) private readonly db: GeoDb,
     @Inject(REALTIME) private readonly realtime: RealtimePublisher,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /** Ação do usuário sobre o próprio compartilhamento (pause/resume/revoke). */
@@ -48,6 +50,7 @@ export class SharingService {
       [groupId, userId, tenantId, member.sharing_status, nextState, consentReason(action), by],
     );
     this.realtime.broadcast(groupId, 'status_change', { userId, status: nextState });
+    await this.notifications.notifyStatusChange(q, groupId, userId, nextState);
     return { status: nextState };
   }
 }

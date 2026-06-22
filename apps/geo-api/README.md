@@ -9,7 +9,15 @@ vêm do JWT). Spec: [`../../docs/superpowers/specs/2026-06-21-gps-spec.md`](../.
 - ✅ **Increment 2** — migrations SQL do schema `geo` (PostGIS, enums, tabelas, índices GiST, RLS). **Este diretório.**
 - ✅ **Increment 3** — app NestJS: guards (JWT assumindo claim `tenant_id`, rate-limit in-memory), `GeoDb` tenant-scoped (RLS via `app.current_tenant`), módulos `groups`/`sharing`/`locations`/`geofencing` (REST + DTOs) consumindo o `geo-shared`. **18 testes** (regras com DB mockado) + typecheck ✓.
 - ✅ **Increment 4** — tempo real + jobs: `LocationsGateway` (socket.io, namespace `/ws/locations`, rooms por grupo, JWT no handshake) via `RealtimePublisher` (serviços publicam `location_update`/`geofence_alert`/`status_change`/`member_joined|left`); `JobsService` (@Cron) agregação 6h + DBSCAN diário + purge com **degradação por storage** (`retentionPlan` no geo-shared) + limpeza de cache; `GET /api/v1/admin/storage-status`. SQL espacial/cron valida no Supabase.
-- ⏳ **Increments 5–7** — mobile RN, dashboard web, FCM (precisam de device/Firebase p/ validar).
+- ✅ **Increment 7** — notificações: `PushSender` (abstração) com `FcmPushSender` (firebase-admin, init lazy) e `NoopPushSender` (default sem credenciais); `NotificationsService` (supervised → admins; collaborative → demais membros só com consenso) ligado a `status_change` e `geofence_alert`; `POST /api/v1/devices` (registro de push token). 4 testes de destinatários.
+- ✅ **Increment 5** (mobile) e ✅ **6** (dashboard) — ver `apps/geo-mobile` e `apps/geo-dashboard`.
+
+### Setup do FCM (Firebase) — para o push funcionar de verdade
+Crie um projeto Firebase (grátis), gere uma **service account** e exponha ao geo-api uma das:
+`FIREBASE_SERVICE_ACCOUNT` (JSON inline) ou `GOOGLE_APPLICATION_CREDENTIALS` (caminho do arquivo).
+Sem isso, o `createPushSender()` usa o `NoopPushSender` (loga, não envia) — o resto funciona.
+No app mobile, configure `google-services.json` (Android) / `GoogleService-Info.plist` (iOS) e
+registre o token via `POST /api/v1/devices`.
 
 > A camada espacial (SQL PostGIS) é exercida só contra o Supabase; a lógica de regras está
 > coberta por testes com DB mockado aqui + os 39 testes puros do `@pacific/geo-shared`.

@@ -14,7 +14,7 @@ export interface CreateGeofenceInput {
   schedule?: Schedule | null;
 }
 
-interface DetectedEvent { geofenceId: string; eventType: GeofenceEventType; }
+interface DetectedEvent { geofenceId: string; geofenceName: string; eventType: GeofenceEventType; }
 
 @Injectable()
 export class GeofencingService {
@@ -63,8 +63,8 @@ export class GeofencingService {
    * a lógica pura testada (evaluateGeofence/isWithinSchedule). Persiste geofence_event nas transições.
    */
   async detectForPoint(q: Querier, tenantId: string, groupId: string, userId: string, point: LatLng, recordedAt: Date): Promise<DetectedEvent[]> {
-    const fences = await q.query<{ id: string; radius_meters: number; alert_type: AlertType; monitored_members: string[]; schedule: Schedule | null; distance: number }>(
-      `SELECT id, radius_meters, alert_type, monitored_members, schedule,
+    const fences = await q.query<{ id: string; name: string; radius_meters: number; alert_type: AlertType; monitored_members: string[]; schedule: Schedule | null; distance: number }>(
+      `SELECT id, name, radius_meters, alert_type, monitored_members, schedule,
               ST_Distance(center, ST_SetSRID(ST_MakePoint($1,$2),4326)::geography) AS distance
        FROM geo.geofence WHERE group_id = $3 AND is_active = true`,
       [point.lng, point.lat, groupId],
@@ -91,7 +91,7 @@ export class GeofencingService {
          VALUES ($1,$2,$3,$4, ST_SetSRID(ST_MakePoint($5,$6),4326)::geography, $7)`,
         [f.id, userId, tenantId, event, point.lng, point.lat, recordedAt.toISOString()],
       );
-      out.push({ geofenceId: f.id, eventType: event });
+      out.push({ geofenceId: f.id, geofenceName: f.name, eventType: event });
     }
     return out;
   }

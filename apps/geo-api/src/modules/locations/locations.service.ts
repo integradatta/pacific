@@ -4,6 +4,7 @@ import { GEO_DB, type GeoDb, type Querier } from '../../common/geo-db.js';
 import type { Principal } from '../../common/principal.js';
 import { GeofencingService } from '../geofencing/geofencing.service.js';
 import { REALTIME, type RealtimePublisher } from '../../realtime/realtime.js';
+import { NotificationsService } from '../../notifications/notifications.service.js';
 
 export interface IngestResult {
   accepted: boolean;
@@ -18,6 +19,7 @@ export class LocationsService {
     @Inject(GEO_DB) private readonly db: GeoDb,
     private readonly geofencing: GeofencingService,
     @Inject(REALTIME) private readonly realtime: RealtimePublisher,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async ingest(p: Principal, deviceId: string, point: IncomingPoint, now: Date = new Date()): Promise<IngestResult> {
@@ -70,6 +72,7 @@ export class LocationsService {
       this.realtime.broadcast(m.group_id, 'location_update', { userId: p.userId, lat: point.lat, lng: point.lng, recordedAt: point.recordedAt });
       for (const ev of events) {
         this.realtime.broadcast(m.group_id, 'geofence_alert', { userId: p.userId, geofenceId: ev.geofenceId, eventType: ev.eventType });
+        await this.notifications.notifyGeofence(q, m.group_id, p.userId, ev.geofenceName, ev.eventType);
       }
     }
     await q.query(`UPDATE geo.user_device SET last_active_at = now() WHERE user_id = $1 AND device_id = $2`, [p.userId, deviceId]);

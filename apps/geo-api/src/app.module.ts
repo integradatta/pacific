@@ -13,14 +13,20 @@ import { GeofencingController } from './modules/geofencing/geofencing.controller
 import { GeofencingService } from './modules/geofencing/geofencing.service.js';
 import { JobsService } from './jobs/jobs.service.js';
 import { AdminController } from './jobs/admin.controller.js';
+import { NotificationsService } from './notifications/notifications.service.js';
+import { PUSH_SENDER, createPushSender } from './notifications/push-sender.js';
+import { DevicesController, DevicesService } from './notifications/devices.controller.js';
 
 @Module({
   imports: [ScheduleModule.forRoot()],
-  controllers: [GroupsController, SharingController, LocationsController, GeofencingController, AdminController],
+  controllers: [GroupsController, SharingController, LocationsController, GeofencingController, AdminController, DevicesController],
   providers: [
     { provide: GEO_DB, useClass: GeoDbPg },
     LocationsGateway,
     { provide: REALTIME, useExisting: LocationsGateway },
+    { provide: PUSH_SENDER, useFactory: createPushSender },
+    NotificationsService,
+    DevicesService,
     GroupsService,
     SharingService,
     LocationsService,
