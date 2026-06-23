@@ -11,7 +11,9 @@ import type {
   ClientAggregate,
   Rankings as RankingsT,
   PortfolioTrend,
+  IntelligenceThresholds,
 } from '@pacific/shared';
+import { DEFAULT_THRESHOLDS } from '@pacific/shared';
 import { formatBRL } from '@/lib/format';
 
 const TREND = {
@@ -259,6 +261,37 @@ export function WeeklyTrend({ trend, summary }: { trend: PortfolioTrend; summary
         <p className="font-mono text-[11px] text-muted tracking-wider">A tendência aparece após algumas semanas de uso (1 registro por semana).</p>
       )}
     </section>
+  );
+}
+
+/** Ajustes de limiares de risco/concentração (configuráveis pelo credor; sem regra fixa). */
+export function ThresholdSettings({ thresholds, onChange }: { thresholds: IntelligenceThresholds; onChange: (t: IntelligenceThresholds) => void }) {
+  const field = (key: keyof IntelligenceThresholds, label: string, hint: string, min: number, max: number) => (
+    <label className="flex items-center justify-between gap-3">
+      <span className="font-sans text-sm text-text-dim">{label} <span className="text-muted">· {hint}</span></span>
+      <input
+        type="number"
+        min={min}
+        max={max}
+        value={thresholds[key]}
+        onChange={(e) => onChange({ ...thresholds, [key]: Number(e.target.value) })}
+        className="w-20 bg-surface2 border border-line rounded-lg px-2.5 py-1.5 text-text font-mono text-sm text-right focus:outline-none focus:border-sonar transition-colors"
+      />
+    </label>
+  );
+  return (
+    <details className="panel p-0 overflow-hidden group">
+      <summary className="px-6 py-3 cursor-pointer flex items-center justify-between list-none">
+        <span className="font-mono text-[11px] text-muted uppercase tracking-widest">Ajustes de inteligência</span>
+        <span className="font-mono text-[10px] text-muted group-open:rotate-90 transition-transform" aria-hidden>▸</span>
+      </summary>
+      <div className="px-6 py-4 border-t border-line space-y-3">
+        {field('highRiskBelow', 'Alto risco quando recuperabilidade abaixo de', '1–99', 1, 99)}
+        {field('concentrationLimitPct', 'Concentração excessiva nos 3 maiores acima de (%)', '10–100', 10, 100)}
+        {field('dueSoonDays', 'Janela de "vence em breve" (dias)', '1–60', 1, 60)}
+        <button type="button" onClick={() => onChange(DEFAULT_THRESHOLDS)} className="font-mono text-[10px] text-muted hover:text-sonar uppercase tracking-widest">Restaurar padrões</button>
+      </div>
+    </details>
   );
 }
 

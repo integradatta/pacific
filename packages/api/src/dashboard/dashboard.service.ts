@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { balanceAt, deriveStatus, daysRemaining, outstanding, recoverabilityScore, temperatureScore, riskLevel, portfolioIntelligence, currentWeeklyPoint, portfolioTrend, weeklySummary, type DashboardKpis, type DebtStatus, type RiskLevel, type PortfolioRow, type PortfolioIntelligence, type HealthState, type WeeklyPoint } from '@pacific/shared';
+import { balanceAt, deriveStatus, daysRemaining, outstanding, recoverabilityScore, temperatureScore, riskLevel, portfolioIntelligence, currentWeeklyPoint, portfolioTrend, weeklySummary, DEFAULT_THRESHOLDS, type DashboardKpis, type DebtStatus, type RiskLevel, type PortfolioRow, type PortfolioIntelligence, type HealthState, type WeeklyPoint, type IntelligenceThresholds } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 
 @Injectable()
@@ -103,10 +103,10 @@ export class DashboardService {
    * Camada de inteligência da carteira (saúde, resumo, insights, concentração, rankings, ações).
    * Tudo DERIVADO da carteira (reusa `portfolio`); nenhuma infra/envio externo. In-app/assistivo.
    */
-  async intelligence(tenantId: string, asOf: Date = new Date()): Promise<PortfolioIntelligence> {
+  async intelligence(tenantId: string, asOf: Date = new Date(), thresholds: IntelligenceThresholds = DEFAULT_THRESHOLDS): Promise<PortfolioIntelligence> {
     const rows = await this.portfolio(tenantId, asOf);
-    const intel = portfolioIntelligence(rows);
-    const points = await this.weeklyHistory(tenantId, currentWeeklyPoint(rows, asOf));
+    const intel = portfolioIntelligence(rows, thresholds);
+    const points = await this.weeklyHistory(tenantId, currentWeeklyPoint(rows, asOf, thresholds));
     return { ...intel, trend: portfolioTrend(points), weeklySummary: weeklySummary(points) };
   }
 

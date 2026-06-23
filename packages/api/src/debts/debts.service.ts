@@ -159,11 +159,16 @@ export class DebtsService {
   async history(tenantId: string, id: string, now: Date = new Date()): Promise<DebtEvent[]> {
     return this.scoped.withTenant(tenantId, async (tx) => {
       const debt = await this.findOne(tx, tenantId, id);
-      const [notifications, access, logins] = await Promise.all([
+      const [notifications, access, logins, changes] = await Promise.all([
         tx.notification.findMany({ where: { tenantId, debtId: id }, orderBy: { createdAt: 'asc' } }),
         tx.debtorAccess.findFirst({ where: { tenantId, debtorId: debt.debtorId } }),
         tx.debtorLoginEvent.findMany({
           where: { tenantId, debtorId: debt.debtorId, success: true },
+          orderBy: { at: 'asc' },
+        }),
+        // Alterações e pagamentos da operação registrados pela camada de tracking (inclui parciais).
+        tx.platformEvent.findMany({
+          where: { tenantId, targetType: 'debt', targetId: id, type: { in: ['OPERATION_UPDATED', 'OPERATION_PAID'] } },
           orderBy: { at: 'asc' },
         }),
       ]);
@@ -183,10 +188,27 @@ export class DebtsService {
       for (const n of notifications) {
         events.push({ at: n.createdAt.toISOString(), kind: 'notification', title: n.title, detail: n.body });
       }
+      // Alterações/pagamentos do tracking (timeline de mudanças, inclui pagamentos parciais).
+      let trackedSettlement = false;
+      for (const c of changes) {
+        const d = (c.detail ?? {}) as { field?: string; paidAmount?: string; settled?: boolean };
+        if (c.type === 'OPERATION_UPDATED') {
+          events.push({ at: c.at.toISOString(), kind: 'updated', title: d.field === 'tags' ? 'Etiquetas atualizadas' : 'Operação alterada' });
+        } else {
+          if (d.settled) trackedSettlement = true;
+          events.push({
+            at: c.at.toISOString(),
+            kind: 'paid',
+            title: d.settled ? 'Operação quitada' : 'Pagamento registrado',
+            detail: d.paidAmount ? `Pagamento de R$ ${d.paidAmount}` : undefined,
+          });
+        }
+      }
       if (debt.dueDate.getTime() < now.getTime()) {
         events.push({ at: debt.dueDate.toISOString(), kind: 'due', title: 'Operação venceu' });
       }
-      if (debt.settledAt) {
+      // Quitação derivada só se o tracking ainda não registrou (operações antigas, pré-tracking).
+      if (debt.settledAt && !trackedSettlement) {
         events.push({ at: debt.settledAt.toISOString(), kind: 'paid', title: 'Operação quitada' });
       }
 

@@ -121,6 +121,17 @@ export const DEFAULT_THRESHOLDS: IntelligenceThresholds = {
   dueSoonDays: 7,
 };
 
+/** Sanitiza limiares vindos do credor (query/localStorage): faixas seguras + defaults. */
+export function normalizeThresholds(p: Partial<IntelligenceThresholds> = {}): IntelligenceThresholds {
+  const clamp = (n: number | undefined, lo: number, hi: number, def: number): number =>
+    n == null || Number.isNaN(n) ? def : Math.max(lo, Math.min(hi, Math.round(n)));
+  return {
+    highRiskBelow: clamp(p.highRiskBelow, 1, 99, DEFAULT_THRESHOLDS.highRiskBelow),
+    concentrationLimitPct: clamp(p.concentrationLimitPct, 10, 100, DEFAULT_THRESHOLDS.concentrationLimitPct),
+    dueSoonDays: clamp(p.dueSoonDays, 1, 60, DEFAULT_THRESHOLDS.dueSoonDays),
+  };
+}
+
 // ── Helpers ──
 
 const money = (n: Decimal | string | number): string => new Decimal(n).toFixed(2);

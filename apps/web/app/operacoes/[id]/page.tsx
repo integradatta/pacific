@@ -17,6 +17,7 @@ const RATE_PERIOD_LABEL = { MONTHLY: 'ao mês', ANNUAL: 'ao ano' } as const;
 
 const EVENT_GLYPH: Record<DebtEventKind, string> = {
   created: '✦',
+  updated: '✎',
   link: '◈',
   login: '◉',
   notification: '◎',
