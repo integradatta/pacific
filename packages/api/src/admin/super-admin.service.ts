@@ -172,9 +172,9 @@ export class SuperAdminService {
   }
 
   /** Força logout instantâneo de um usuário (revokedAfter = agora; tokens atuais caem já). Audita. */
-  async forceLogout(actor: Actor, supabaseId: string): Promise<void> {
-    await this.db.user.updateMany({ where: { supabaseId }, data: { revokedAfter: new Date() } });
-    await this.audit(actor, 'user.force_logout', 'user', supabaseId, {});
+  async forceLogout(actor: Actor, userId: string): Promise<void> {
+    await this.db.user.updateMany({ where: { id: userId }, data: { revokedAfter: new Date() } });
+    await this.audit(actor, 'user.force_logout', 'user', userId, {});
   }
 
   /**

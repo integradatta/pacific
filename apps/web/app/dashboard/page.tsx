@@ -6,11 +6,11 @@ import { useKpis, usePortfolio, useIntelligence, useThresholds } from '@/lib/hoo
 import { HorizonteVencimentos } from '@/components/HorizonteVencimentos';
 import { KpiReadouts } from '@/components/KpiReadouts';
 import { CarteiraTable } from '@/components/CarteiraTable';
-import { IntelligenceBlock, ThresholdSettings } from '@/components/Intelligence';
+import { IntelligenceBlock } from '@/components/Intelligence';
 import { DashboardSkeleton } from '@/components/Skeleton';
 
 export default function DashboardPage() {
-  const [thresholds, setThresholds] = useThresholds();
+  const [thresholds] = useThresholds();
   const kpis = useKpis();
   const portfolio = usePortfolio();
   const intelligence = useIntelligence(thresholds);
@@ -33,11 +33,13 @@ export default function DashboardPage() {
           {intelligence.data ? (
             <>
               <div className="flex justify-end gap-2">
+                <Link href="/configuracoes" className="font-mono text-[11px] text-muted hover:text-sonar uppercase tracking-widest border border-line hover:border-sonar/40 rounded-lg px-3 py-1.5 transition-colors">
+                  Ajustes
+                </Link>
                 <Link href="/relatorio" className="font-mono text-[11px] text-muted hover:text-sonar uppercase tracking-widest border border-line hover:border-sonar/40 rounded-lg px-3 py-1.5 transition-colors">
                   Exportar resumo →
                 </Link>
               </div>
-              <ThresholdSettings thresholds={thresholds} onChange={setThresholds} />
               <IntelligenceBlock intel={intelligence.data} />
             </>
           ) : null}

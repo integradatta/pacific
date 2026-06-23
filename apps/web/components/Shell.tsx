@@ -19,6 +19,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/carteira', label: 'Carteira', icon: '◈' },
   { href: '/vencimentos', label: 'Vencimentos', icon: '◷' },
   { href: '/notificacoes', label: 'Notificações', icon: '◎' },
+  { href: '/configuracoes', label: 'Configurações', icon: '⚙' },
 ];
 
 interface ShellProps {

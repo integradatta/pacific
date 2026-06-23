@@ -8,6 +8,7 @@ import { LogoutButton } from '@/components/LogoutButton';
 const NAV = [
   { href: '/admin', label: 'Visão geral', icon: '◈' },
   { href: '/admin/credores', label: 'Padrinhos', icon: '◍' },
+  { href: '/admin/usuarios', label: 'Usuários', icon: '◑' },
   { href: '/admin/aprovacoes', label: 'Aprovações', icon: '✓' },
   { href: '/admin/notificacoes', label: 'Notificações', icon: '◎' },
   { href: '/admin/links', label: 'Links de acesso', icon: '⚷' },

@@ -127,10 +127,10 @@ describe('SuperAdminService', () => {
     expect(await svc(fakeDb()).tenantOperations('t1')).toEqual([{ id: 'op1' }]);
   });
 
-  it('forceLogout marca revokedAfter (corte instantâneo) + audita', async () => {
+  it('forceLogout marca revokedAfter por id do usuário (corte instantâneo) + audita', async () => {
     const db = fakeDb();
-    await svc(db).forceLogout(ACTOR, 'sb-u1');
-    expect(db.user.updateMany).toHaveBeenCalledWith({ where: { supabaseId: 'sb-u1' }, data: { revokedAfter: expect.any(Date) } });
+    await svc(db).forceLogout(ACTOR, 'u1');
+    expect(db.user.updateMany).toHaveBeenCalledWith({ where: { id: 'u1' }, data: { revokedAfter: expect.any(Date) } });
     expect(db.adminAuditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: 'user.force_logout' }) }));
   });
 

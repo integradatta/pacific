@@ -49,6 +49,14 @@ export function useAdminUsers() {
   return useQuery({ queryKey: ['admin', 'users'], queryFn: () => apiGet<AdminUserRow[]>('/admin/users') });
 }
 
+export function useRequestPasswordReset() {
+  return useMutation({ mutationFn: (id: string) => apiPost<void>(`/admin/users/${id}/password-reset`) });
+}
+
+export function useForceLogoutUser() {
+  return useMutation({ mutationFn: (id: string) => apiPost<void>(`/admin/users/${id}/force-logout`) });
+}
+
 export function useAdminAudit() {
   return useQuery({ queryKey: ['admin', 'audit'], queryFn: () => apiGet<AdminAuditEntry[]>('/admin/audit') });
 }
