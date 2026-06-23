@@ -68,7 +68,23 @@ export function AdminShell({ title, children }: { title: string; children: React
         </div>
       </nav>
 
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Barra mobile: nav rolável por ícones (telas estreitas) */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-20 glass border-b border-line flex items-center gap-3 px-4 h-12">
+        <span className="font-display text-sm font-semibold text-text tracking-tight shrink-0">PACIFIC<span className="font-mono text-[9px] text-iris ml-1 align-middle">ADMIN</span></span>
+        <nav aria-label="Navegação do administrador" className="flex gap-0.5 ml-auto overflow-x-auto">
+          {NAV.map((item) => {
+            const active = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href));
+            return (
+              <Link key={item.href} href={item.href} aria-label={item.label} aria-current={active ? 'page' : undefined}
+                className={`p-2 rounded-md text-base leading-none shrink-0 transition-colors ${active ? 'text-iris' : 'text-muted hover:text-text'}`}>
+                {item.icon}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+
+      <div className="flex-1 flex flex-col min-w-0 mt-12 md:mt-0">
         <header className="glass border-b border-line px-6 py-3.5 flex items-center gap-4 sticky top-0 z-10">
           <h1 className="font-display text-xl font-semibold text-text tracking-tight shrink-0">{title}</h1>
           <form onSubmit={search} className="flex-1 max-w-md ml-auto">
