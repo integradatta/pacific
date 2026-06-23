@@ -62,6 +62,7 @@ enum NotificationType {
   DUE_15
   DUE_7
   DUE_3
+  DUE_1
   DUE_TODAY
   OVERDUE
 }
