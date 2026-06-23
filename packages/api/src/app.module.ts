@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AllExceptionsFilter } from './common/http-exception.filter.js';
 import { PrismaService } from './common/prisma.service.js';
 import { TenantDatasourceResolver } from './tenancy/tenant-datasource.resolver.js';
@@ -14,6 +15,7 @@ import { DashboardController } from './dashboard/dashboard.controller.js';
 import { DashboardService } from './dashboard/dashboard.service.js';
 import { NotificationsController } from './notifications/notifications.controller.js';
 import { NotificationsService } from './notifications/notifications.service.js';
+import { NotificationsScheduler } from './notifications/notifications.scheduler.js';
 import { DebtorExchangeController } from './auth/debtor-exchange.controller.js';
 import { DebtorExchangeService } from './auth/debtor-exchange.service.js';
 import { DebtorTokenService } from './auth/debtor-token.service.js';
@@ -26,8 +28,9 @@ import { TrackingService } from './tracking/tracking.service.js';
 import { EventsController, PublicEventsController } from './tracking/events.controller.js';
 
 @Module({
+  imports: [ScheduleModule.forRoot()],
   controllers: [CreditorsController, DebtorProvisioningController, DebtsController, DashboardController, NotificationsController, DebtorExchangeController, DebtorSelfController, SuperAdminController, EventsController, PublicEventsController],
-  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, DebtorsAdminService, DebtsService, DashboardService, NotificationsService, DebtorExchangeService, DebtorTokenService, DebtorSelfService, SuperAdminService, TrackingService, { provide: AUTH_ADMIN, useFactory: createAuthAdmin }, { provide: APP_FILTER, useClass: AllExceptionsFilter }],
+  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, DebtorsAdminService, DebtsService, DashboardService, NotificationsService, NotificationsScheduler, DebtorExchangeService, DebtorTokenService, DebtorSelfService, SuperAdminService, TrackingService, { provide: AUTH_ADMIN, useFactory: createAuthAdmin }, { provide: APP_FILTER, useClass: AllExceptionsFilter }],
   exports: [PrismaService],
 })
 export class AppModule {}
