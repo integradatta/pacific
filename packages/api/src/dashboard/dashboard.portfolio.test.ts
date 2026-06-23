@@ -9,8 +9,9 @@ function pfDebt(id: string, name: string, dueDate: Date, rate = '0', principal =
 function pfDb(debts: ReturnType<typeof pfDebt>[]) {
   return { debt: { findMany: vi.fn(async () => debts) } };
 }
+const snapStore = () => ({ portfolioSnapshot: { upsert: vi.fn(async () => ({})), findMany: vi.fn(async () => []) } });
 const svc = (db: ReturnType<typeof pfDb>) =>
-  new DashboardService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db) } as never);
+  new DashboardService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db), raw: () => snapStore() } as never);
 
 describe('DashboardService.portfolio', () => {
   it('mapeia dívidas para linhas com status/dias/saldo + nome do devedor', async () => {

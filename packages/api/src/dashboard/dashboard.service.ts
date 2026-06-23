@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { balanceAt, deriveStatus, daysRemaining, outstanding, recoverabilityScore, temperatureScore, riskLevel, portfolioIntelligence, type DashboardKpis, type DebtStatus, type RiskLevel, type PortfolioRow, type PortfolioIntelligence } from '@pacific/shared';
+import { balanceAt, deriveStatus, daysRemaining, outstanding, recoverabilityScore, temperatureScore, riskLevel, portfolioIntelligence, currentWeeklyPoint, portfolioTrend, weeklySummary, type DashboardKpis, type DebtStatus, type RiskLevel, type PortfolioRow, type PortfolioIntelligence, type HealthState, type WeeklyPoint } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 
 @Injectable()
@@ -105,6 +105,39 @@ export class DashboardService {
    */
   async intelligence(tenantId: string, asOf: Date = new Date()): Promise<PortfolioIntelligence> {
     const rows = await this.portfolio(tenantId, asOf);
-    return portfolioIntelligence(rows);
+    const intel = portfolioIntelligence(rows);
+    const points = await this.weeklyHistory(tenantId, currentWeeklyPoint(rows, asOf));
+    return { ...intel, trend: portfolioTrend(points), weeklySummary: weeklySummary(points) };
+  }
+
+  /**
+   * Persiste o snapshot da semana atual (idempotente por tenant+semana; best-effort, nunca quebra
+   * o dashboard) e devolve as últimas ~6 semanas. In-app — nenhum envio externo.
+   */
+  private async weeklyHistory(tenantId: string, point: WeeklyPoint): Promise<WeeklyPoint[]> {
+    const db = this.scoped.raw();
+    const weekStart = new Date(point.weekStart);
+    const data = { healthScore: point.healthScore, state: point.state, receivable: point.receivable, overdue: point.overdue, expectedProfit: point.expectedProfit, opsActive: point.opsActive };
+    try {
+      await db.portfolioSnapshot.upsert({
+        where: { tenantId_weekStart: { tenantId, weekStart } },
+        create: { tenantId, weekStart, ...data },
+        update: { ...data, capturedAt: new Date() },
+      });
+    } catch {
+      /* best-effort */
+    }
+    const rows = await db.portfolioSnapshot
+      .findMany({ where: { tenantId }, orderBy: { weekStart: 'desc' }, take: 6 })
+      .catch(() => [] as Awaited<ReturnType<typeof db.portfolioSnapshot.findMany>>);
+    return rows.map((s) => ({
+      weekStart: s.weekStart.toISOString(),
+      healthScore: s.healthScore,
+      state: s.state as HealthState,
+      receivable: s.receivable.toString(),
+      overdue: s.overdue.toString(),
+      expectedProfit: s.expectedProfit.toString(),
+      opsActive: s.opsActive,
+    }));
   }
 }

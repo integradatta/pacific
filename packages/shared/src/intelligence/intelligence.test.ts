@@ -10,6 +10,10 @@ import {
   actionItems,
   rankings,
   portfolioIntelligence,
+  currentWeeklyPoint,
+  portfolioTrend,
+  weeklySummary,
+  type WeeklyPoint,
 } from './intelligence.js';
 
 // Helper p/ montar uma linha de carteira com defaults sensatos.
@@ -114,6 +118,28 @@ describe('intelligence', () => {
     const r = rankings(rows);
     expect(r.mostProfitable[0].id).toBe('1');
     expect(r.riskiest[0].id).toBe('2');
+  });
+
+  it('currentWeeklyPoint deriva saúde/exposição/lucro da semana', () => {
+    const p = currentWeeklyPoint([row({ id: '1', debtorName: 'A', amountDue: '5000.00', expectedReturn: '1200.00' })], new Date('2026-06-17T12:00:00Z'));
+    expect(p.weekStart).toBe('2026-06-15T00:00:00.000Z'); // segunda-feira da semana
+    expect(p.opsActive).toBe(1);
+    expect(p.state).toBe('HEALTHY');
+  });
+
+  it('portfolioTrend classifica melhora/piora pela variação de saúde', () => {
+    const pt = (weekStart: string, healthScore: number): WeeklyPoint => ({ weekStart, healthScore, state: 'HEALTHY', receivable: '0', overdue: '0', expectedProfit: '0', opsActive: 1 });
+    expect(portfolioTrend([pt('2026-06-01', 60), pt('2026-06-08', 85)]).direction).toBe('IMPROVING');
+    expect(portfolioTrend([pt('2026-06-01', 90), pt('2026-06-08', 50)]).direction).toBe('WORSENING');
+    expect(portfolioTrend([pt('2026-06-01', 80), pt('2026-06-08', 82)]).direction).toBe('STABLE');
+    expect(portfolioTrend([]).direction).toBe('STABLE');
+  });
+
+  it('weeklySummary descreve a variação vs semana anterior', () => {
+    const pt = (weekStart: string, healthScore: number, profit: string): WeeklyPoint => ({ weekStart, healthScore, state: 'HEALTHY', receivable: '1000.00', overdue: '0.00', expectedProfit: profit, opsActive: 2 });
+    const s = weeklySummary([pt('2026-06-01', 70, '300.00'), pt('2026-06-08', 80, '500.00')]);
+    expect(s).toContain('Saúde 80/100');
+    expect(s).toContain('+10');
   });
 
   it('portfolioIntelligence compõe tudo', () => {

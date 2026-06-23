@@ -1,5 +1,6 @@
 import { Decimal } from 'decimal.js';
 import { riskLevel } from '../finance/finance.js';
+import { isoWeekStart } from '../utils/date.utils.js';
 import type { DebtStatus, PortfolioRow, RiskLevel } from '../types/financial.types.js';
 
 // ── Tipos da camada de inteligência (tudo derivado da carteira; nenhuma infra/envio externo) ──
@@ -79,6 +80,23 @@ export interface Rankings {
   clientsByProfit: ClientAggregate[];
 }
 
+/** Ponto semanal da saúde da carteira (snapshot in-app; alimenta tendência + resumo da semana). */
+export interface WeeklyPoint {
+  weekStart: string; // ISO (segunda-feira da semana)
+  healthScore: number;
+  state: HealthState;
+  receivable: string;
+  overdue: string;
+  expectedProfit: string;
+  opsActive: number;
+}
+export type TrendDirection = 'IMPROVING' | 'STABLE' | 'WORSENING';
+export interface PortfolioTrend {
+  direction: TrendDirection;
+  deltaScore: number; // variação de saúde no período (~30 dias)
+  series: WeeklyPoint[]; // ordenado por semana asc (sparkline)
+}
+
 export interface PortfolioIntelligence {
   health: PortfolioHealth;
   summary: string;
@@ -87,6 +105,8 @@ export interface PortfolioIntelligence {
   topClient: ClientAggregate | null;
   rankings: Rankings;
   actionItems: ActionItem[];
+  trend?: PortfolioTrend; // preenchido pelo serviço (precisa do histórico de snapshots)
+  weeklySummary?: string; // resumo da semana (in-app; sem envio externo)
 }
 
 /** Limiares do credor (com defaults sensatos). Mantidos configuráveis sem regra fixa global. */
@@ -309,6 +329,51 @@ export function rankings(rows: PortfolioRow[], aggs = clientAggregates(rows)): R
     clientsByRisk: [...aggs].sort((a, b) => a.avgRecoverability - b.avgRecoverability).slice(0, 5),
     clientsByProfit: [...aggs].sort((a, b) => new Decimal(b.expectedProfit).minus(a.expectedProfit).toNumber()).slice(0, 5),
   };
+}
+
+// ── Tendência semanal (snapshots in-app; nenhum envio externo) ──
+
+/** Ponto da semana atual, derivado da carteira (o serviço persiste como snapshot semanal). */
+export function currentWeeklyPoint(rows: PortfolioRow[], asOf: Date = new Date(), t: IntelligenceThresholds = DEFAULT_THRESHOLDS): WeeklyPoint {
+  const openRows = open(rows);
+  const health = portfolioHealth(rows, t);
+  const receivable = openRows.reduce((s, r) => s.plus(r.amountDue), new Decimal(0));
+  const overdue = openRows.filter((r) => r.status === 'RED').reduce((s, r) => s.plus(r.amountDue), new Decimal(0));
+  const profit = openRows.reduce((s, r) => s.plus(opProfit(r)), new Decimal(0));
+  return {
+    weekStart: isoWeekStart(asOf).toISOString(),
+    healthScore: health.score,
+    state: health.state,
+    receivable: money(receivable),
+    overdue: money(overdue),
+    expectedProfit: money(profit),
+    opsActive: openRows.length,
+  };
+}
+
+/** Tendência da carteira a partir do histórico semanal (primeira vs última semana da janela). */
+export function portfolioTrend(points: WeeklyPoint[]): PortfolioTrend {
+  const series = [...points].sort((a, b) => (a.weekStart < b.weekStart ? -1 : 1));
+  if (series.length < 2) return { direction: 'STABLE', deltaScore: 0, series };
+  const delta = series[series.length - 1]!.healthScore - series[0]!.healthScore;
+  const direction: TrendDirection = delta >= 5 ? 'IMPROVING' : delta <= -5 ? 'WORSENING' : 'STABLE';
+  return { direction, deltaScore: delta, series };
+}
+
+/** Resumo da semana (variação vs semana anterior). In-app — nunca enviado por e-mail/push. */
+export function weeklySummary(points: WeeklyPoint[]): string {
+  const series = [...points].sort((a, b) => (a.weekStart < b.weekStart ? -1 : 1));
+  const cur = series[series.length - 1];
+  if (!cur) return 'Ainda não há registro semanal da carteira.';
+  const prev = series[series.length - 2];
+  const sign = (n: number) => (n > 0 ? `+${n}` : `${n}`);
+  if (!prev) return `Primeiro registro da semana: saúde ${cur.healthScore}/100, ${cur.opsActive} ${cur.opsActive === 1 ? 'operação ativa' : 'operações ativas'}, lucro projetado ${brl(cur.expectedProfit)}.`;
+  const dScore = cur.healthScore - prev.healthScore;
+  const dProfit = new Decimal(cur.expectedProfit).minus(prev.expectedProfit);
+  const parts = [`Saúde ${cur.healthScore}/100 (${sign(dScore)} vs. semana passada).`];
+  parts.push(`A receber ${brl(cur.receivable)}, vencido ${brl(cur.overdue)}.`);
+  parts.push(`Lucro projetado ${brl(cur.expectedProfit)} (${dProfit.gte(0) ? '+' : ''}${brl(dProfit)}).`);
+  return parts.join(' ');
 }
 
 // ── Composição ──

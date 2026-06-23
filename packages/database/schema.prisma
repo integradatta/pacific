@@ -219,3 +219,22 @@ model DebtorLoginEvent {
   @@index([tenantId])
   @@index([debtorId, at])
 }
+
+// Snapshot SEMANAL da saúde da carteira (in-app; sem envio externo). Um por (tenant, semana),
+// gravado de forma oportunista quando o credor abre a inteligência. Alimenta a tendência de
+// risco (📈➖📉), o histórico visual e o "resumo da semana". Global (filtrado por tenantId).
+model PortfolioSnapshot {
+  id             String   @id @default(uuid())
+  tenantId       String
+  weekStart      DateTime // segunda-feira (UTC) da semana ISO
+  healthScore    Int
+  state          String // HEALTHY | ATTENTION | CRITICAL
+  receivable     Decimal  @db.Decimal(14, 2)
+  overdue        Decimal  @db.Decimal(14, 2)
+  expectedProfit Decimal  @db.Decimal(14, 2)
+  opsActive      Int
+  capturedAt     DateTime @default(now())
+
+  @@unique([tenantId, weekStart])
+  @@index([tenantId, weekStart])
+}

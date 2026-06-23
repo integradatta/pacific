@@ -10,8 +10,17 @@ import type {
   Concentration,
   ClientAggregate,
   Rankings as RankingsT,
+  PortfolioTrend,
 } from '@pacific/shared';
 import { formatBRL } from '@/lib/format';
+
+const TREND = {
+  IMPROVING: { icon: '📈', label: 'Melhorando', cls: 'text-status-green border-status-green/40' },
+  STABLE: { icon: '➖', label: 'Estável', cls: 'text-muted border-line' },
+  WORSENING: { icon: '📉', label: 'Piorando', cls: 'text-status-red border-status-red/40' },
+} as const;
+
+const STATE_BAR = { HEALTHY: 'bg-status-green', ATTENTION: 'bg-status-yellow', CRITICAL: 'bg-status-red' } as const;
 
 const HEALTH = {
   HEALTHY: { label: 'Saudável', icon: '🟢', text: 'text-status-green', bg: 'bg-status-green', ring: 'border-status-green/40', soft: 'bg-status-green/10' },
@@ -225,6 +234,34 @@ export function Rankings({ rankings: r }: { rankings: RankingsT }) {
   );
 }
 
+/** Resumo da semana + tendência de risco (📈➖📉) — in-app, sem envio externo. */
+export function WeeklyTrend({ trend, summary }: { trend: PortfolioTrend; summary?: string }) {
+  const t = TREND[trend.direction];
+  const max = Math.max(100, ...trend.series.map((p) => p.healthScore));
+  return (
+    <section className="panel p-6">
+      <div className="flex items-center justify-between gap-4 mb-3">
+        <h2 className="font-display text-lg font-semibold text-text tracking-tight">Resumo da semana</h2>
+        <span className={`inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full border ${t.cls}`}>
+          <span aria-hidden>{t.icon}</span> {t.label}{trend.deltaScore !== 0 && <span className="tabular-nums">{trend.deltaScore > 0 ? `+${trend.deltaScore}` : trend.deltaScore}</span>}
+        </span>
+      </div>
+      {summary && <p className="font-sans text-sm text-text-dim leading-relaxed mb-4">{summary}</p>}
+      {trend.series.length > 1 ? (
+        <div className="flex items-end gap-1.5 h-16" aria-label="Histórico de saúde da carteira">
+          {trend.series.map((p) => (
+            <div key={p.weekStart} className="flex-1 flex flex-col items-center justify-end gap-1" title={`${new Date(p.weekStart).toLocaleDateString('pt-BR')}: ${p.healthScore}/100`}>
+              <span className={`w-full rounded-sm ${STATE_BAR[p.state]}`} style={{ height: `${Math.max(6, (p.healthScore / max) * 100)}%` }} />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="font-mono text-[11px] text-muted tracking-wider">A tendência aparece após algumas semanas de uso (1 registro por semana).</p>
+      )}
+    </section>
+  );
+}
+
 /** Bloco completo de inteligência para o dashboard. */
 export function IntelligenceBlock({ intel }: { intel: PortfolioIntelligence }) {
   return (
@@ -233,7 +270,10 @@ export function IntelligenceBlock({ intel }: { intel: PortfolioIntelligence }) {
       <InsightStrip insights={intel.insights} />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         <ActionCenter items={intel.actionItems} />
-        <ConcentrationCard concentration={intel.concentration} topClient={intel.topClient} />
+        <div className="space-y-6">
+          {intel.trend && <WeeklyTrend trend={intel.trend} summary={intel.weeklySummary} />}
+          <ConcentrationCard concentration={intel.concentration} topClient={intel.topClient} />
+        </div>
       </div>
       <Rankings rankings={intel.rankings} />
     </div>
