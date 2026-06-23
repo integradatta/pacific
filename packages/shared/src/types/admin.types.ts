@@ -74,6 +74,7 @@ export type PlatformEventType =
   | 'CLIENT_CREATED'
   | 'TENANT_APPROVED'
   | 'TENANT_SUSPENDED'
+  | 'ERROR'
   | 'IMPORTANT';
 
 export type ActorType = 'CREDITOR' | 'DEBTOR' | 'SUPER_ADMIN' | 'SYSTEM';

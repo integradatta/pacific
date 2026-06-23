@@ -22,6 +22,8 @@ export default function LoginPage() {
 
     if (authError) {
       setError('Não foi possível entrar. Verifique e-mail e senha.');
+      // Reporta a tentativa falha p/ o monitoramento do super-admin (endpoint público, best-effort).
+      void apiPost('/public/events/login-failed', { email }).catch(() => undefined);
       setLoading(false);
       return;
     }

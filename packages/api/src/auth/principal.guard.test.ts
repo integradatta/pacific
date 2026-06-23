@@ -7,7 +7,7 @@ const ctx = (user: AuthUser): ExecutionContext => {
   const req = { user };
   return { switchToHttp: () => ({ getRequest: () => req }) } as unknown as ExecutionContext;
 };
-const scoped = (row: { role: string; tenantId: string | null } | null) =>
+const scoped = (row: { role: string; tenantId: string | null; revokedAfter?: Date | null } | null) =>
   ({ raw: () => ({ user: { findUnique: vi.fn(async () => row) } }) }) as never;
 
 describe('PrincipalGuard', () => {
@@ -36,5 +36,19 @@ describe('PrincipalGuard', () => {
     const user: AuthUser = { supabaseId: 'novo', email: 'n@x.com', role: 'CREDITOR', tenantId: null };
     await new PrincipalGuard(scoped(null)).canActivate(ctx(user));
     expect(user.tenantId).toBeNull();
+  });
+
+  it('rejeita token emitido ANTES de revokedAfter (force-logout instantâneo)', async () => {
+    const past = Math.floor(Date.now() / 1000) - 3600; // token de 1h atrás
+    const user: AuthUser = { supabaseId: 'sb1', email: 'c@x.com', role: 'CREDITOR', tenantId: null, tokenIssuedAt: past };
+    const guard = new PrincipalGuard(scoped({ role: 'CREDITOR', tenantId: 't1', revokedAfter: new Date() }));
+    await expect(guard.canActivate(ctx(user))).rejects.toThrow(/encerrada/i);
+  });
+
+  it('aceita token emitido DEPOIS de revokedAfter (novo login após o corte)', async () => {
+    const now = Math.floor(Date.now() / 1000) + 5;
+    const user: AuthUser = { supabaseId: 'sb1', email: 'c@x.com', role: 'CREDITOR', tenantId: null, tokenIssuedAt: now };
+    const guard = new PrincipalGuard(scoped({ role: 'CREDITOR', tenantId: 't1', revokedAfter: new Date(Date.now() - 10_000) }));
+    await expect(guard.canActivate(ctx(user))).resolves.toBe(true);
   });
 });

@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
+import { AllExceptionsFilter } from './common/http-exception.filter.js';
 import { PrismaService } from './common/prisma.service.js';
 import { TenantDatasourceResolver } from './tenancy/tenant-datasource.resolver.js';
 import { TenantScopedService } from './tenancy/tenant-scoped.service.js';
@@ -21,11 +23,11 @@ import { SuperAdminController } from './admin/super-admin.controller.js';
 import { SuperAdminService } from './admin/super-admin.service.js';
 import { AUTH_ADMIN, createAuthAdmin } from './admin/auth-admin.js';
 import { TrackingService } from './tracking/tracking.service.js';
-import { EventsController } from './tracking/events.controller.js';
+import { EventsController, PublicEventsController } from './tracking/events.controller.js';
 
 @Module({
-  controllers: [CreditorsController, DebtorProvisioningController, DebtsController, DashboardController, NotificationsController, DebtorExchangeController, DebtorSelfController, SuperAdminController, EventsController],
-  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, DebtorsAdminService, DebtsService, DashboardService, NotificationsService, DebtorExchangeService, DebtorTokenService, DebtorSelfService, SuperAdminService, TrackingService, { provide: AUTH_ADMIN, useFactory: createAuthAdmin }],
+  controllers: [CreditorsController, DebtorProvisioningController, DebtsController, DashboardController, NotificationsController, DebtorExchangeController, DebtorSelfController, SuperAdminController, EventsController, PublicEventsController],
+  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, DebtorsAdminService, DebtsService, DashboardService, NotificationsService, DebtorExchangeService, DebtorTokenService, DebtorSelfService, SuperAdminService, TrackingService, { provide: AUTH_ADMIN, useFactory: createAuthAdmin }, { provide: APP_FILTER, useClass: AllExceptionsFilter }],
   exports: [PrismaService],
 })
 export class AppModule {}

@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import type { AuthUser } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 import type { RequestWithUser } from './auth.types.js';
@@ -26,6 +26,10 @@ export class PrincipalGuard implements CanActivate {
         // Gate de aprovação: credor só opera com tenant APPROVED e ACTIVE.
         user.tenantApproved =
           row.role !== 'CREDITOR' || (row.tenant?.approval === 'APPROVED' && row.tenant?.status === 'ACTIVE');
+        // Force-logout instantâneo: token emitido ANTES de revokedAfter é rejeitado já.
+        if (row.revokedAfter && user.tokenIssuedAt != null && user.tokenIssuedAt * 1000 < row.revokedAfter.getTime()) {
+          throw new UnauthorizedException('Sessão encerrada. Faça login novamente.');
+        }
       }
     }
     return true;

@@ -9,6 +9,7 @@ type Claims = {
   sub?: string;
   email?: unknown;
   iss?: string;
+  iat?: number;
   app_metadata?: { role?: string; tenantId?: string; debtorId?: string };
 };
 
@@ -44,6 +45,7 @@ export class JwtGuard implements CanActivate {
       email: String(payload.email ?? ''),
       role,
       tenantId: role === 'SUPER_ADMIN' ? null : (meta.tenantId ?? null),
+      ...(typeof payload.iat === 'number' ? { tokenIssuedAt: payload.iat } : {}),
       ...(role === 'DEBTOR' ? { debtorId: meta.debtorId ?? String(payload.sub ?? '') } : {}),
     };
     return true;

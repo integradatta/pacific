@@ -18,6 +18,7 @@ function fakeDb() {
       findMany: vi.fn(async () => [{ id: 'u1', email: 'c@x.com', role: 'CREDITOR', tenantId: 't1', supabaseId: 'sb-u1', createdAt: new Date('2026-06-02T00:00:00Z') }]),
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) => (where.id === 'u1' ? { id: 'u1', email: 'c@x.com' } : null)),
       deleteMany: vi.fn(async () => ({ count: 1 })),
+      updateMany: vi.fn(async () => ({ count: 1 })),
     },
     adminAuditLog: { create: vi.fn(async () => ({})), findMany: vi.fn(async () => []) },
     debtorAccess: {
@@ -124,6 +125,19 @@ describe('SuperAdminService', () => {
 
   it('tenantOperations devolve a carteira (portfolio)', async () => {
     expect(await svc(fakeDb()).tenantOperations('t1')).toEqual([{ id: 'op1' }]);
+  });
+
+  it('forceLogout marca revokedAfter (corte instantâneo) + audita', async () => {
+    const db = fakeDb();
+    await svc(db).forceLogout(ACTOR, 'sb-u1');
+    expect(db.user.updateMany).toHaveBeenCalledWith({ where: { supabaseId: 'sb-u1' }, data: { revokedAfter: expect.any(Date) } });
+    expect(db.adminAuditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: 'user.force_logout' }) }));
+  });
+
+  it('setCreditorBlocked(true) também marca revokedAfter dos usuários (derruba sessões)', async () => {
+    const db = fakeDb();
+    await svc(db).setCreditorBlocked(ACTOR, 't1', true);
+    expect(db.user.updateMany).toHaveBeenCalledWith({ where: { tenantId: 't1' }, data: { revokedAfter: expect.any(Date) } });
   });
 
   describe('deleteTenant', () => {

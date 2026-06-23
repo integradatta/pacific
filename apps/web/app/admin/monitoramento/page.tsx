@@ -8,6 +8,7 @@ import { useAdminEvents } from '@/lib/admin';
 
 const FILTERS: { v?: PlatformEventType; label: string }[] = [
   { v: undefined, label: 'Tudo' },
+  { v: 'ERROR', label: 'Erros' },
   { v: 'LOGIN', label: 'Logins' },
   { v: 'LOGIN_FAILED', label: 'Falhas' },
   { v: 'OPERATION_CREATED', label: 'Operações' },
@@ -17,7 +18,7 @@ const FILTERS: { v?: PlatformEventType; label: string }[] = [
 ];
 
 function tone(t: PlatformEventType): 'iris' | 'green' | 'yellow' | 'red' | 'muted' {
-  if (t === 'LOGIN_FAILED' || t === 'ACCESS_REVOKED' || t === 'TENANT_SUSPENDED') return 'red';
+  if (t === 'LOGIN_FAILED' || t === 'ACCESS_REVOKED' || t === 'TENANT_SUSPENDED' || t === 'ERROR') return 'red';
   if (t === 'OPERATION_PAID' || t === 'TENANT_APPROVED' || t === 'ACCESS_REACTIVATED') return 'green';
   if (t === 'LOGIN' || t === 'LINK_USED') return 'iris';
   return 'muted';

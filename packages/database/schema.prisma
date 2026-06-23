@@ -53,6 +53,7 @@ enum PlatformEventType {
   CLIENT_CREATED
   TENANT_APPROVED
   TENANT_SUSPENDED
+  ERROR
   IMPORTANT
 }
 
@@ -120,6 +121,8 @@ model User {
   tenantId   String?
   tenant     Tenant?  @relation(fields: [tenantId], references: [id])
   debtor     Debtor?
+  // Force-logout instantâneo: tokens emitidos ANTES deste instante são rejeitados (denylist).
+  revokedAfter DateTime?
   createdAt  DateTime @default(now())
 
   @@index([tenantId])

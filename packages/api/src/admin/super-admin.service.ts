@@ -165,14 +165,15 @@ export class SuperAdminService {
     if (!tenant) throw new NotFoundException('Credor não encontrado');
     const users = await this.db.user.findMany({ where: { tenantId, role: 'CREDITOR' }, select: { supabaseId: true } });
     for (const u of users) await this.authAdmin.setBlocked(u.supabaseId, blocked);
+    // Bloquear = derruba sessões atuais JÁ (revokedAfter) + impede re-login (ban acima).
+    if (blocked) await this.db.user.updateMany({ where: { tenantId }, data: { revokedAfter: new Date() } });
     await this.db.tenant.update({ where: { id: tenantId }, data: { status: blocked ? 'SUSPENDED' : 'ACTIVE' } });
     await this.audit(actor, blocked ? 'tenant.block' : 'tenant.unblock', 'tenant', tenantId, { users: users.length });
   }
 
-  /** Força logout de um usuário específico (ban no Supabase). Audita. */
+  /** Força logout instantâneo de um usuário (revokedAfter = agora; tokens atuais caem já). Audita. */
   async forceLogout(actor: Actor, supabaseId: string): Promise<void> {
-    await this.authAdmin.setBlocked(supabaseId, true);
-    await this.authAdmin.setBlocked(supabaseId, false); // re-permite login futuro; sessões atuais caem no TTL
+    await this.db.user.updateMany({ where: { supabaseId }, data: { revokedAfter: new Date() } });
     await this.audit(actor, 'user.force_logout', 'user', supabaseId, {});
   }
 
