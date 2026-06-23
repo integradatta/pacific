@@ -7,3 +7,4 @@ export * from './utils/tags.js';
 export * from './location/contracts.js';
 export * from './types/financial.types.js';
 export * from './finance/finance.js';
+export * from './intelligence/intelligence.js';

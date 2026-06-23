@@ -6,7 +6,7 @@ import { PrincipalGuard } from '../auth/principal.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { TenantId } from '../tenancy/tenant-id.decorator.js';
 import { DashboardService } from './dashboard.service.js';
-import type { DashboardKpis, PortfolioRow } from '@pacific/shared';
+import type { DashboardKpis, PortfolioRow, PortfolioIntelligence } from '@pacific/shared';
 
 @Controller('dashboard')
 @UseGuards(new JwtGuard(), PrincipalGuard, TenantGuard, RolesGuard)
@@ -21,5 +21,10 @@ export class DashboardController {
   @Get('portfolio') @Roles('CREDITOR')
   portfolio(@TenantId() tenantId: string): Promise<PortfolioRow[]> {
     return this.dashboard.portfolio(tenantId);
+  }
+
+  @Get('intelligence') @Roles('CREDITOR')
+  intelligence(@TenantId() tenantId: string): Promise<PortfolioIntelligence> {
+    return this.dashboard.intelligence(tenantId);
   }
 }

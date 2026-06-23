@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { balanceAt, deriveStatus, daysRemaining, outstanding, recoverabilityScore, temperatureScore, riskLevel, type DashboardKpis, type DebtStatus, type RiskLevel, type PortfolioRow } from '@pacific/shared';
+import { balanceAt, deriveStatus, daysRemaining, outstanding, recoverabilityScore, temperatureScore, riskLevel, portfolioIntelligence, type DashboardKpis, type DebtStatus, type RiskLevel, type PortfolioRow, type PortfolioIntelligence } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 
 @Injectable()
@@ -87,6 +87,7 @@ export class DashboardService {
         balance,
         amountDue: outstanding(balance, d.paidAmount.toString(), settled),
         paidAmount: d.paidAmount.toFixed(2),
+        expectedReturn: balanceAt(terms, terms.dueDate), // valor final no vencimento (p/ lucro projetado)
         settled,
         daysRemaining: days,
         status: deriveStatus(days),
@@ -96,5 +97,14 @@ export class DashboardService {
         tags: d.tags,
       };
     });
+  }
+
+  /**
+   * Camada de inteligência da carteira (saúde, resumo, insights, concentração, rankings, ações).
+   * Tudo DERIVADO da carteira (reusa `portfolio`); nenhuma infra/envio externo. In-app/assistivo.
+   */
+  async intelligence(tenantId: string, asOf: Date = new Date()): Promise<PortfolioIntelligence> {
+    const rows = await this.portfolio(tenantId, asOf);
+    return portfolioIntelligence(rows);
   }
 }

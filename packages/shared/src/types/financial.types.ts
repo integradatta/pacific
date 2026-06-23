@@ -56,6 +56,7 @@ export interface PortfolioRow {
   balance: string;     // saldo bruto atual (principal + juros acumulados)
   amountDue: string;   // devido agora (bruto − pago; 0 se quitada)
   paidAmount: string;  // total já pago
+  expectedReturn: string; // valor final no vencimento (principal + juros até o vencimento)
   settled: boolean;    // quitada
   daysRemaining: number;
   status: DebtStatus;
