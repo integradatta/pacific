@@ -1,11 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import type { PortfolioRow } from '@pacific/shared';
+import { Decimal } from 'decimal.js';
+import { riskReason, type PortfolioRow } from '@pacific/shared';
 import { STATUS_COLOR, STATUS_LABEL } from '@/lib/status';
 import { formatBRL, venceEm } from '@/lib/format';
 import { RiskBadge } from './RiskBadge';
 import { TagList } from './Tags';
+
+const projectedProfit = (r: PortfolioRow): string => Decimal.max(0, new Decimal(r.expectedReturn).minus(r.principal)).toFixed(2);
 
 function ScoreCell({ value, tone }: { value: number; tone: 'good' | 'urgency' }) {
   const color =
@@ -56,6 +59,7 @@ export function CarteiraTable({ rows }: { rows: PortfolioRow[] }) {
           <tr className="font-mono text-[10px] text-muted uppercase tracking-widest border-b border-line">
             <th className="text-left font-normal px-6 py-2.5">Devedor</th>
             <th className="text-right font-normal px-6 py-2.5" title="Valor devido agora (saldo com juros − pago)">Devido</th>
+            <th className="text-right font-normal px-6 py-2.5" title="Lucro esperado no vencimento (= juros projetados)">Lucro esp.</th>
             <th className="text-right font-normal px-6 py-2.5">Vence</th>
             <th className="text-right font-normal px-6 py-2.5" title="Recuperabilidade (0–100)">Recup.</th>
             <th className="text-right font-normal px-6 py-2.5" title="Temperatura / urgência (0–100)">Temp.</th>
@@ -75,10 +79,11 @@ export function CarteiraTable({ rows }: { rows: PortfolioRow[] }) {
               <td className={`px-6 py-3.5 font-mono text-sm text-right tabular-nums ${r.settled ? 'text-muted' : 'text-text'}`}>
                 {formatBRL(r.amountDue)}
               </td>
+              <td className="px-6 py-3.5 font-mono text-sm text-status-green/90 text-right tabular-nums">{formatBRL(projectedProfit(r))}</td>
               <td className="px-6 py-3.5 font-mono text-sm text-muted text-right tabular-nums">{r.settled ? '—' : venceEm(r.daysRemaining)}</td>
               <ScoreCell value={r.recoverability} tone="good" />
               <ScoreCell value={r.temperature} tone="urgency" />
-              <td className="px-6 py-3.5"><RiskBadge recoverability={r.recoverability} compact /></td>
+              <td className="px-6 py-3.5" title={riskReason(r)}><RiskBadge recoverability={r.recoverability} compact /></td>
               <td className="px-6 py-3.5">
                 {r.settled ? (
                   <span className="inline-flex items-center gap-2 font-mono text-xs text-status-green">

@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { Suspense, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Shell } from '@/components/Shell';
 import { usePortfolio } from '@/lib/hooks';
 import { CarteiraTable } from '@/components/CarteiraTable';
@@ -25,11 +26,15 @@ const RISK_OPTS: { v: RiskLevel | 'ALL'; label: string }[] = [
 const controlClass =
   'bg-surface2 border border-line rounded-lg px-3 py-2 text-text font-mono text-xs focus:outline-none focus:border-sonar focus:shadow-glow transition-all';
 
-export default function CarteiraPage() {
+function CarteiraInner() {
   const portfolio = usePortfolio();
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<DebtStatus | 'ALL'>('ALL');
-  const [risk, setRisk] = useState<RiskLevel | 'ALL'>('ALL');
+  const params = useSearchParams();
+  // Filtros iniciais vindos da URL (insights/rankings clicáveis fazem deep-link).
+  const initStatus = (params.get('status') as DebtStatus | null) ?? 'ALL';
+  const initRisk = (params.get('risk') as RiskLevel | null) ?? 'ALL';
+  const [search, setSearch] = useState(params.get('q') ?? '');
+  const [status, setStatus] = useState<DebtStatus | 'ALL'>(initStatus);
+  const [risk, setRisk] = useState<RiskLevel | 'ALL'>(initRisk);
   const [tag, setTag] = useState<string>('ALL');
 
   // Etiquetas disponíveis: união ordenada das tags presentes na carteira.
@@ -91,5 +96,13 @@ export default function CarteiraPage() {
         </div>
       )}
     </Shell>
+  );
+}
+
+export default function CarteiraPage() {
+  return (
+    <Suspense fallback={<Shell title="Carteira"><ListSkeleton /></Shell>}>
+      <CarteiraInner />
+    </Suspense>
   );
 }

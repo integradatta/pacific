@@ -1,15 +1,17 @@
 'use client';
 
 import { Shell } from '@/components/Shell';
-import { useKpis, usePortfolio } from '@/lib/hooks';
+import { useKpis, usePortfolio, useIntelligence } from '@/lib/hooks';
 import { HorizonteVencimentos } from '@/components/HorizonteVencimentos';
 import { KpiReadouts } from '@/components/KpiReadouts';
 import { CarteiraTable } from '@/components/CarteiraTable';
+import { IntelligenceBlock } from '@/components/Intelligence';
 import { DashboardSkeleton } from '@/components/Skeleton';
 
 export default function DashboardPage() {
   const kpis = useKpis();
   const portfolio = usePortfolio();
+  const intelligence = useIntelligence();
   const loading = kpis.isLoading || portfolio.isLoading;
   const error = kpis.isError || portfolio.isError;
 
@@ -26,6 +28,7 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="space-y-6">
+          {intelligence.data ? <IntelligenceBlock intel={intelligence.data} /> : null}
           <HorizonteVencimentos rows={portfolio.data ?? []} />
           {kpis.data ? <KpiReadouts kpis={kpis.data} /> : null}
           <CarteiraTable rows={portfolio.data ?? []} />
