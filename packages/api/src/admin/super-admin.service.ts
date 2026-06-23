@@ -14,6 +14,10 @@ function startOfTodayUTC(now = new Date()): Date {
   return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
+// Limites de página: protege contra carregar tabelas inteiras (escala p/ milhões de registros).
+const clampTake = (n: number | undefined, def = 100, max = 500): number => Math.min(Math.max(n ?? def, 1), max);
+const clampSkip = (n: number | undefined): number => Math.max(n ?? 0, 0);
+
 // Super-admin opera CROSS-TENANT (sem app.current_tenant). Usa o cliente raw() — Tenant/User/
 // AdminAuditLog/DebtorAccess ficam fora da RLS, então o owner acessa normalmente. Para dados sob
 // RLS (Debt/DebtorLoginEvent), itera por tenant via withTenant (reusa DashboardService).
@@ -29,16 +33,33 @@ export class SuperAdminService {
     return this.scoped.raw();
   }
 
-  /** KPIs globais da plataforma (cross-tenant). */
+  // Cache curto do overview: agrega cross-tenant (caro). Evita recomputar a cada acesso de
+  // admin sob concorrência. TTL pequeno = dados quase em tempo real sem martelar o banco.
+  private overviewCache: { at: number; value: AdminOverview } | null = null;
+  private static readonly OVERVIEW_TTL_MS = 60_000;
+
+  /** KPIs globais da plataforma (cross-tenant). Counts via SQL (escala); agregados financeiros
+   *  por tenant (computados — ver docs/SCALABILITY.md p/ o caminho de stats materializadas). */
   async overview(now = new Date()): Promise<AdminOverview> {
-    const tenants = await this.db.tenant.findMany({ select: { id: true, status: true, approval: true, createdAt: true } });
+    const cached = this.overviewCache;
+    if (cached && Date.now() - cached.at < SuperAdminService.OVERVIEW_TTL_MS) return cached.value;
+
     const today = startOfTodayUTC(now);
+    // Contagens via count() (indexável; não carrega todas as linhas).
+    const [creditorsTotal, creditorsActive, creditorsBlocked, creditorsPending, newCreditorsToday, activeTenants] = await Promise.all([
+      this.db.tenant.count(),
+      this.db.tenant.count({ where: { approval: 'APPROVED', status: 'ACTIVE' } }),
+      this.db.tenant.count({ where: { status: 'SUSPENDED' } }),
+      this.db.tenant.count({ where: { approval: 'PENDING' } }),
+      this.db.tenant.count({ where: { createdAt: { gte: today } } }),
+      this.db.tenant.findMany({ where: { approval: 'APPROVED', status: 'ACTIVE' }, select: { id: true } }),
+    ]);
     const o: AdminOverview = {
-      creditorsTotal: tenants.length,
-      creditorsActive: tenants.filter((t) => t.approval === 'APPROVED' && t.status === 'ACTIVE').length,
-      creditorsBlocked: tenants.filter((t) => t.status === 'SUSPENDED').length,
-      creditorsPending: tenants.filter((t) => t.approval === 'PENDING').length,
-      newCreditorsToday: tenants.filter((t) => t.createdAt >= today).length,
+      creditorsTotal,
+      creditorsActive,
+      creditorsBlocked,
+      creditorsPending,
+      newCreditorsToday,
       operationsTotal: 0,
       operationsActive: 0,
       operationsOverdue: 0,
@@ -50,8 +71,7 @@ export class SuperAdminService {
     let volume = new Decimal(0);
     let outstanding = new Decimal(0);
     let received = new Decimal(0);
-    for (const t of tenants) {
-      if (t.approval !== 'APPROVED' || t.status !== 'ACTIVE') continue;
+    for (const t of activeTenants) {
       const k = await this.dashboard.kpis(t.id, now);
       const statusTotal = k.countByStatus.GREEN + k.countByStatus.YELLOW + k.countByStatus.ORANGE + k.countByStatus.RED;
       o.operationsTotal += statusTotal + k.countSettled;
@@ -67,14 +87,18 @@ export class SuperAdminService {
     o.volumeLent = volume.toFixed(2);
     o.outstanding = outstanding.toFixed(2);
     o.received = received.toFixed(2);
+    this.overviewCache = { at: Date.now(), value: o };
     return o;
   }
 
-  /** Credores com agregados de carteira (a receber + nº de operações). */
-  async creditors(now = new Date()): Promise<AdminCreditorRow[]> {
+  /** Credores com agregados de carteira (a receber + nº de operações). Paginado: o N+1 de KPIs
+   *  fica limitado ao tamanho da página (escala por página, não pela base inteira). */
+  async creditors(limit?: number, offset?: number, now = new Date()): Promise<AdminCreditorRow[]> {
     const tenants = await this.db.tenant.findMany({
       include: { users: { where: { role: 'CREDITOR' }, select: { email: true }, take: 1 } },
       orderBy: { createdAt: 'desc' },
+      take: clampTake(limit),
+      skip: clampSkip(offset),
     });
     const out: AdminCreditorRow[] = [];
     for (const t of tenants) {
@@ -101,8 +125,8 @@ export class SuperAdminService {
   }
 
   /** Links de acesso de devedores (cross-tenant; DebtorAccess fica fora da RLS). */
-  async accessLinks(limit = 200): Promise<AdminAccessLinkRow[]> {
-    const rows = await this.db.debtorAccess.findMany({ orderBy: { createdAt: 'desc' }, take: Math.min(Math.max(limit, 1), 1000) });
+  async accessLinks(limit?: number, offset?: number): Promise<AdminAccessLinkRow[]> {
+    const rows = await this.db.debtorAccess.findMany({ orderBy: { createdAt: 'desc' }, take: clampTake(limit, 200), skip: clampSkip(offset) });
     return rows.map((a) => ({
       id: a.id,
       debtorId: a.debtorId,
@@ -121,11 +145,13 @@ export class SuperAdminService {
     await this.audit(actor, 'link.revoke', 'debtorAccess', id, { debtorId: link.debtorId });
   }
 
-  async listTenants(approval?: TenantApproval): Promise<AdminTenantRow[]> {
+  async listTenants(approval?: TenantApproval, limit?: number, offset?: number): Promise<AdminTenantRow[]> {
     const rows = await this.db.tenant.findMany({
       where: approval ? { approval } : undefined,
       include: { _count: { select: { users: true } } },
       orderBy: { createdAt: 'desc' },
+      take: clampTake(limit),
+      skip: clampSkip(offset),
     });
     return rows.map((t) => ({
       id: t.id,
@@ -211,10 +237,12 @@ export class SuperAdminService {
     await this.audit(actor, 'user.password_reset', 'user', userId, { email: user.email });
   }
 
-  async listUsers(): Promise<AdminUserRow[]> {
+  async listUsers(limit?: number, offset?: number): Promise<AdminUserRow[]> {
     const rows = await this.db.user.findMany({
       select: { id: true, email: true, role: true, tenantId: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
+      take: clampTake(limit),
+      skip: clampSkip(offset),
     });
     return rows.map((u) => ({
       id: u.id,

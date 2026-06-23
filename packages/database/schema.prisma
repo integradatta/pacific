@@ -178,6 +178,8 @@ model Debt {
 
   @@index([tenantId])
   @@index([debtorId])
+  // Carteira ordena por vencimento dentro do tenant (dashboard/portfolio) — escala com o volume.
+  @@index([tenantId, dueDate])
 }
 
 model Notification {
@@ -193,6 +195,8 @@ model Notification {
 
   @@unique([debtId, type])
   @@index([tenantId])
+  // Listagem de notificações ordena por data dentro do tenant.
+  @@index([tenantId, createdAt])
 }
 
 model DebtorAccess {

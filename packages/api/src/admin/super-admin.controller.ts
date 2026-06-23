@@ -10,6 +10,7 @@ import { SuperAdminService, type Actor } from './super-admin.service.js';
 import { TrackingService } from '../tracking/tracking.service.js';
 
 const actorOf = (u: AuthUser): Actor => ({ supabaseId: u.supabaseId, email: u.email });
+const n = (v: string | undefined): number | undefined => (v == null || v === '' ? undefined : Number(v));
 
 export class DeleteTenantDto {
   @IsString() confirmOrgCode!: string;
@@ -40,13 +41,13 @@ export class SuperAdminController {
   }
 
   @Get('creditors') @Roles('SUPER_ADMIN')
-  creditors(): Promise<AdminCreditorRow[]> {
-    return this.admin.creditors();
+  creditors(@Query('limit') limit?: string, @Query('offset') offset?: string): Promise<AdminCreditorRow[]> {
+    return this.admin.creditors(n(limit), n(offset));
   }
 
   @Get('access-links') @Roles('SUPER_ADMIN')
-  accessLinks(@Query('limit') limit?: string): Promise<AdminAccessLinkRow[]> {
-    return this.admin.accessLinks(limit ? Number(limit) : undefined);
+  accessLinks(@Query('limit') limit?: string, @Query('offset') offset?: string): Promise<AdminAccessLinkRow[]> {
+    return this.admin.accessLinks(n(limit), n(offset));
   }
 
   @Post('access-links/:id/revoke') @Roles('SUPER_ADMIN')
@@ -55,8 +56,8 @@ export class SuperAdminController {
   }
 
   @Get('tenants') @Roles('SUPER_ADMIN')
-  tenants(@Query('approval') approval?: TenantApproval): Promise<AdminTenantRow[]> {
-    return this.admin.listTenants(approval);
+  tenants(@Query('approval') approval?: TenantApproval, @Query('limit') limit?: string, @Query('offset') offset?: string): Promise<AdminTenantRow[]> {
+    return this.admin.listTenants(approval, n(limit), n(offset));
   }
 
   @Post('tenants/:id/approve') @Roles('SUPER_ADMIN')
@@ -105,8 +106,8 @@ export class SuperAdminController {
   }
 
   @Get('users') @Roles('SUPER_ADMIN')
-  users(): Promise<AdminUserRow[]> {
-    return this.admin.listUsers();
+  users(@Query('limit') limit?: string, @Query('offset') offset?: string): Promise<AdminUserRow[]> {
+    return this.admin.listUsers(n(limit), n(offset));
   }
 
   @Post('users/:id/password-reset') @Roles('SUPER_ADMIN')

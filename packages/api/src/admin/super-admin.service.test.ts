@@ -13,6 +13,7 @@ function fakeDb() {
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) => (where.id === 't1' ? { id: 't1', orgCode: 'PAC-A' } : null)),
       update: vi.fn(async () => ({})),
       delete: vi.fn(async () => ({})),
+      count: vi.fn(async () => 0),
     },
     user: {
       findMany: vi.fn(async () => [{ id: 'u1', email: 'c@x.com', role: 'CREDITOR', tenantId: 't1', supabaseId: 'sb-u1', createdAt: new Date('2026-06-02T00:00:00Z') }]),
@@ -82,13 +83,17 @@ describe('SuperAdminService', () => {
     await expect(svc(fakeDb()).requestPasswordReset(ACTOR, 'nope')).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('overview agrega KPIs dos tenants aprovados+ativos', async () => {
+  it('overview agrega KPIs dos tenants aprovados+ativos (counts via count, loop só nos ativos)', async () => {
     const db = fakeDb();
-    db.tenant.findMany = vi.fn(async () => [
-      { id: 't1', status: 'ACTIVE', approval: 'APPROVED', createdAt: new Date('2026-06-01T00:00:00Z') },
-      { id: 't2', status: 'ACTIVE', approval: 'APPROVED', createdAt: new Date('2026-06-01T00:00:00Z') },
-      { id: 't3', status: 'SUSPENDED', approval: 'APPROVED', createdAt: new Date('2026-06-01T00:00:00Z') },
-    ]) as never;
+    db.tenant.count = vi.fn(async (args?: { where?: { status?: string; approval?: string; createdAt?: unknown } }) => {
+      const w = args?.where;
+      if (!w) return 3;
+      if (w.status === 'SUSPENDED') return 1;
+      if (w.approval === 'PENDING') return 0;
+      if (w.approval === 'APPROVED' && w.status === 'ACTIVE') return 2;
+      return 0;
+    }) as never;
+    db.tenant.findMany = vi.fn(async () => [{ id: 't1' }, { id: 't2' }]) as never; // só os ativos
     const o = await svc(db).overview(new Date('2026-07-01T12:00:00Z'));
     expect(o).toMatchObject({ creditorsTotal: 3, creditorsActive: 2, creditorsBlocked: 1 });
     expect(o.volumeLent).toBe('2000.00'); // 2 tenants × 1000
