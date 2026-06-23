@@ -51,7 +51,7 @@ export class DebtsService {
   async create(tenantId: string, input: CreateDebtInput): Promise<Debt> {
     return this.scoped.withTenant(tenantId, async (tx) => {
       const debtor = await tx.debtor.findFirst({ where: { id: input.debtorId, tenantId } });
-      if (!debtor) throw new NotFoundException('Devedor não encontrado neste tenant');
+      if (!debtor) throw new NotFoundException('Sobrinho não encontrado neste tenant');
       const debt = await tx.debt.create({
         data: {
           tenantId,
@@ -183,7 +183,7 @@ export class DebtsService {
         }
       }
       for (const l of logins) {
-        events.push({ at: l.at.toISOString(), kind: 'login', title: 'Devedor acessou o portal' });
+        events.push({ at: l.at.toISOString(), kind: 'login', title: 'Sobrinho acessou o portal' });
       }
       for (const n of notifications) {
         events.push({ at: n.createdAt.toISOString(), kind: 'notification', title: n.title, detail: n.body });

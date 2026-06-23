@@ -13,7 +13,7 @@ const mono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: 'Pacific — Torre de Controle',
-  description: 'Monitoramento de carteira de empréstimos privados.',
+  description: 'Monitoramento de carteira de ajudas privadas.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

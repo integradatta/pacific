@@ -57,9 +57,9 @@ export function CarteiraTable({ rows }: { rows: PortfolioRow[] }) {
       <table className="w-full">
         <thead>
           <tr className="font-mono text-[10px] text-muted uppercase tracking-widest border-b border-line">
-            <th className="text-left font-normal px-6 py-2.5">Devedor</th>
-            <th className="text-right font-normal px-6 py-2.5" title="Valor devido agora (saldo com juros − pago)">Devido</th>
-            <th className="text-right font-normal px-6 py-2.5" title="Lucro esperado no vencimento (= juros projetados)">Lucro esp.</th>
+            <th className="text-left font-normal px-6 py-2.5">Sobrinho</th>
+            <th className="text-right font-normal px-6 py-2.5" title="Valor devido agora (saldo com gratidão − pago)">Devido</th>
+            <th className="text-right font-normal px-6 py-2.5" title="Lucro esperado no vencimento (= gratidão projetada)">Lucro esp.</th>
             <th className="text-right font-normal px-6 py-2.5">Vence</th>
             <th className="text-right font-normal px-6 py-2.5" title="Recuperabilidade (0–100)">Recup.</th>
             <th className="text-right font-normal px-6 py-2.5" title="Temperatura / urgência (0–100)">Temp.</th>

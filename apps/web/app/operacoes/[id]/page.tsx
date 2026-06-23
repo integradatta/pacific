@@ -145,7 +145,7 @@ function SituacaoAtual({ s, principal, pending, onPay }: { s: DebtSummary; princ
       {/* Breakdown: original + juros = atual (− pago = devido) */}
       <div className="mt-4 space-y-1.5">
         <CalcRow label="Valor original" value={formatBRL(principal)} />
-        <CalcRow op="+" label="Juros acumulados" value={formatBRL(s.accruedInterest)} />
+        <CalcRow op="+" label="Gratidão acumulada" value={formatBRL(s.accruedInterest)} />
         <CalcRow op="=" label="Valor atual" value={formatBRL(s.balance)} strong={!hasPaid} />
         {hasPaid ? (
           <>
@@ -203,7 +203,7 @@ export default function OperacaoDetalhePage({ params }: { params: { id: string }
             <header className="panel p-6">
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
-                  <p className="font-mono text-[10px] text-muted uppercase tracking-[0.18em] mb-1">Devedor</p>
+                  <p className="font-mono text-[10px] text-muted uppercase tracking-[0.18em] mb-1">Sobrinho</p>
                   <h2 className="font-display text-2xl font-semibold text-text tracking-tight">{debt.data.debtorName}</h2>
                   {debt.data.description ? <p className="font-sans text-sm text-text-dim mt-1">{debt.data.description}</p> : null}
                 </div>

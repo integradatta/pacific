@@ -41,14 +41,14 @@ function CredoresInner() {
   }, [all.data, q]);
 
   return (
-    <AdminShell title="Credores">
+    <AdminShell title="Padrinhos">
       <div className="space-y-4">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filtrar por nome, org ou e-mail…" className="w-full max-w-md bg-surface2 border border-line rounded-lg px-3.5 py-2 text-text font-sans text-sm placeholder:text-muted focus:outline-none focus:border-iris focus:shadow-glow transition-all" />
         <section className="panel overflow-hidden">
           <table className="w-full">
             <thead>
               <tr className="font-mono text-[10px] text-muted uppercase tracking-widest border-b border-line">
-                <th className="text-left font-normal px-6 py-2.5">Credor</th>
+                <th className="text-left font-normal px-6 py-2.5">Padrinho</th>
                 <th className="text-left font-normal px-6 py-2.5">E-mail</th>
                 <th className="text-right font-normal px-6 py-2.5">Operações</th>
                 <th className="text-right font-normal px-6 py-2.5">A receber</th>
@@ -67,7 +67,7 @@ function CredoresInner() {
                   <td className="px-6 py-3"><Actions c={c} /></td>
                 </tr>
               ))}
-              {rows.length === 0 && <tr><td colSpan={6} className="px-6 py-6 text-center font-sans text-sm text-text-dim">{all.isLoading ? 'Carregando…' : 'Nenhum credor encontrado.'}</td></tr>}
+              {rows.length === 0 && <tr><td colSpan={6} className="px-6 py-6 text-center font-sans text-sm text-text-dim">{all.isLoading ? 'Carregando…' : 'Nenhum padrinho encontrado.'}</td></tr>}
             </tbody>
           </table>
         </section>
@@ -78,7 +78,7 @@ function CredoresInner() {
 
 export default function CredoresPage() {
   return (
-    <Suspense fallback={<AdminShell title="Credores"><p className="font-mono text-sm text-muted animate-pulse">Carregando…</p></AdminShell>}>
+    <Suspense fallback={<AdminShell title="Padrinhos"><p className="font-mono text-sm text-muted animate-pulse">Carregando…</p></AdminShell>}>
       <CredoresInner />
     </Suspense>
   );

@@ -35,12 +35,12 @@ export function Constellation({ creditors }: { creditors: AdminCreditorRow[] }) 
       <div className="flex items-baseline justify-between mb-1">
         <div>
           <h2 className="font-display text-lg font-semibold text-text tracking-tight">Constelação da plataforma</h2>
-          <p className="font-mono text-[10px] text-muted uppercase tracking-[0.18em] mt-0.5">cada nó é um credor · raio = carteira · cor = saúde</p>
+          <p className="font-mono text-[10px] text-muted uppercase tracking-[0.18em] mt-0.5">cada nó é um padrinho · raio = carteira · cor = saúde</p>
         </div>
-        <span className="font-mono text-[10px] text-muted uppercase tracking-widest tabular-nums">{creditors.length} credores</span>
+        <span className="font-mono text-[10px] text-muted uppercase tracking-widest tabular-nums">{creditors.length} padrinhos</span>
       </div>
 
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 'auto' }} role="img" aria-label="Mapa de credores da plataforma">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 'auto' }} role="img" aria-label="Mapa de padrinhos da plataforma">
         <defs>
           <radialGradient id="coreGlow" cx="50%" cy="50%" r="50%">
             <stop offset="0%" stopColor="rgb(var(--iris) / 0.18)" />

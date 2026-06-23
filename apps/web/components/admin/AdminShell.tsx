@@ -7,7 +7,7 @@ import { LogoutButton } from '@/components/LogoutButton';
 
 const NAV = [
   { href: '/admin', label: 'Visão geral', icon: '◈' },
-  { href: '/admin/credores', label: 'Credores', icon: '◍' },
+  { href: '/admin/credores', label: 'Padrinhos', icon: '◍' },
   { href: '/admin/aprovacoes', label: 'Aprovações', icon: '✓' },
   { href: '/admin/notificacoes', label: 'Notificações', icon: '◎' },
   { href: '/admin/links', label: 'Links de acesso', icon: '⚷' },
@@ -74,7 +74,7 @@ export function AdminShell({ title, children }: { title: string; children: React
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Buscar credores, operações, logs…"
+              placeholder="Buscar padrinhos, operações, logs…"
               aria-label="Busca global"
               className="w-full bg-surface2 border border-line rounded-lg px-3.5 py-2 text-text font-sans text-sm placeholder:text-muted focus:outline-none focus:border-iris focus:shadow-[0_0_0_1px_rgb(var(--iris)/0.25),0_0_22px_-2px_rgb(var(--iris)/0.45)] transition-all"
             />

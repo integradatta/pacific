@@ -20,9 +20,9 @@ export default function AdminOverviewPage() {
       <div className="space-y-6">
         {/* Faixa de KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard label="Credores" value={o ? String(o.creditorsTotal) : '—'} sub={o ? `${o.creditorsActive} ativos · ${o.newCreditorsToday} hoje` : ''} tone="iris" />
+          <KpiCard label="Padrinhos" value={o ? String(o.creditorsTotal) : '—'} sub={o ? `${o.creditorsActive} ativos · ${o.newCreditorsToday} hoje` : ''} tone="iris" />
           <KpiCard label="Aguardando aprovação" value={o ? String(o.creditorsPending) : '—'} sub={o ? `${o.creditorsBlocked} bloqueados` : ''} tone={o && o.creditorsPending > 0 ? 'red' : undefined} />
-          <KpiCard label="Volume emprestado" value={o ? formatBRL(o.volumeLent) : '—'} sub={o ? `${o.operationsTotal} operações` : ''} />
+          <KpiCard label="Volume em ajuda" value={o ? formatBRL(o.volumeLent) : '—'} sub={o ? `${o.operationsTotal} operações` : ''} />
           <KpiCard label="A receber" value={o ? formatBRL(o.outstanding) : '—'} sub={o ? `${o.operationsOverdue} vencidas` : ''} />
         </div>
 

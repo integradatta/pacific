@@ -12,9 +12,9 @@ export default function CreditorOperationsPage({ params }: { params: { id: strin
   const rows = ops.data ?? [];
 
   return (
-    <AdminShell title="Operações do credor">
+    <AdminShell title="Operações do padrinho">
       <div className="space-y-4">
-        <Link href="/admin/credores" className="inline-block font-mono text-[11px] text-muted hover:text-iris uppercase tracking-widest">← Credores</Link>
+        <Link href="/admin/credores" className="inline-block font-mono text-[11px] text-muted hover:text-iris uppercase tracking-widest">← Padrinhos</Link>
 
         <section className="panel overflow-hidden">
           <div className="px-6 py-4 border-b border-line flex items-baseline justify-between">
@@ -27,7 +27,7 @@ export default function CreditorOperationsPage({ params }: { params: { id: strin
             <table className="w-full">
               <thead>
                 <tr className="font-mono text-[10px] text-muted uppercase tracking-widest border-b border-line">
-                  <th className="text-left font-normal px-6 py-2.5">Devedor</th>
+                  <th className="text-left font-normal px-6 py-2.5">Sobrinho</th>
                   <th className="text-right font-normal px-6 py-2.5">Devido</th>
                   <th className="text-right font-normal px-6 py-2.5">Vence</th>
                   <th className="text-left font-normal px-6 py-2.5">Etiquetas</th>
@@ -51,7 +51,7 @@ export default function CreditorOperationsPage({ params }: { params: { id: strin
         </section>
 
         <p className="font-mono text-[10px] text-muted tracking-wider">
-          Auditoria e acessos deste credor em <Link href="/admin/auditoria" className="text-iris">Auditoria</Link> e <Link href="/admin/monitoramento" className="text-iris">Monitoramento</Link>.
+          Auditoria e acessos deste padrinho em <Link href="/admin/auditoria" className="text-iris">Auditoria</Link> e <Link href="/admin/monitoramento" className="text-iris">Monitoramento</Link>.
         </p>
       </div>
     </AdminShell>

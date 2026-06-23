@@ -93,7 +93,7 @@ export default function NovaOperacaoPage() {
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="ratePct" className={labelClass}>Taxa de juros (%)</label>
+            <label htmlFor="ratePct" className={labelClass}>Taxa de gratidão (%)</label>
             <div className="flex gap-2">
               <input id="ratePct" type="number" inputMode="decimal" min="0" step="0.01" required value={ratePct} onChange={(e) => setRatePct(e.target.value)} placeholder="Ex.: 5" className={inputClass} />
               <div className="flex rounded-lg border border-line overflow-hidden shrink-0" role="group" aria-label="Período da taxa">
@@ -147,7 +147,7 @@ export default function NovaOperacaoPage() {
           ) : (
             <dl className="space-y-3">
               <PreviewRow label="Valor final" value={formatBRL(preview.finalValue)} strong />
-              <PreviewRow label="Juros totais" value={formatBRL(preview.totalInterest)} />
+              <PreviewRow label="Gratidão total" value={formatBRL(preview.totalInterest)} />
               <PreviewRow label="Rentabilidade" value={`${preview.profitabilityPct.toLocaleString('pt-BR')}%`} accent />
               <PreviewRow label="Retorno esperado" value={formatBRL(preview.expectedReturn)} />
               <PreviewRow label="Dias restantes" value={venceEm(preview.daysRemaining)} />

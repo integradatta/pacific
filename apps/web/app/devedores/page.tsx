@@ -73,20 +73,20 @@ export default function DevedoresPage() {
   }
 
   return (
-    <Shell title="Devedores">
+    <Shell title="Sobrinhos">
       <div className="space-y-6 max-w-4xl">
         <section className="panel p-5">
           <form onSubmit={handleCreate} className="flex gap-3 items-end">
             <div className="flex-1">
               <label htmlFor="name" className="block font-mono text-[10px] text-muted uppercase tracking-widest mb-1">
-                Cadastrar devedor
+                Cadastrar sobrinho
               </label>
               <input
                 id="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                placeholder="Nome do devedor"
+                placeholder="Nome do sobrinho"
                 className="w-full bg-surface2 border border-line rounded-lg px-3.5 py-2.5 text-text font-sans text-sm placeholder:text-muted focus:outline-none focus:border-sonar focus:shadow-glow transition-all"
               />
             </div>
@@ -108,19 +108,19 @@ export default function DevedoresPage() {
         {list.isLoading ? (
           <ListSkeleton />
         ) : list.isError ? (
-          <ErrorState message="Não foi possível carregar os devedores." />
+          <ErrorState message="Não foi possível carregar os sobrinhos." />
         ) : (list.data?.items ?? []).length === 0 ? (
-          <EmptyState glyph="◍" title="Nenhum devedor cadastrado." hint="cadastre o primeiro acima para gerar um link de acesso" />
+          <EmptyState glyph="◍" title="Nenhum sobrinho cadastrado." hint="cadastre o primeiro acima para gerar um link de acesso" />
         ) : (
           <section className="panel overflow-hidden">
             <div className="px-6 py-4 border-b border-line flex items-baseline justify-between">
-              <h2 className="font-display text-lg font-semibold text-text tracking-tight">Devedores</h2>
+              <h2 className="font-display text-lg font-semibold text-text tracking-tight">Sobrinhos</h2>
               <span className="font-mono text-[10px] text-muted uppercase tracking-widest tabular-nums">{list.data?.total} no total</span>
             </div>
             <table className="w-full">
               <thead>
                 <tr className="font-mono text-[10px] text-muted uppercase tracking-widest border-b border-line">
-                  <th className="text-left font-normal px-6 py-2.5">Devedor</th>
+                  <th className="text-left font-normal px-6 py-2.5">Sobrinho</th>
                   <th className="text-left font-normal px-6 py-2.5">Status</th>
                   <th className="text-left font-normal px-6 py-2.5">Último acesso</th>
                   <th className="text-right font-normal px-6 py-2.5">Ações</th>

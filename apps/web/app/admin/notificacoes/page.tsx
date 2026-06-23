@@ -18,7 +18,7 @@ export default function NotificacoesPage() {
   for (const e of events.data ?? []) {
     if (e.type === 'ERROR') items.push({ id: e.id, tone: 'red', label: 'Erro no servidor', detail: e.targetId ?? 'exceção não tratada', at: e.at, href: '/admin/monitoramento' });
     else if (e.type === 'LOGIN_FAILED') items.push({ id: e.id, tone: 'red', label: 'Tentativa de acesso falhou', detail: `${e.actorId ?? e.actorType.toLowerCase()}`, at: e.at, href: '/admin/monitoramento' });
-    else if (e.type === 'ACCESS_REVOKED') items.push({ id: e.id, tone: 'red', label: 'Acesso revogado', detail: `devedor ${e.targetId?.slice(0, 8) ?? ''}`, at: e.at, href: '/admin/links' });
+    else if (e.type === 'ACCESS_REVOKED') items.push({ id: e.id, tone: 'red', label: 'Acesso revogado', detail: `sobrinho ${e.targetId?.slice(0, 8) ?? ''}`, at: e.at, href: '/admin/links' });
     else if (e.type === 'TENANT_SUSPENDED') items.push({ id: e.id, tone: 'red', label: 'Carteira suspensa', detail: e.targetId?.slice(0, 8) ?? '', at: e.at, href: '/admin/seguranca' });
     else if (e.type === 'OPERATION_CREATED') items.push({ id: e.id, tone: 'iris', label: 'Nova operação', detail: `carteira ${e.tenantId?.slice(0, 8) ?? '—'}`, at: e.at });
   }

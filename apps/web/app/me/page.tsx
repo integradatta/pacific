@@ -38,7 +38,7 @@ function DebtCard({ debt }: { debt: MyDebt }) {
           <p className="font-mono text-[11px] text-muted mt-1">
             {Number(s.paidAmount) > 0 && !s.settled
               ? <>saldo {formatBRL(s.balance)} · pago {formatBRL(s.paidAmount)}</>
-              : <>juros acumulados {formatBRL(s.accruedInterest)}</>}
+              : <>gratidão acumulada {formatBRL(s.accruedInterest)}</>}
           </p>
         </div>
         {s.settled ? (
@@ -97,7 +97,7 @@ export default function MePage() {
             </div>
           </div>
         ) : q.isError ? (
-          <ErrorState message="Não foi possível carregar. Abra novamente o link do seu credor." />
+          <ErrorState message="Não foi possível carregar. Abra novamente o link do seu padrinho." />
         ) : (q.data ?? []).length === 0 ? (
           <EmptyState glyph="◇" title="Nenhuma dívida registrada." />
         ) : (

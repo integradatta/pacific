@@ -13,13 +13,13 @@ export default function LinksPage() {
     <AdminShell title="Links de acesso">
       <section className="panel overflow-hidden">
         <div className="px-6 py-4 border-b border-line flex items-baseline justify-between">
-          <h2 className="font-display text-lg font-semibold text-text tracking-tight">Links de devedores</h2>
+          <h2 className="font-display text-lg font-semibold text-text tracking-tight">Links de sobrinhos</h2>
           <span className="font-mono text-[10px] text-muted uppercase tracking-widest tabular-nums">{rows.length} · {rows.filter((l) => l.active).length} ativos</span>
         </div>
         <table className="w-full">
           <thead>
             <tr className="font-mono text-[10px] text-muted uppercase tracking-widest border-b border-line">
-              <th className="text-left font-normal px-6 py-2.5">Devedor</th>
+              <th className="text-left font-normal px-6 py-2.5">Sobrinho</th>
               <th className="text-left font-normal px-6 py-2.5">Carteira</th>
               <th className="text-left font-normal px-6 py-2.5">Estado</th>
               <th className="text-right font-normal px-6 py-2.5">Último acesso</th>

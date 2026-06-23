@@ -32,7 +32,7 @@ export default function ExecutivoPage() {
     <AdminShell title="Executivo">
       <div className="space-y-6 max-w-4xl">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard label="Credores" value={o ? String(o.creditorsTotal) : '—'} sub={o ? `${o.creditorsActive} ativos` : ''} tone="iris" />
+          <KpiCard label="Padrinhos" value={o ? String(o.creditorsTotal) : '—'} sub={o ? `${o.creditorsActive} ativos` : ''} tone="iris" />
           <KpiCard label="Operações" value={o ? String(o.operationsTotal) : '—'} sub={o ? `${o.operationsActive} ativas` : ''} />
           <KpiCard label="Volume na plataforma" value={o ? formatBRL(o.volumeLent) : '—'} />
           <KpiCard label="Novos hoje" value={o ? String(o.newCreditorsToday) : '—'} tone="sonar" />
@@ -40,7 +40,7 @@ export default function ExecutivoPage() {
 
         <section className="panel p-6 space-y-5">
           <h2 className="font-display text-lg font-semibold text-text tracking-tight">Saúde financeira da plataforma</h2>
-          <Bar label="Total emprestado" value={lent} max={max} color="bg-iris" />
+          <Bar label="Total em ajuda" value={lent} max={max} color="bg-iris" />
           <Bar label="A receber (em aberto)" value={out} max={max} color="bg-status-yellow" />
           <Bar label="Já recebido" value={recv} max={max} color="bg-status-green" />
           <p className="font-mono text-[10px] text-muted tracking-wider pt-2">

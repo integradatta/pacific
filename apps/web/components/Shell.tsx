@@ -15,7 +15,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Torre de Controle', icon: '⊕' },
   { href: '/operacoes/nova', label: 'Nova Operação', icon: '✦' },
-  { href: '/devedores', label: 'Devedores', icon: '◍' },
+  { href: '/devedores', label: 'Sobrinhos', icon: '◍' },
   { href: '/carteira', label: 'Carteira', icon: '◈' },
   { href: '/vencimentos', label: 'Vencimentos', icon: '◷' },
   { href: '/notificacoes', label: 'Notificações', icon: '◎' },
