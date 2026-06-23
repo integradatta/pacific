@@ -103,3 +103,13 @@ body {
     transition: none !important;
   }
 }
+
+/* Exportação executiva: ao imprimir/salvar PDF, mostra só o relatório (claro). */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
+  }
+}

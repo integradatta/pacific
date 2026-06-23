@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Shell } from '@/components/Shell';
 import { useKpis, usePortfolio, useIntelligence } from '@/lib/hooks';
 import { HorizonteVencimentos } from '@/components/HorizonteVencimentos';
@@ -28,7 +29,16 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {intelligence.data ? <IntelligenceBlock intel={intelligence.data} /> : null}
+          {intelligence.data ? (
+            <>
+              <div className="flex justify-end">
+                <Link href="/relatorio" className="font-mono text-[11px] text-muted hover:text-sonar uppercase tracking-widest border border-line hover:border-sonar/40 rounded-lg px-3 py-1.5 transition-colors">
+                  Exportar resumo →
+                </Link>
+              </div>
+              <IntelligenceBlock intel={intelligence.data} />
+            </>
+          ) : null}
           <HorizonteVencimentos rows={portfolio.data ?? []} />
           {kpis.data ? <KpiReadouts kpis={kpis.data} /> : null}
           <CarteiraTable rows={portfolio.data ?? []} />
