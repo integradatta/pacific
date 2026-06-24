@@ -36,8 +36,8 @@ export function CarteiraTable({ rows }: { rows: PortfolioRow[] }) {
     return (
       <section className="panel p-12 text-center">
         <p className="font-mono text-2xl text-muted/60 mb-3" aria-hidden>◈</p>
-        <p className="font-sans text-sm text-text-dim">Nenhuma dívida na carteira ainda.</p>
-        <p className="font-mono text-[10px] text-muted uppercase tracking-widest mt-1 mb-5">cadastre uma operação para começar a monitorar</p>
+        <p className="font-sans text-sm text-text-dim">Nenhuma ajuda na carteira ainda.</p>
+        <p className="font-mono text-[10px] text-muted uppercase tracking-widest mt-1 mb-5">cadastre uma ajuda para começar a monitorar</p>
         <Link
           href="/operacoes/nova"
           className="inline-flex items-center gap-2 bg-sonar text-ink font-mono text-xs font-semibold uppercase tracking-widest px-4 py-2.5 rounded-lg shadow-[0_8px_24px_-10px_rgb(var(--sonar)/0.7)] hover:brightness-110 active:translate-y-px transition-all"
@@ -52,7 +52,7 @@ export function CarteiraTable({ rows }: { rows: PortfolioRow[] }) {
     <section className="panel overflow-hidden">
       <div className="px-6 py-4 border-b border-line flex items-baseline justify-between">
         <h2 className="font-display text-lg font-semibold text-text tracking-tight">Carteira</h2>
-        <span className="font-mono text-[10px] text-muted uppercase tracking-widest tabular-nums">{rows.length} dívidas</span>
+        <span className="font-mono text-[10px] text-muted uppercase tracking-widest tabular-nums">{rows.length} ajudas</span>
       </div>
       <table className="w-full">
         <thead>
@@ -64,7 +64,7 @@ export function CarteiraTable({ rows }: { rows: PortfolioRow[] }) {
             <th className="text-right font-normal px-6 py-2.5" title="Recuperabilidade (0–100)">Recup.</th>
             <th className="text-right font-normal px-6 py-2.5" title="Temperatura / urgência (0–100)">Temp.</th>
             <th className="text-left font-normal px-6 py-2.5">Risco</th>
-            <th className="text-left font-normal px-6 py-2.5">Status</th>
+            <th className="text-left font-normal px-6 py-2.5">Situação</th>
           </tr>
         </thead>
         <tbody>

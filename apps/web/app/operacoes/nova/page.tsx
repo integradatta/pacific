@@ -78,7 +78,7 @@ export default function NovaOperacaoPage() {
   }
 
   return (
-    <Shell title="Nova Operação">
+    <Shell title="Nova Ajuda">
       <div className="grid gap-6 md:grid-cols-2 max-w-4xl">
         {/* Formulário */}
         <form onSubmit={handleSubmit} className="panel p-6 space-y-4" noValidate>

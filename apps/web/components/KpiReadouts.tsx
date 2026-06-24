@@ -38,7 +38,7 @@ export function KpiReadouts({ kpis }: { kpis: DashboardKpis }) {
     <div className="space-y-4">
       {/* Valores */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Readout label="Total investido" value={formatBRL(kpis.totalLent)} />
+        <Readout label="Total em ajudas" value={formatBRL(kpis.totalLent)} />
         <Readout label="A receber" value={formatBRL(kpis.totalReceivable)} />
         <Readout label="Retorno esperado" value={formatBRL(kpis.totalExpectedReturn)} />
         <Readout label="Vencido" value={formatBRL(kpis.totalOverdue)} accent={Number(kpis.totalOverdue) > 0} />
