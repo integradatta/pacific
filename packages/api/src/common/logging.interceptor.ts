@@ -16,6 +16,7 @@ export class LoggingInterceptor implements NestInterceptor {
     const start = Date.now();
     const method = req.method;
     const url = req.originalUrl ?? req.url;
+    if (url.startsWith('/health')) return next.handle(); // monitores: não polui o log
     const done = () => {
       const status = ctx.switchToHttp().getResponse<Response>().statusCode;
       this.log.log(JSON.stringify({ method, url, status, ms: Date.now() - start }));

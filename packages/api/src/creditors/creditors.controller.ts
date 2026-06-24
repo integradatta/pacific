@@ -2,6 +2,7 @@ import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { CreditorsService } from './creditors.service.js';
 import { RegisterCreditorDto } from './dto/register-creditor.dto.js';
 import { JwtGuard } from '../auth/jwt.guard.js';
+import { IpRateLimitGuard } from '../auth/ip-rate-limit.guard.js';
 import { PrincipalGuard } from '../auth/principal.guard.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import type { AuthUser } from '@pacific/shared';
@@ -20,7 +21,7 @@ export class CreditorsController {
 
   // Exige sessão Supabase válida; identidade derivada do JWT (não do body).
   @Post('register-creditor')
-  @UseGuards(new JwtGuard())
+  @UseGuards(new IpRateLimitGuard(), new JwtGuard())
   register(
     @CurrentUser() user: AuthUser,
     @Body() dto: RegisterCreditorDto,

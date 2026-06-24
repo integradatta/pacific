@@ -1,11 +1,14 @@
 import 'dotenv/config';
 import 'reflect-metadata';
+import helmet from 'helmet';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module.js';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
+  // Headers de segurança. CSP off (API só serve JSON) e CORP cross-origin p/ não quebrar o web.
+  app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   // Portal web está em outra origem; sem CORS o navegador bloqueia as chamadas.
   app.enableCors({ origin: process.env.WEB_ORIGIN ?? true, credentials: true });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
