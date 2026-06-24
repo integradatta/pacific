@@ -26,7 +26,7 @@ Como a plataforma cresce sem reescritas. Decisões atuais + caminhos preparados.
   cross-tenant chamando `kpis()` por tenant (o saldo com juros é **computado**, não armazenado). Mitigações já aplicadas:
   - `overview()`: contagens via `count()` (indexado) + **cache TTL 60s** (admins concorrentes não recomputam).
   - `creditors()`: **paginado** → o N+1 fica limitado ao tamanho da página.
-- **Caminho preparado p/ milhares de credores** (quando necessário): tabela de **stats materializadas por tenant**
+- **Stats materializadas (FEITO):** tabela **TenantStats** por tenant
   (`TenantStats`: principal, contagens, recebido) atualizada nas mutações de dívida (create/pay/update) +
   `PortfolioSnapshot` (já existe, semanal) para histórico. Aí `overview()` lê N linhas agregadas, sem tocar `Debt`.
 

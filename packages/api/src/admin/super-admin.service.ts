@@ -45,50 +45,80 @@ export class SuperAdminService {
     if (cached && Date.now() - cached.at < SuperAdminService.OVERVIEW_TTL_MS) return cached.value;
 
     const today = startOfTodayUTC(now);
-    // Contagens via count() (indexável; não carrega todas as linhas).
-    const [creditorsTotal, creditorsActive, creditorsBlocked, creditorsPending, newCreditorsToday, activeTenants] = await Promise.all([
+    // Contagens via count() (indexável; não carrega todas as linhas) + stats materializadas.
+    const [creditorsTotal, creditorsActive, creditorsBlocked, creditorsPending, newCreditorsToday, stats] = await Promise.all([
       this.db.tenant.count(),
       this.db.tenant.count({ where: { approval: 'APPROVED', status: 'ACTIVE' } }),
       this.db.tenant.count({ where: { status: 'SUSPENDED' } }),
       this.db.tenant.count({ where: { approval: 'PENDING' } }),
       this.db.tenant.count({ where: { createdAt: { gte: today } } }),
-      this.db.tenant.findMany({ where: { approval: 'APPROVED', status: 'ACTIVE' }, select: { id: true } }),
+      this.db.tenantStats.findMany(),
     ]);
     const o: AdminOverview = {
-      creditorsTotal,
-      creditorsActive,
-      creditorsBlocked,
-      creditorsPending,
-      newCreditorsToday,
-      operationsTotal: 0,
-      operationsActive: 0,
-      operationsOverdue: 0,
-      volumeLent: '0',
-      outstanding: '0',
-      received: '0',
-      loginsToday: 0,
+      creditorsTotal, creditorsActive, creditorsBlocked, creditorsPending, newCreditorsToday,
+      operationsTotal: 0, operationsActive: 0, operationsOverdue: 0,
+      volumeLent: '0', outstanding: '0', received: '0', loginsToday: 0,
     };
     let volume = new Decimal(0);
     let outstanding = new Decimal(0);
     let received = new Decimal(0);
-    for (const t of activeTenants) {
-      const k = await this.dashboard.kpis(t.id, now);
-      const statusTotal = k.countByStatus.GREEN + k.countByStatus.YELLOW + k.countByStatus.ORANGE + k.countByStatus.RED;
-      o.operationsTotal += statusTotal + k.countSettled;
-      o.operationsActive += k.countActive;
-      o.operationsOverdue += k.countByStatus.RED;
-      volume = volume.plus(k.totalLent);
-      outstanding = outstanding.plus(k.totalReceivable);
-      received = received.plus(k.totalReceived);
-      o.loginsToday += await this.scoped.withTenant(t.id, (tx) =>
-        tx.debtorLoginEvent.count({ where: { tenantId: t.id, success: true, at: { gte: today } } }),
-      );
+
+    if (stats.length > 0) {
+      // Caminho escalável: agrega das stats materializadas (1 linha por tenant; sem varrer dívidas).
+      for (const s of stats) {
+        o.operationsTotal += s.opsTotal;
+        o.operationsActive += s.opsActive;
+        o.operationsOverdue += s.opsOverdue;
+        o.loginsToday += s.loginsToday;
+        volume = volume.plus(s.totalLent.toString());
+        outstanding = outstanding.plus(s.totalReceivable.toString());
+        received = received.plus(s.totalReceived.toString());
+      }
+    } else {
+      // Fallback (antes do 1º refresh do job): computa ao vivo por tenant.
+      const activeTenants = await this.db.tenant.findMany({ where: { approval: 'APPROVED', status: 'ACTIVE' }, select: { id: true } });
+      for (const t of activeTenants) {
+        const k = await this.dashboard.kpis(t.id, now);
+        const statusTotal = k.countByStatus.GREEN + k.countByStatus.YELLOW + k.countByStatus.ORANGE + k.countByStatus.RED;
+        o.operationsTotal += statusTotal + k.countSettled;
+        o.operationsActive += k.countActive;
+        o.operationsOverdue += k.countByStatus.RED;
+        volume = volume.plus(k.totalLent);
+        outstanding = outstanding.plus(k.totalReceivable);
+        received = received.plus(k.totalReceived);
+        o.loginsToday += await this.scoped.withTenant(t.id, (tx) =>
+          tx.debtorLoginEvent.count({ where: { tenantId: t.id, success: true, at: { gte: today } } }),
+        );
+      }
     }
     o.volumeLent = volume.toFixed(2);
     o.outstanding = outstanding.toFixed(2);
     o.received = received.toFixed(2);
     this.overviewCache = { at: Date.now(), value: o };
     return o;
+  }
+
+  /**
+   * Recalcula as stats materializadas por tenant (job diário; pesado, roda fora do request).
+   * É a computação cara que o overview deixa de fazer a cada acesso.
+   */
+  async refreshStats(now = new Date()): Promise<{ tenants: number }> {
+    const today = startOfTodayUTC(now);
+    const tenants = await this.db.tenant.findMany({ where: { approval: 'APPROVED', status: 'ACTIVE' }, select: { id: true } });
+    for (const t of tenants) {
+      const k = await this.dashboard.kpis(t.id, now);
+      const opsTotal = k.countByStatus.GREEN + k.countByStatus.YELLOW + k.countByStatus.ORANGE + k.countByStatus.RED + k.countSettled;
+      const loginsToday = await this.scoped.withTenant(t.id, (tx) =>
+        tx.debtorLoginEvent.count({ where: { tenantId: t.id, success: true, at: { gte: today } } }),
+      );
+      const data = {
+        opsTotal, opsActive: k.countActive, opsOverdue: k.countByStatus.RED,
+        totalLent: k.totalLent, totalReceivable: k.totalReceivable, totalReceived: k.totalReceived,
+        loginsToday, refreshedAt: now,
+      };
+      await this.db.tenantStats.upsert({ where: { tenantId: t.id }, create: { tenantId: t.id, ...data }, update: data });
+    }
+    return { tenants: tenants.length };
   }
 
   /** Credores com agregados de carteira (a receber + nº de operações). Paginado: o N+1 de KPIs

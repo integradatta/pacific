@@ -26,6 +26,7 @@ import { DebtorSelfController } from './debtors/debtor-self.controller.js';
 import { DebtorSelfService } from './debtors/debtor-self.service.js';
 import { SuperAdminController } from './admin/super-admin.controller.js';
 import { SuperAdminService } from './admin/super-admin.service.js';
+import { StatsScheduler } from './admin/stats.scheduler.js';
 import { AUTH_ADMIN, createAuthAdmin } from './admin/auth-admin.js';
 import { TrackingService } from './tracking/tracking.service.js';
 import { EventsController, PublicEventsController } from './tracking/events.controller.js';
@@ -33,7 +34,7 @@ import { EventsController, PublicEventsController } from './tracking/events.cont
 @Module({
   imports: [ScheduleModule.forRoot()],
   controllers: [HealthController, CreditorsController, DebtorProvisioningController, DebtsController, DashboardController, NotificationsController, DebtorExchangeController, DebtorSelfController, SuperAdminController, EventsController, PublicEventsController],
-  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, DebtorsAdminService, DebtsService, DashboardService, NotificationsService, NotificationsScheduler, RetentionScheduler, DebtorExchangeService, DebtorTokenService, DebtorSelfService, SuperAdminService, TrackingService, { provide: AUTH_ADMIN, useFactory: createAuthAdmin }, { provide: APP_FILTER, useClass: AllExceptionsFilter }, { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor }],
+  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, DebtorsAdminService, DebtsService, DashboardService, NotificationsService, NotificationsScheduler, RetentionScheduler, DebtorExchangeService, DebtorTokenService, DebtorSelfService, SuperAdminService, StatsScheduler, TrackingService, { provide: AUTH_ADMIN, useFactory: createAuthAdmin }, { provide: APP_FILTER, useClass: AllExceptionsFilter }, { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor }],
   exports: [PrismaService],
 })
 export class AppModule {}

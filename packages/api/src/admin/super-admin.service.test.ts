@@ -33,6 +33,7 @@ function fakeDb() {
     debtor: { deleteMany: vi.fn(async () => ({ count: 1 })) },
     notification: { deleteMany: vi.fn(async () => ({ count: 0 })) },
     debtorLoginEvent: { count: vi.fn(async () => 3), deleteMany: vi.fn(async () => ({ count: 0 })) },
+    tenantStats: { findMany: vi.fn(async () => []), upsert: vi.fn(async () => ({})) },
   };
 }
 const mkAuthAdmin = () => ({ sendPasswordReset: vi.fn(async () => {}), setBlocked: vi.fn(async () => {}), deleteUser: vi.fn(async () => {}) });
@@ -101,6 +102,28 @@ describe('SuperAdminService', () => {
     expect(o.outstanding).toBe('1200.00'); // 2 × 600
     expect(o.operationsOverdue).toBe(2); // 2 × RED=1
     expect(o.loginsToday).toBe(6); // 2 × 3
+  });
+
+  it('overview usa TenantStats quando existem (sem varrer dívidas)', async () => {
+    const db = fakeDb();
+    db.tenant.count = vi.fn(async () => 2) as never;
+    db.tenantStats.findMany = vi.fn(async () => [
+      { tenantId: 't1', opsTotal: 5, opsActive: 3, opsOverdue: 1, totalLent: '1000.00', totalReceivable: '600.00', totalReceived: '200.00', loginsToday: 4 },
+      { tenantId: 't2', opsTotal: 2, opsActive: 2, opsOverdue: 0, totalLent: '500.00', totalReceivable: '500.00', totalReceived: '0.00', loginsToday: 1 },
+    ]) as never;
+    const dash = mkDash();
+    const o = await svc(db, mkAuthAdmin(), dash).overview(new Date('2026-07-01T12:00:00Z'));
+    expect(o.operationsTotal).toBe(7);
+    expect(o.volumeLent).toBe('1500.00');
+    expect(o.outstanding).toBe('1100.00');
+    expect(o.loginsToday).toBe(5);
+    expect(dash.kpis).not.toHaveBeenCalled(); // caminho escalável: não computa por dívida
+  });
+
+  it('refreshStats faz upsert das stats por carteira ativa', async () => {
+    const db = fakeDb();
+    await svc(db).refreshStats(new Date('2026-07-01T12:00:00Z'));
+    expect(db.tenantStats.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { tenantId: 't1' } }));
   });
 
   it('accessLinks lista os links', async () => {
