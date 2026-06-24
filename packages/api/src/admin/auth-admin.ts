@@ -33,9 +33,20 @@ export class SupabaseAuthAdmin implements AuthAdmin {
     return { url, key };
   }
 
+  /** fetch com timeout (não pendura o request se o Supabase admin demorar). */
+  private async req(input: string, init: RequestInit, timeoutMs = 8000): Promise<Response> {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      return await fetch(input, { ...init, signal: ctrl.signal });
+    } finally {
+      clearTimeout(t);
+    }
+  }
+
   async sendPasswordReset(email: string): Promise<void> {
     const { url, key } = this.cfg();
-    const res = await fetch(`${url}/auth/v1/recover`, {
+    const res = await this.req(`${url}/auth/v1/recover`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
       body: JSON.stringify({ email }),
@@ -46,7 +57,7 @@ export class SupabaseAuthAdmin implements AuthAdmin {
   async setBlocked(supabaseId: string, blocked: boolean): Promise<void> {
     const { url, key } = this.cfg();
     // ban_duration "none" desbloqueia; um valor longo bloqueia (admin API do GoTrue).
-    const res = await fetch(`${url}/auth/v1/admin/users/${supabaseId}`, {
+    const res = await this.req(`${url}/auth/v1/admin/users/${supabaseId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', apikey: key, Authorization: `Bearer ${key}` },
       body: JSON.stringify({ ban_duration: blocked ? '876000h' : 'none' }),
@@ -56,7 +67,7 @@ export class SupabaseAuthAdmin implements AuthAdmin {
 
   async deleteUser(supabaseId: string): Promise<void> {
     const { url, key } = this.cfg();
-    const res = await fetch(`${url}/auth/v1/admin/users/${supabaseId}`, {
+    const res = await this.req(`${url}/auth/v1/admin/users/${supabaseId}`, {
       method: 'DELETE',
       headers: { apikey: key, Authorization: `Bearer ${key}` },
     });

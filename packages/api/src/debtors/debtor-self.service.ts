@@ -49,9 +49,12 @@ export class DebtorSelfService {
     });
   }
 
-  /** Registra o token de push do dispositivo do sobrinho (app nativo). Envio (FCM) é externo. */
+  /** Registra o token de push do dispositivo do sobrinho (app nativo). Envio (FCM) é externo.
+   *  Dedup: mantém só o token atual por (devedor, plataforma) — evita acúmulo de tokens stale. */
   async registerPushToken(tenantId: string, debtorId: string, token: string, platform: string): Promise<void> {
-    await this.scoped.raw().deviceToken.upsert({
+    const db = this.scoped.raw();
+    await db.deviceToken.deleteMany({ where: { debtorId, platform, token: { not: token } } });
+    await db.deviceToken.upsert({
       where: { token },
       create: { tenantId, debtorId, token, platform },
       update: { tenantId, debtorId, platform, lastSeenAt: new Date() },

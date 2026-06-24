@@ -16,7 +16,7 @@ function fakeDb(debts: Array<{ id: string }>, payEvents: Array<{ targetId: strin
       ),
     },
     platformEvent: { findMany: vi.fn(async () => payEvents) },
-    deviceToken: { upsert: vi.fn(async () => ({})) },
+    deviceToken: { upsert: vi.fn(async () => ({})), deleteMany: vi.fn(async () => ({ count: 0 })) },
   };
 }
 const svc = (db: ReturnType<typeof fakeDb>) =>
