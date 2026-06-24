@@ -16,10 +16,11 @@ function fakeDb(debts: Array<{ id: string }>, payEvents: Array<{ targetId: strin
       ),
     },
     platformEvent: { findMany: vi.fn(async () => payEvents) },
+    deviceToken: { upsert: vi.fn(async () => ({})) },
   };
 }
 const svc = (db: ReturnType<typeof fakeDb>) =>
-  new DebtorSelfService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db) } as never);
+  new DebtorSelfService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db), raw: () => db } as never);
 
 describe('DebtorSelfService.myDebts', () => {
   it('retorna as dívidas do próprio devedor com summary + principal, escopado por tenant+debtor', async () => {
@@ -45,5 +46,13 @@ describe('DebtorSelfService.myDebts', () => {
       { at: '2026-03-01T00:00:00.000Z', total: '300.00' },
       { at: '2026-04-01T00:00:00.000Z', total: '500.00' },
     ]);
+  });
+
+  it('registerPushToken faz upsert do token do dispositivo', async () => {
+    const db = fakeDb([]);
+    await svc(db).registerPushToken('t1', 'me', 'fcm-abc', 'android');
+    expect(db.deviceToken.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { token: 'fcm-abc' }, create: expect.objectContaining({ debtorId: 'me', platform: 'android' }) }),
+    );
   });
 });

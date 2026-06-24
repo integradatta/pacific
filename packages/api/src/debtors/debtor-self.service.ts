@@ -48,4 +48,13 @@ export class DebtorSelfService {
       }));
     });
   }
+
+  /** Registra o token de push do dispositivo do sobrinho (app nativo). Envio (FCM) é externo. */
+  async registerPushToken(tenantId: string, debtorId: string, token: string, platform: string): Promise<void> {
+    await this.scoped.raw().deviceToken.upsert({
+      where: { token },
+      create: { tenantId, debtorId, token, platform },
+      update: { tenantId, debtorId, platform, lastSeenAt: new Date() },
+    });
+  }
 }

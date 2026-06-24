@@ -22,13 +22,12 @@ Como a plataforma cresce sem reescritas. Decisões atuais + caminhos preparados.
 
 - Carteira de um credor é **bounded** (consultas escopadas por `tenantId`, indexadas). O dashboard/inteligência
   carrega só as dívidas do tenant — escala por tenant, não pela base toda.
-- **Gargalo conhecido** (documentado, não crítico hoje): `overview()` e `creditors()` do super-admin agregam
-  cross-tenant chamando `kpis()` por tenant (o saldo com juros é **computado**, não armazenado). Mitigações já aplicadas:
-  - `overview()`: contagens via `count()` (indexado) + **cache TTL 60s** (admins concorrentes não recomputam).
-  - `creditors()`: **paginado** → o N+1 fica limitado ao tamanho da página.
-- **Stats materializadas (FEITO):** tabela **TenantStats** por tenant
-  (`TenantStats`: principal, contagens, recebido) atualizada nas mutações de dívida (create/pay/update) +
-  `PortfolioSnapshot` (já existe, semanal) para histórico. Aí `overview()` lê N linhas agregadas, sem tocar `Debt`.
+- **Agregação cross-tenant (RESOLVIDA):** antes, `overview()` varria todas as dívidas de todos os credores
+  a cada acesso (o saldo com juros é **computado**, não armazenado). Agora:
+  - **`TenantStats`** (1 linha por tenant) recalculada por um **job diário** (`StatsScheduler @4h`) — a
+    computação cara roda fora do request. `overview()` **lê e soma** as stats (O(tenants)); fallback ao
+    cálculo vivo só antes do 1º refresh. Defasagem ≤24h no overview (o dashboard do credor é sempre vivo).
+  - `overview()` ainda usa `count()` p/ as contagens + **cache TTL 60s**; `creditors()` é **paginado**.
 
 ## Modularidade
 

@@ -200,6 +200,20 @@ model Notification {
   @@index([tenantId, createdAt])
 }
 
+// Token de push do dispositivo do sobrinho (app nativo). O envio em si (FCM) é externo/manual;
+// aqui só registramos o token p/ quando a entrega for ligada. Global (filtrado por debtor).
+model DeviceToken {
+  id         String   @id @default(uuid())
+  tenantId   String
+  debtorId   String
+  token      String   @unique
+  platform   String // ios | android | web
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  @@index([tenantId, debtorId])
+}
+
 model DebtorAccess {
   id         String    @id @default(uuid())
   debtorId   String    @unique
@@ -223,6 +237,22 @@ model DebtorLoginEvent {
 
   @@index([tenantId])
   @@index([debtorId, at])
+}
+
+// Estatísticas materializadas por tenant — agregados caros (computados a partir de Debt sob RLS)
+// pré-calculados por um job diário. O overview do super-admin LÊ daqui (1 linha por tenant) em vez
+// de varrer todas as dívidas de todos os credores a cada acesso → escala p/ milhares de credores.
+// Tolerância de até ~24h de defasagem no overview (aceitável; o dashboard do credor é sempre vivo).
+model TenantStats {
+  tenantId        String   @id
+  opsTotal        Int      @default(0)
+  opsActive       Int      @default(0)
+  opsOverdue      Int      @default(0)
+  totalLent       Decimal  @default(0) @db.Decimal(14, 2)
+  totalReceivable Decimal  @default(0) @db.Decimal(14, 2)
+  totalReceived   Decimal  @default(0) @db.Decimal(14, 2)
+  loginsToday     Int      @default(0)
+  refreshedAt     DateTime @default(now())
 }
 
 // Snapshot SEMANAL da saúde da carteira (in-app; sem envio externo). Um por (tenant, semana),

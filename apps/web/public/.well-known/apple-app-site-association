@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "SUBSTITUA_TEAMID.app.pacific.mobile",
+        "paths": ["/d/*", "/me"]
+      }
+    ]
+  }
+}
