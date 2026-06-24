@@ -7,6 +7,9 @@ import { AppModule } from './app.module.js';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
+  // Atrás do proxy do Railway/Vercel: confia no 1º hop p/ obter o IP real do cliente
+  // (X-Forwarded-For) — essencial p/ o rate limiting por IP não tratar todos como um só.
+  (app.getHttpAdapter().getInstance() as { set: (k: string, v: unknown) => void }).set('trust proxy', 1);
   // Headers de segurança. CSP off (API só serve JSON) e CORP cross-origin p/ não quebrar o web.
   app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   // CORS: em produção, WEB_ORIGIN é OBRIGATÓRIO (lista separada por vírgula). Nunca refletir
