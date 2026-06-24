@@ -1,12 +1,17 @@
 import 'dotenv/config';
 import 'reflect-metadata';
 import helmet from 'helmet';
+import { json, urlencoded } from 'express';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module.js';
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  // bodyParser próprio com LIMITE de tamanho — mitiga DoS por payload grande/aninhado
+  // (body-parser/qs/express). 100kb cobre os payloads JSON da API com folga.
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  app.use(json({ limit: '100kb' }));
+  app.use(urlencoded({ extended: true, limit: '100kb' }));
   // Atrás do proxy do Railway/Vercel: confia no 1º hop p/ obter o IP real do cliente
   // (X-Forwarded-For) — essencial p/ o rate limiting por IP não tratar todos como um só.
   (app.getHttpAdapter().getInstance() as { set: (k: string, v: unknown) => void }).set('trust proxy', 1);
