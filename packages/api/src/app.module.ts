@@ -5,6 +5,7 @@ import { AllExceptionsFilter } from './common/http-exception.filter.js';
 import { LoggingInterceptor } from './common/logging.interceptor.js';
 import { HealthController } from './common/health.controller.js';
 import { RetentionScheduler } from './common/retention.scheduler.js';
+import { RlsHealthCheck } from './common/rls-healthcheck.service.js';
 import { PrismaService } from './common/prisma.service.js';
 import { TenantDatasourceResolver } from './tenancy/tenant-datasource.resolver.js';
 import { TenantScopedService } from './tenancy/tenant-scoped.service.js';
@@ -34,7 +35,7 @@ import { EventsController, PublicEventsController } from './tracking/events.cont
 @Module({
   imports: [ScheduleModule.forRoot()],
   controllers: [HealthController, CreditorsController, DebtorProvisioningController, DebtsController, DashboardController, NotificationsController, DebtorExchangeController, DebtorSelfController, SuperAdminController, EventsController, PublicEventsController],
-  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, DebtorsAdminService, DebtsService, DashboardService, NotificationsService, NotificationsScheduler, RetentionScheduler, DebtorExchangeService, DebtorTokenService, DebtorSelfService, SuperAdminService, StatsScheduler, TrackingService, { provide: AUTH_ADMIN, useFactory: createAuthAdmin }, { provide: APP_FILTER, useClass: AllExceptionsFilter }, { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor }],
+  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, DebtorsAdminService, DebtsService, DashboardService, NotificationsService, NotificationsScheduler, RetentionScheduler, RlsHealthCheck, DebtorExchangeService, DebtorTokenService, DebtorSelfService, SuperAdminService, StatsScheduler, TrackingService, { provide: AUTH_ADMIN, useFactory: createAuthAdmin }, { provide: APP_FILTER, useClass: AllExceptionsFilter }, { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor }],
   exports: [PrismaService],
 })
 export class AppModule {}
