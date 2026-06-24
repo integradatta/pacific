@@ -38,10 +38,10 @@ const diasLabel = (d: number) => (d < 0 ? `${Math.abs(d)} dias em atraso` : d ==
 
 function smartSummary(d: MyDebt): string {
   const s = d.summary;
-  if (s.settled) return 'Sua dívida está quitada. Não há valor em aberto.';
+  if (s.settled) return 'Sua ajuda está quitada. Não há valor em aberto.';
   const sit = s.status === 'RED' ? 'está em atraso' : s.status === 'YELLOW' || s.status === 'ORANGE' ? 'tem vencimento próximo' : 'está em dia';
   const venc = s.daysRemaining < 0 ? `venceu há ${Math.abs(s.daysRemaining)} dias` : s.daysRemaining === 0 ? 'vence hoje' : `vence em ${s.daysRemaining} dias`;
-  return `Sua dívida ${sit} e ${venc}. O valor atual é de ${formatBRL(s.amountDue)}.`;
+  return `Sua ajuda ${sit} e ${venc}. O valor atual é de ${formatBRL(s.amountDue)}.`;
 }
 
 // Evolução: valor original (+) gratidão acumulada (−) pagamentos (=) valor atual. Barras proporcionais ao saldo bruto.
@@ -55,7 +55,7 @@ function Evolution({ debt }: { debt: MyDebt }) {
   ];
   return (
     <section className="panel p-5">
-      <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-4">Evolução da dívida</p>
+      <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-4">Evolução da ajuda</p>
       <div className="space-y-3">
         {rows.map((r) => (
           <div key={r.label} className="space-y-1">
@@ -153,7 +153,7 @@ function DebtView({ debt }: { debt: MyDebt }) {
       <section className="panel p-6 space-y-5 border-l-2" style={{ borderLeftColor: 'rgb(var(--sonar))' }}>
         <div className="flex items-start justify-between">
           <div>
-            <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-1">{s.settled ? 'Dívida quitada' : 'Valor atual · em aberto'}</p>
+            <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-1">{s.settled ? 'Ajuda quitada' : 'Valor atual · em aberto'}</p>
             <p className={`font-mono text-4xl font-medium tabular-nums tracking-tight ${s.settled ? 'text-status-green' : 'text-text'}`}>
               {formatBRL(s.settled ? '0.00' : s.amountDue)}
             </p>
@@ -229,7 +229,7 @@ export default function MePage() {
       <div className="max-w-md mx-auto space-y-6 animate-rise">
         <header className="space-y-1">
           <p className="font-mono text-[10px] text-muted uppercase tracking-[0.2em]">Pacific</p>
-          <h1 className="font-display text-2xl font-semibold text-text tracking-tight">Sua dívida</h1>
+          <h1 className="font-display text-2xl font-semibold text-text tracking-tight">Sua ajuda</h1>
         </header>
 
         {q.isLoading ? (
@@ -245,13 +245,13 @@ export default function MePage() {
         ) : q.isError ? (
           <ErrorState message="Não foi possível carregar. Abra novamente o link do seu padrinho." />
         ) : !primary ? (
-          <EmptyState glyph="◇" title="Nenhuma dívida registrada." />
+          <EmptyState glyph="◇" title="Nenhuma ajuda registrada." />
         ) : (
           <>
             <DebtView debt={primary} />
             {others.length > 0 && (
               <section className="panel p-5">
-                <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-3">Outras dívidas</p>
+                <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-3">Outras ajudas</p>
                 <ul className="divide-y divide-line/70 -my-2">
                   {others.map((d) => {
                     const sem = semaphore(d.summary.status, d.summary.settled);

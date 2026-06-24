@@ -41,7 +41,7 @@ export function AdminShell({ title, children }: { title: string; children: React
             centro de comando
           </p>
           <span className="font-display text-lg font-semibold text-text tracking-tight">PACIFIC</span>
-          <span className="font-mono text-[10px] text-iris ml-1.5 align-middle">ADMIN</span>
+          <span className="font-mono text-[10px] text-iris ml-1.5 align-middle">COMANDO</span>
         </div>
         <ul className="flex-1 py-4 space-y-0.5 px-2.5">
           {NAV.map((item) => {
@@ -64,13 +64,13 @@ export function AdminShell({ title, children }: { title: string; children: React
           })}
         </ul>
         <div className="px-5 py-4 border-t border-line">
-          <p className="font-mono text-[9px] text-muted/70 uppercase tracking-[0.18em]">acesso global · plataforma</p>
+          <p className="font-mono text-[9px] text-muted/70 uppercase tracking-[0.18em]">plataforma · tempo real</p>
         </div>
       </nav>
 
       {/* Barra mobile: nav rolável por ícones (telas estreitas) */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-20 glass border-b border-line flex items-center gap-3 px-4 h-12">
-        <span className="font-display text-sm font-semibold text-text tracking-tight shrink-0">PACIFIC<span className="font-mono text-[9px] text-iris ml-1 align-middle">ADMIN</span></span>
+        <span className="font-display text-sm font-semibold text-text tracking-tight shrink-0">PACIFIC<span className="font-mono text-[9px] text-iris ml-1 align-middle">COMANDO</span></span>
         <nav aria-label="Navegação do administrador" className="flex gap-0.5 ml-auto overflow-x-auto">
           {NAV.map((item) => {
             const active = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href));
