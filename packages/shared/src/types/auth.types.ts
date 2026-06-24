@@ -1,4 +1,4 @@
-export type UserRole = 'SUPER_ADMIN' | 'CREDITOR' | 'DEBTOR';
+export type UserRole = 'OWNER' | 'SUPER_ADMIN' | 'CREDITOR' | 'DEBTOR';
 export interface AuthUser {
   supabaseId: string;
   email: string;

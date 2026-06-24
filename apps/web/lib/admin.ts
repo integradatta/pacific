@@ -57,6 +57,23 @@ export function useForceLogoutUser() {
   return useMutation({ mutationFn: (id: string) => apiPost<void>(`/admin/users/${id}/force-logout`) });
 }
 
+// ── OWNER (admin supremo) — gestão dos administradores ──
+export function useAdminAdmins() {
+  return useQuery({ queryKey: ['admin', 'admins'], queryFn: () => apiGet<AdminUserRow[]>('/admin/admins') });
+}
+function invalidateAdmins(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: ['admin', 'admins'] });
+  void qc.invalidateQueries({ queryKey: ['admin', 'users'] });
+}
+export function useRevokeAdmin() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => apiPost<void>(`/admin/admins/${id}/revoke`), onSuccess: () => invalidateAdmins(qc) });
+}
+export function usePromoteAdmin() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (id: string) => apiPost<void>(`/admin/admins/${id}/promote`), onSuccess: () => invalidateAdmins(qc) });
+}
+
 export function useAdminAudit() {
   return useQuery({ queryKey: ['admin', 'audit'], queryFn: () => apiGet<AdminAuditEntry[]>('/admin/audit') });
 }

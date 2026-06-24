@@ -10,6 +10,7 @@ datasource db {
 }
 
 enum UserRole {
+  OWNER // admin supremo / proprietário — superconjunto do SUPER_ADMIN (pode revogar admins)
   SUPER_ADMIN
   CREDITOR
   DEBTOR

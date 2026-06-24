@@ -6,7 +6,7 @@ import { AdminShell } from '@/components/admin/AdminShell';
 import { AdminBadge } from '@/components/admin/ui';
 import { useAdminUsers, useRequestPasswordReset, useForceLogoutUser } from '@/lib/admin';
 
-const ROLE_TONE = { SUPER_ADMIN: 'iris', CREDITOR: 'green', DEBTOR: 'muted' } as const;
+const ROLE_TONE = { OWNER: 'iris', SUPER_ADMIN: 'iris', CREDITOR: 'green', DEBTOR: 'muted' } as const;
 const btn = 'font-mono text-[10px] uppercase tracking-widest border rounded px-2.5 py-1 transition-colors disabled:opacity-50';
 
 function Actions({ u }: { u: AdminUserRow }) {

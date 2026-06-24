@@ -3,7 +3,9 @@
 import { type ReactNode, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { LogoutButton } from '@/components/LogoutButton';
+import { apiGet } from '@/lib/api';
 
 const NAV = [
   { href: '/admin', label: 'Visão geral', icon: '◈' },
@@ -19,10 +21,15 @@ const NAV = [
   { href: '/admin/executivo', label: 'Executivo', icon: '◆' },
 ];
 
+const OWNER_ITEM = { href: '/admin/admins', label: 'Admin Supremo', icon: '♛' };
+
 export function AdminShell({ title, children }: { title: string; children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [q, setQ] = useState('');
+  // O item "Admin Supremo" só aparece para o proprietário (OWNER).
+  const me = useQuery({ queryKey: ['auth-me'], queryFn: () => apiGet<{ role: string }>('/auth/me') });
+  const nav = me.data?.role === 'OWNER' ? [...NAV, OWNER_ITEM] : NAV;
 
   function search(e: FormEvent) {
     e.preventDefault();
@@ -44,7 +51,7 @@ export function AdminShell({ title, children }: { title: string; children: React
           <span className="font-mono text-[10px] text-iris ml-1.5 align-middle">COMANDO</span>
         </div>
         <ul className="flex-1 py-4 space-y-0.5 px-2.5">
-          {NAV.map((item) => {
+          {nav.map((item) => {
             const active = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href));
             return (
               <li key={item.href}>
@@ -72,7 +79,7 @@ export function AdminShell({ title, children }: { title: string; children: React
       <div className="md:hidden fixed top-0 left-0 right-0 z-20 glass border-b border-line flex items-center gap-3 px-4 h-12">
         <span className="font-display text-sm font-semibold text-text tracking-tight shrink-0">PACIFIC<span className="font-mono text-[9px] text-iris ml-1 align-middle">COMANDO</span></span>
         <nav aria-label="Navegação do administrador" className="flex gap-0.5 ml-auto overflow-x-auto">
-          {NAV.map((item) => {
+          {nav.map((item) => {
             const active = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href));
             return (
               <Link key={item.href} href={item.href} aria-label={item.label} aria-current={active ? 'page' : undefined}

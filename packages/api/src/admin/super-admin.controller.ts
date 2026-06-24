@@ -115,6 +115,22 @@ export class SuperAdminController {
     return this.admin.requestPasswordReset(actorOf(u), id);
   }
 
+  // ── OWNER (admin supremo) — exclusivo do proprietário ──
+  @Get('admins') @Roles('OWNER')
+  admins(): Promise<AdminUserRow[]> {
+    return this.admin.listAdmins();
+  }
+
+  @Post('admins/:id/revoke') @Roles('OWNER')
+  revokeAdmin(@CurrentUser() u: AuthUser, @Param('id') id: string): Promise<void> {
+    return this.admin.revokeAdmin(actorOf(u), id);
+  }
+
+  @Post('admins/:id/promote') @Roles('OWNER')
+  promoteAdmin(@CurrentUser() u: AuthUser, @Param('id') id: string): Promise<void> {
+    return this.admin.promoteToAdmin(actorOf(u), id);
+  }
+
   @Get('audit') @Roles('SUPER_ADMIN')
   audit(
     @Query('action') action?: string,

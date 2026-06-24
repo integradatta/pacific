@@ -16,10 +16,11 @@ function fakeDb() {
       count: vi.fn(async () => 0),
     },
     user: {
-      findMany: vi.fn(async () => [{ id: 'u1', email: 'c@x.com', role: 'CREDITOR', tenantId: 't1', supabaseId: 'sb-u1', createdAt: new Date('2026-06-02T00:00:00Z') }]),
-      findUnique: vi.fn(async ({ where }: { where: { id: string } }) => (where.id === 'u1' ? { id: 'u1', email: 'c@x.com' } : null)),
+      findMany: vi.fn(async () => [{ id: 'u1', email: 'c@x.com', role: 'SUPER_ADMIN', tenantId: null, supabaseId: 'sb-u1', createdAt: new Date('2026-06-02T00:00:00Z') }]),
+      findUnique: vi.fn(async ({ where }: { where: { id: string } }) => (where.id === 'u1' ? { id: 'u1', email: 'c@x.com', role: 'SUPER_ADMIN', supabaseId: 'sb-u1' } : null)),
       deleteMany: vi.fn(async () => ({ count: 1 })),
       updateMany: vi.fn(async () => ({ count: 1 })),
+      update: vi.fn(async () => ({})),
     },
     adminAuditLog: { create: vi.fn(async () => ({})), findMany: vi.fn(async () => []) },
     debtorAccess: {
@@ -130,6 +131,40 @@ describe('SuperAdminService', () => {
 
   it('tenantOperations devolve a carteira (portfolio)', async () => {
     expect(await svc(fakeDb()).tenantOperations('t1')).toEqual([{ id: 'op1' }]);
+  });
+
+  describe('OWNER — gestão de admins', () => {
+    it('listAdmins filtra OWNER+SUPER_ADMIN', async () => {
+      const db = fakeDb();
+      await svc(db).listAdmins();
+      expect(db.user.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { role: { in: ['OWNER', 'SUPER_ADMIN'] } } }));
+    });
+    it('revokeAdmin rebaixa p/ CREDITOR + revokedAfter + audita', async () => {
+      const db = fakeDb();
+      await svc(db).revokeAdmin(ACTOR, 'u1');
+      expect(db.user.update).toHaveBeenCalledWith({ where: { id: 'u1' }, data: { role: 'CREDITOR', revokedAfter: expect.any(Date) } });
+      expect(db.adminAuditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: 'admin.revoke' }) }));
+    });
+    it('revokeAdmin recusa revogar a si mesmo', async () => {
+      const db = fakeDb();
+      db.user.findUnique = vi.fn(async () => ({ id: 'u1', email: 'c@x.com', role: 'SUPER_ADMIN', supabaseId: 'sa-1' })) as never; // = ACTOR
+      const err = await svc(db).revokeAdmin(ACTOR, 'u1').catch((e) => e);
+      expect((err as HttpException).getStatus()).toBe(400);
+      expect(db.user.update).not.toHaveBeenCalled();
+    });
+    it('revokeAdmin recusa revogar um OWNER', async () => {
+      const db = fakeDb();
+      db.user.findUnique = vi.fn(async () => ({ id: 'u2', email: 'o@x.com', role: 'OWNER', supabaseId: 'sb-o' })) as never;
+      const err = await svc(db).revokeAdmin(ACTOR, 'u2').catch((e) => e);
+      expect((err as HttpException).getStatus()).toBe(400);
+    });
+    it('promoteToAdmin promove CREDITOR → SUPER_ADMIN + audita', async () => {
+      const db = fakeDb();
+      db.user.findUnique = vi.fn(async () => ({ id: 'u3', email: 'c@x.com', role: 'CREDITOR', supabaseId: 'sb-3' })) as never;
+      await svc(db).promoteToAdmin(ACTOR, 'u3');
+      expect(db.user.update).toHaveBeenCalledWith({ where: { id: 'u3' }, data: { role: 'SUPER_ADMIN' } });
+      expect(db.adminAuditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: 'admin.promote' }) }));
+    });
   });
 
   it('forceLogout marca revokedAfter por id do usuário (corte instantâneo) + audita', async () => {

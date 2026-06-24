@@ -237,6 +237,41 @@ export class SuperAdminService {
     await this.audit(actor, 'user.password_reset', 'user', userId, { email: user.email });
   }
 
+  // ── OWNER (admin supremo) — gestão dos administradores ──
+
+  /** OWNER: lista os administradores (OWNER + SUPER_ADMIN). */
+  async listAdmins(): Promise<AdminUserRow[]> {
+    const rows = await this.db.user.findMany({
+      where: { role: { in: ['OWNER', 'SUPER_ADMIN'] } },
+      select: { id: true, email: true, role: true, tenantId: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+    });
+    return rows.map((u) => ({ id: u.id, email: u.email, role: u.role as AdminUserRow['role'], tenantId: u.tenantId, createdAt: u.createdAt.toISOString() }));
+  }
+
+  /**
+   * OWNER: revoga o acesso de um SUPER_ADMIN — rebaixa para CREDITOR (sem carteira → o gate bloqueia)
+   * e derruba as sessões ativas (revokedAfter = agora). Não revoga um OWNER nem a si mesmo. Audita.
+   */
+  async revokeAdmin(actor: Actor, userId: string): Promise<void> {
+    const user = await this.db.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Usuário não encontrado');
+    if (user.supabaseId === actor.supabaseId) throw new BadRequestException('Você não pode revogar o próprio acesso.');
+    if (user.role === 'OWNER') throw new BadRequestException('Não é possível revogar um proprietário.');
+    if (user.role !== 'SUPER_ADMIN') throw new BadRequestException('O usuário não é um administrador.');
+    await this.db.user.update({ where: { id: userId }, data: { role: 'CREDITOR', revokedAfter: new Date() } });
+    await this.audit(actor, 'admin.revoke', 'user', userId, { email: user.email });
+  }
+
+  /** OWNER: promove um usuário a SUPER_ADMIN. Audita. */
+  async promoteToAdmin(actor: Actor, userId: string): Promise<void> {
+    const user = await this.db.user.findUnique({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Usuário não encontrado');
+    if (user.role === 'OWNER' || user.role === 'SUPER_ADMIN') throw new BadRequestException('O usuário já é administrador.');
+    await this.db.user.update({ where: { id: userId }, data: { role: 'SUPER_ADMIN' } });
+    await this.audit(actor, 'admin.promote', 'user', userId, { email: user.email });
+  }
+
   async listUsers(limit?: number, offset?: number): Promise<AdminUserRow[]> {
     const rows = await this.db.user.findMany({
       select: { id: true, email: true, role: true, tenantId: true, createdAt: true },

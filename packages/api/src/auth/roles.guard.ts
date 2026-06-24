@@ -11,7 +11,10 @@ export class RolesGuard implements CanActivate {
     const required = this.reflector.get<UserRole[]>(ROLES_KEY, context.getHandler()) ?? [];
     if (required.length === 0) return true;
     const user = context.switchToHttp().getRequest<RequestWithUser>().user;
-    if (!user || !required.includes(user.role)) throw new ForbiddenException('Papel não autorizado');
+    // OWNER (admin supremo / proprietário) é superconjunto do SUPER_ADMIN: passa em tudo que o
+    // super-admin passa, além dos endpoints exclusivos de OWNER.
+    const ok = !!user && (required.includes(user.role) || (user.role === 'OWNER' && required.includes('SUPER_ADMIN')));
+    if (!ok) throw new ForbiddenException('Papel não autorizado');
     return true;
   }
 }
