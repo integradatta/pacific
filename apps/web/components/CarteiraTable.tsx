@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Decimal } from 'decimal.js';
-import { riskReason, type PortfolioRow } from '@pacific/shared';
+import type { PortfolioRow } from '@pacific/shared';
 import { STATUS_COLOR, STATUS_LABEL } from '@/lib/status';
 import { formatBRL, venceEm } from '@/lib/format';
 import { RiskBadge } from './RiskBadge';
@@ -83,7 +83,7 @@ export function CarteiraTable({ rows }: { rows: PortfolioRow[] }) {
               <td className="px-6 py-3.5 font-mono text-sm text-muted text-right tabular-nums">{r.settled ? '—' : venceEm(r.daysRemaining)}</td>
               <ScoreCell value={r.recoverability} tone="good" />
               <ScoreCell value={r.temperature} tone="urgency" />
-              <td className="px-6 py-3.5" title={riskReason(r)}><RiskBadge recoverability={r.recoverability} compact /></td>
+              <td className="px-6 py-3.5" title={r.riskReason}><RiskBadge recoverability={r.recoverability} compact /></td>
               <td className="px-6 py-3.5">
                 {r.settled ? (
                   <span className="inline-flex items-center gap-2 font-mono text-xs text-status-green">

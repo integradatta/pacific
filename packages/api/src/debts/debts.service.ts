@@ -1,8 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
 import type { Debt, Prisma } from '@pacific/database';
-import { summarize, normalizeTags, balanceAt, type DebtSummary, type DebtRecord, type DebtEvent } from '@pacific/shared';
+import { summarize, normalizeTags, balanceAt, operationPreview, recoverabilityScore, type DebtSummary, type DebtRecord, type DebtEvent, type OperationPreview } from '@pacific/shared';
 import type { PayDebtInput } from './dto/pay-debt.dto.js';
+import type { PreviewDebtDto } from './dto/preview-debt.dto.js';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 import { TrackingService } from '../tracking/tracking.service.js';
 import { generateAccessToken, hashAccessToken } from '../auth/access-token.util.js';
@@ -18,6 +19,18 @@ export class DebtsService {
     private readonly scoped: TenantScopedService,
     private readonly tracking: TrackingService,
   ) {}
+
+  /** Prévia da operação — cálculo proprietário (juros/score) roda AQUI, no servidor (não no client). */
+  preview(input: PreviewDebtDto, now: Date = new Date()): OperationPreview & { recoverability: number } {
+    const terms = {
+      principal: input.principal,
+      rate: input.rate,
+      ratePeriod: input.ratePeriod,
+      startDate: input.startDate ? new Date(input.startDate) : now,
+      dueDate: new Date(input.dueDate),
+    };
+    return { ...operationPreview(terms, now), recoverability: recoverabilityScore(terms, now) };
+  }
 
   /**
    * Cadastro simplificado: cria cliente (devedor) + acesso + operação (dívida) atomicamente.

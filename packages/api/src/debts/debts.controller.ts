@@ -8,6 +8,7 @@ import { TenantId } from '../tenancy/tenant-id.decorator.js';
 import { PaginationQuery, Page } from '../common/pagination.js';
 import { DebtsService } from './debts.service.js';
 import { CreateDebtDto } from './dto/create-debt.dto.js';
+import { PreviewDebtDto } from './dto/preview-debt.dto.js';
 import { CreateQuickDebtDto } from './dto/create-quick-debt.dto.js';
 import { UpdateDebtTagsDto } from './dto/update-debt-tags.dto.js';
 import { PayDebtDto } from './dto/pay-debt.dto.js';
@@ -18,6 +19,12 @@ import type { DebtSummary, DebtRecord, DebtEvent } from '@pacific/shared';
 @UseGuards(new JwtGuard(), PrincipalGuard, TenantGuard, RolesGuard)
 export class DebtsController {
   constructor(private readonly debts: DebtsService) {}
+
+  // Prévia (juros/score) — cálculo no servidor; o client não embarca o motor proprietário.
+  @Post('preview') @Roles('CREDITOR')
+  preview(@Body() dto: PreviewDebtDto) {
+    return this.debts.preview(dto);
+  }
 
   @Post() @Roles('CREDITOR')
   create(@TenantId() tenantId: string, @Body() dto: CreateDebtDto): Promise<Debt> {

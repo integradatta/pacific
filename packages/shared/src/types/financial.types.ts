@@ -62,6 +62,7 @@ export interface PortfolioRow {
   status: DebtStatus;
   recoverability: number;
   temperature: number;
+  riskReason: string; // explicabilidade do risco (computada no servidor; não embarca o motor no client)
   dueDate: string; // ISO
   tags: string[];
 }

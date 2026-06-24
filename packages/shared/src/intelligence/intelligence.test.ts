@@ -29,6 +29,7 @@ function row(p: Partial<PortfolioRow> & { id: string; debtorName: string }): Por
     status: 'GREEN',
     recoverability: 90,
     temperature: 10,
+    riskReason: '',
     dueDate: '2026-08-01T00:00:00.000Z',
     tags: [],
     ...p,

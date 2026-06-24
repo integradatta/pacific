@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { balanceAt, deriveStatus, daysRemaining, outstanding, recoverabilityScore, temperatureScore, riskLevel, portfolioIntelligence, currentWeeklyPoint, portfolioTrend, weeklySummary, DEFAULT_THRESHOLDS, type DashboardKpis, type DebtStatus, type RiskLevel, type PortfolioRow, type PortfolioIntelligence, type HealthState, type WeeklyPoint, type IntelligenceThresholds } from '@pacific/shared';
+import { balanceAt, deriveStatus, daysRemaining, outstanding, recoverabilityScore, temperatureScore, riskLevel, riskReason, portfolioIntelligence, currentWeeklyPoint, portfolioTrend, weeklySummary, DEFAULT_THRESHOLDS, type DashboardKpis, type DebtStatus, type RiskLevel, type PortfolioRow, type PortfolioIntelligence, type HealthState, type WeeklyPoint, type IntelligenceThresholds } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 
 @Injectable()
@@ -80,7 +80,7 @@ export class DashboardService {
       const days = daysRemaining(terms, asOf);
       const balance = balanceAt(terms, asOf);
       const settled = d.settledAt != null;
-      return {
+      const base: PortfolioRow = {
         id: d.id,
         debtorName: d.debtor.name,
         principal: d.principal.toFixed(2),
@@ -93,9 +93,12 @@ export class DashboardService {
         status: deriveStatus(days),
         recoverability: recoverabilityScore(terms, asOf),
         temperature: temperatureScore(terms, asOf),
+        riskReason: '',
         dueDate: d.dueDate.toISOString(),
         tags: d.tags,
       };
+      // Explicabilidade do risco computada no servidor (não embarca o motor no client).
+      return { ...base, riskReason: riskReason(base) };
     });
   }
 
