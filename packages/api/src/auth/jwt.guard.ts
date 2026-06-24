@@ -9,6 +9,7 @@ type Claims = {
   sub?: string;
   email?: unknown;
   iss?: string;
+  iat?: number;
   app_metadata?: { role?: string; tenantId?: string; debtorId?: string };
 };
 
@@ -38,12 +39,13 @@ export class JwtGuard implements CanActivate {
     const payload = await this.verify(token);
     const meta = payload.app_metadata ?? {};
     const role: AuthUser['role'] =
-      meta.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : meta.role === 'DEBTOR' ? 'DEBTOR' : 'CREDITOR';
+      meta.role === 'OWNER' ? 'OWNER' : meta.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : meta.role === 'DEBTOR' ? 'DEBTOR' : 'CREDITOR';
     req.user = {
       supabaseId: String(payload.sub ?? ''),
       email: String(payload.email ?? ''),
       role,
       tenantId: role === 'SUPER_ADMIN' ? null : (meta.tenantId ?? null),
+      ...(typeof payload.iat === 'number' ? { tokenIssuedAt: payload.iat } : {}),
       ...(role === 'DEBTOR' ? { debtorId: meta.debtorId ?? String(payload.sub ?? '') } : {}),
     };
     return true;

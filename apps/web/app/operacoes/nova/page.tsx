@@ -1,13 +1,23 @@
 'use client';
 
-import { useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { Shell } from '@/components/Shell';
 import { apiPost } from '@/lib/api';
-import { operationPreview, recoverabilityScore } from '@pacific/shared';
 import { formatBRL, venceEm } from '@/lib/format';
 import { RiskBadge } from '@/components/RiskBadge';
 import { TagInput } from '@/components/Tags';
+
+// Resultado da prévia — calculado no SERVIDOR (o motor proprietário não vai no bundle do client).
+interface PreviewResult {
+  finalValue: string;
+  totalInterest: string;
+  profitabilityPct: number;
+  expectedReturn: string;
+  daysRemaining: number;
+  recoverability: number;
+}
 
 const inputClass =
   'w-full bg-surface2 border border-line rounded-lg px-3.5 py-2.5 text-text font-sans text-sm placeholder:text-muted focus:outline-none focus:border-sonar focus:shadow-glow transition-all';
@@ -32,30 +42,28 @@ export default function NovaOperacaoPage() {
     return Number.isFinite(n) ? String(n / 100) : '0';
   }, [ratePct]);
 
-  // Termos válidos (ou null) — base do cálculo em tempo real (motor puro, no navegador).
-  const terms = useMemo(() => {
+  // Entrada da prévia (válida ou null). O cálculo roda no SERVIDOR (POST /debts/preview).
+  const previewInput = useMemo(() => {
     const p = Number(principal);
     if (!principal || !dueDate || !Number.isFinite(p) || p <= 0) return null;
-    return { principal: String(p), rate: rateFraction, ratePeriod, startDate: new Date(), dueDate: new Date(dueDate) };
+    return { principal: String(p), rate: rateFraction, ratePeriod, dueDate: new Date(dueDate).toISOString() };
   }, [principal, dueDate, rateFraction, ratePeriod]);
 
-  const preview = useMemo(() => {
-    if (!terms) return null;
-    try {
-      return operationPreview(terms);
-    } catch {
-      return null;
-    }
-  }, [terms]);
+  // Debounce — não chama a API a cada tecla.
+  const [debounced, setDebounced] = useState<typeof previewInput>(null);
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(previewInput), 400);
+    return () => clearTimeout(t);
+  }, [previewInput]);
 
-  const recoverability = useMemo(() => {
-    if (!terms) return null;
-    try {
-      return recoverabilityScore(terms, new Date());
-    } catch {
-      return null;
-    }
-  }, [terms]);
+  const previewQuery = useQuery({
+    queryKey: ['debt-preview', debounced],
+    enabled: !!debounced,
+    queryFn: () => apiPost<PreviewResult>('/debts/preview', debounced),
+    staleTime: 60_000,
+  });
+  const preview = previewQuery.data ?? null;
+  const recoverability = preview?.recoverability ?? null;
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
@@ -78,7 +86,7 @@ export default function NovaOperacaoPage() {
   }
 
   return (
-    <Shell title="Nova Operação">
+    <Shell title="Nova Ajuda">
       <div className="grid gap-6 md:grid-cols-2 max-w-4xl">
         {/* Formulário */}
         <form onSubmit={handleSubmit} className="panel p-6 space-y-4" noValidate>
@@ -93,7 +101,7 @@ export default function NovaOperacaoPage() {
           </div>
 
           <div className="space-y-1">
-            <label htmlFor="ratePct" className={labelClass}>Taxa de juros (%)</label>
+            <label htmlFor="ratePct" className={labelClass}>Taxa de gratidão (%)</label>
             <div className="flex gap-2">
               <input id="ratePct" type="number" inputMode="decimal" min="0" step="0.01" required value={ratePct} onChange={(e) => setRatePct(e.target.value)} placeholder="Ex.: 5" className={inputClass} />
               <div className="flex rounded-lg border border-line overflow-hidden shrink-0" role="group" aria-label="Período da taxa">
@@ -147,7 +155,7 @@ export default function NovaOperacaoPage() {
           ) : (
             <dl className="space-y-3">
               <PreviewRow label="Valor final" value={formatBRL(preview.finalValue)} strong />
-              <PreviewRow label="Juros totais" value={formatBRL(preview.totalInterest)} />
+              <PreviewRow label="Gratidão total" value={formatBRL(preview.totalInterest)} />
               <PreviewRow label="Rentabilidade" value={`${preview.profitabilityPct.toLocaleString('pt-BR')}%`} accent />
               <PreviewRow label="Retorno esperado" value={formatBRL(preview.expectedReturn)} />
               <PreviewRow label="Dias restantes" value={venceEm(preview.daysRemaining)} />

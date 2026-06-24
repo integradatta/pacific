@@ -4,6 +4,7 @@ import { type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useNotifications } from '@/lib/notifications';
+import { LogoutButton } from '@/components/LogoutButton';
 
 interface NavItem {
   href: string;
@@ -13,11 +14,12 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard', label: 'Torre de Controle', icon: '⊕' },
-  { href: '/operacoes/nova', label: 'Nova Operação', icon: '✦' },
-  { href: '/devedores', label: 'Devedores', icon: '◍' },
+  { href: '/operacoes/nova', label: 'Nova Ajuda', icon: '✦' },
+  { href: '/devedores', label: 'Sobrinhos', icon: '◍' },
   { href: '/carteira', label: 'Carteira', icon: '◈' },
   { href: '/vencimentos', label: 'Vencimentos', icon: '◷' },
   { href: '/notificacoes', label: 'Notificações', icon: '◎' },
+  { href: '/configuracoes', label: 'Configurações', icon: '⚙' },
 ];
 
 interface ShellProps {
@@ -137,6 +139,7 @@ export function Shell({ title, orgCode = 'ORG-000', children }: ShellProps) {
             >
               ◉
             </div>
+            <LogoutButton />
           </div>
         </header>
 

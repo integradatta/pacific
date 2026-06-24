@@ -10,6 +10,7 @@ datasource db {
 }
 
 enum UserRole {
+  OWNER // admin supremo / proprietário — superconjunto do SUPER_ADMIN (pode revogar admins)
   SUPER_ADMIN
   CREDITOR
   DEBTOR
@@ -18,6 +19,12 @@ enum UserRole {
 enum TenantStatus {
   ACTIVE
   SUSPENDED
+}
+
+enum TenantApproval {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum DebtStatus {
@@ -32,23 +39,80 @@ enum RatePeriod {
   ANNUAL
 }
 
+enum PlatformEventType {
+  LOGIN
+  LOGOUT
+  LOGIN_FAILED
+  LINK_USED
+  LINK_CREATED
+  LINK_ROTATED
+  ACCESS_REVOKED
+  ACCESS_REACTIVATED
+  OPERATION_CREATED
+  OPERATION_UPDATED
+  OPERATION_PAID
+  CLIENT_CREATED
+  TENANT_APPROVED
+  TENANT_SUSPENDED
+  ERROR
+  IMPORTANT
+}
+
 enum NotificationType {
   DUE_SOON // legado (mantido p/ registros antigos); a geração agora usa as réguas abaixo
   DUE_15
   DUE_7
   DUE_3
+  DUE_1
   DUE_TODAY
   OVERDUE
 }
 
 model Tenant {
-  id        String       @id @default(uuid())
+  id        String         @id @default(uuid())
   name      String
-  orgCode   String       @unique
-  status    TenantStatus @default(ACTIVE)
-  createdAt DateTime     @default(now())
+  orgCode   String         @unique
+  status    TenantStatus   @default(ACTIVE)
+  // Gate de aprovação pelo super-admin. Tenants antigos = APPROVED (default, não quebram);
+  // novos credores entram PENDING e só operam após aprovação.
+  approval  TenantApproval @default(APPROVED)
+  createdAt DateTime       @default(now())
   users     User[]
   debtors   Debtor[]
+}
+
+// Log unificado de eventos da plataforma (login/logout, uso de links, operações, clientes,
+// revogações, eventos importantes). Append-only, GLOBAL (sem RLS) — o super-admin lê cross-tenant
+// e filtra por tenantId/tipo/data. tenantId nulo = evento de plataforma (super-admin/sistema).
+model PlatformEvent {
+  id         String            @id @default(uuid())
+  tenantId   String?
+  actorType  String // CREDITOR | DEBTOR | SUPER_ADMIN | SYSTEM
+  actorId    String?
+  type       PlatformEventType
+  targetType String?
+  targetId   String?
+  detail     Json?
+  ip         String?
+  at         DateTime          @default(now())
+
+  @@index([at])
+  @@index([tenantId, at])
+  @@index([type, at])
+}
+
+// Auditoria das ações do super-admin (aprovar/suspender/etc.). Append-only. Sem RLS (global).
+model AdminAuditLog {
+  id              String   @id @default(uuid())
+  actorSupabaseId String
+  actorEmail      String?
+  action          String
+  targetType      String
+  targetId        String
+  detail          Json?
+  createdAt       DateTime @default(now())
+
+  @@index([createdAt])
 }
 
 model User {
@@ -59,6 +123,8 @@ model User {
   tenantId   String?
   tenant     Tenant?  @relation(fields: [tenantId], references: [id])
   debtor     Debtor?
+  // Force-logout instantâneo: tokens emitidos ANTES deste instante são rejeitados (denylist).
+  revokedAfter DateTime?
   createdAt  DateTime @default(now())
 
   @@index([tenantId])
@@ -113,6 +179,8 @@ model Debt {
 
   @@index([tenantId])
   @@index([debtorId])
+  // Carteira ordena por vencimento dentro do tenant (dashboard/portfolio) — escala com o volume.
+  @@index([tenantId, dueDate])
 }
 
 model Notification {
@@ -128,6 +196,22 @@ model Notification {
 
   @@unique([debtId, type])
   @@index([tenantId])
+  // Listagem de notificações ordena por data dentro do tenant.
+  @@index([tenantId, createdAt])
+}
+
+// Token de push do dispositivo do sobrinho (app nativo). O envio em si (FCM) é externo/manual;
+// aqui só registramos o token p/ quando a entrega for ligada. Global (filtrado por debtor).
+model DeviceToken {
+  id         String   @id @default(uuid())
+  tenantId   String
+  debtorId   String
+  token      String   @unique
+  platform   String // ios | android | web
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  @@index([tenantId, debtorId])
 }
 
 model DebtorAccess {
@@ -153,4 +237,39 @@ model DebtorLoginEvent {
 
   @@index([tenantId])
   @@index([debtorId, at])
+}
+
+// Estatísticas materializadas por tenant — agregados caros (computados a partir de Debt sob RLS)
+// pré-calculados por um job diário. O overview do super-admin LÊ daqui (1 linha por tenant) em vez
+// de varrer todas as dívidas de todos os credores a cada acesso → escala p/ milhares de credores.
+// Tolerância de até ~24h de defasagem no overview (aceitável; o dashboard do credor é sempre vivo).
+model TenantStats {
+  tenantId        String   @id
+  opsTotal        Int      @default(0)
+  opsActive       Int      @default(0)
+  opsOverdue      Int      @default(0)
+  totalLent       Decimal  @default(0) @db.Decimal(14, 2)
+  totalReceivable Decimal  @default(0) @db.Decimal(14, 2)
+  totalReceived   Decimal  @default(0) @db.Decimal(14, 2)
+  loginsToday     Int      @default(0)
+  refreshedAt     DateTime @default(now())
+}
+
+// Snapshot SEMANAL da saúde da carteira (in-app; sem envio externo). Um por (tenant, semana),
+// gravado de forma oportunista quando o credor abre a inteligência. Alimenta a tendência de
+// risco (📈➖📉), o histórico visual e o "resumo da semana". Global (filtrado por tenantId).
+model PortfolioSnapshot {
+  id             String   @id @default(uuid())
+  tenantId       String
+  weekStart      DateTime // segunda-feira (UTC) da semana ISO
+  healthScore    Int
+  state          String // HEALTHY | ATTENTION | CRITICAL
+  receivable     Decimal  @db.Decimal(14, 2)
+  overdue        Decimal  @db.Decimal(14, 2)
+  expectedProfit Decimal  @db.Decimal(14, 2)
+  opsActive      Int
+  capturedAt     DateTime @default(now())
+
+  @@unique([tenantId, weekStart])
+  @@index([tenantId, weekStart])
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { DebtsService } from './debts.service.js';
+import { TrackingService } from '../tracking/tracking.service.js';
 import { NotFoundException } from '@nestjs/common';
 
 const dec = (v: string) => ({ toString: () => v });
@@ -33,6 +34,7 @@ function fakeDb() {
     },
     debtorAccess: { create: vi.fn(async () => ({})), findFirst: vi.fn(async () => null) },
     debtorLoginEvent: { findMany: vi.fn(async () => []) },
+    platformEvent: { create: vi.fn(async () => ({})), findMany: vi.fn(async () => []) },
     notification: { findMany: vi.fn(async () => []), deleteMany: vi.fn(async () => ({ count: 0 })) },
     debt: {
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'debt1', ...data })),
@@ -45,8 +47,9 @@ function fakeDb() {
   };
 }
 // withTenant executa o callback com o db fake como "tx" (a transação real só roda em runtime).
+const tracking = new TrackingService({ raw: () => ({}) } as never);
 const svc = (db: ReturnType<typeof fakeDb>) =>
-  new DebtsService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db) } as never);
+  new DebtsService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db) } as never, tracking);
 const base = { principal: '1000.00', rate: '0.030000', ratePeriod: 'MONTHLY' as const, startDate: '2026-05-01T00:00:00Z', dueDate: '2026-07-01T00:00:00Z' };
 
 describe('DebtsService', () => {
@@ -129,6 +132,16 @@ describe('DebtsService', () => {
       db.debt.findFirst = vi.fn(async () => debtRow({ settledAt: new Date('2026-06-15T00:00:00Z') })) as never;
       const events = await svc(db).history('t1', 'debt1', new Date('2026-06-20T00:00:00Z'));
       expect(events.some((e) => e.kind === 'paid' && e.title === 'Operação quitada')).toBe(true);
+    });
+    it('inclui alterações e pagamentos (parciais) registrados pelo tracking', async () => {
+      const db = fakeDb();
+      db.platformEvent.findMany = vi.fn(async () => [
+        { type: 'OPERATION_UPDATED', at: new Date('2026-05-20T00:00:00Z'), detail: { field: 'tags' } },
+        { type: 'OPERATION_PAID', at: new Date('2026-05-25T00:00:00Z'), detail: { paidAmount: '500.00', settled: false } },
+      ]) as never;
+      const events = await svc(db).history('t1', 'debt1', new Date('2026-06-01T00:00:00Z'));
+      expect(events.some((e) => e.kind === 'updated' && e.title === 'Etiquetas atualizadas')).toBe(true);
+      expect(events.some((e) => e.kind === 'paid' && e.title === 'Pagamento registrado' && e.detail === 'Pagamento de R$ 500.00')).toBe(true);
     });
     it('filtra notificações e acessos por tenant + dívida/devedor', async () => {
       const db = fakeDb();

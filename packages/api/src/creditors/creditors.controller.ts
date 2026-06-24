@@ -2,6 +2,7 @@ import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { CreditorsService } from './creditors.service.js';
 import { RegisterCreditorDto } from './dto/register-creditor.dto.js';
 import { JwtGuard } from '../auth/jwt.guard.js';
+import { IpRateLimitGuard } from '../auth/ip-rate-limit.guard.js';
 import { PrincipalGuard } from '../auth/principal.guard.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import type { AuthUser } from '@pacific/shared';
@@ -11,6 +12,7 @@ export interface MeResponse {
   email: string;
   role: AuthUser['role'];
   tenantId: string | null; // null = autenticado mas ainda sem carteira (precisa concluir o cadastro)
+  approved: boolean; // credor com tenant aprovado E ativo (super-admin/devedor: sempre true)
 }
 
 @Controller('auth')
@@ -19,7 +21,7 @@ export class CreditorsController {
 
   // Exige sessão Supabase válida; identidade derivada do JWT (não do body).
   @Post('register-creditor')
-  @UseGuards(new JwtGuard())
+  @UseGuards(new IpRateLimitGuard(), new JwtGuard())
   register(
     @CurrentUser() user: AuthUser,
     @Body() dto: RegisterCreditorDto,
@@ -32,6 +34,6 @@ export class CreditorsController {
   @Get('me')
   @UseGuards(new JwtGuard(), PrincipalGuard)
   me(@CurrentUser() user: AuthUser): MeResponse {
-    return { supabaseId: user.supabaseId, email: user.email, role: user.role, tenantId: user.tenantId };
+    return { supabaseId: user.supabaseId, email: user.email, role: user.role, tenantId: user.tenantId, approved: user.tenantApproved ?? true };
   }
 }

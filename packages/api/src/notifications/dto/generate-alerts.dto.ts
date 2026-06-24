@@ -1,7 +1,7 @@
 import { IsArray, IsIn, IsOptional } from 'class-validator';
 
 // Réguas de alerta automático (mais próximas do vencimento primeiro).
-export const ALERT_TYPES = ['DUE_15', 'DUE_7', 'DUE_3', 'DUE_TODAY', 'OVERDUE'] as const;
+export const ALERT_TYPES = ['DUE_15', 'DUE_7', 'DUE_3', 'DUE_1', 'DUE_TODAY', 'OVERDUE'] as const;
 export type AlertType = (typeof ALERT_TYPES)[number];
 
 export class GenerateAlertsDto {

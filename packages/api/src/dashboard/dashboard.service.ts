@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { balanceAt, deriveStatus, daysRemaining, outstanding, recoverabilityScore, temperatureScore, riskLevel, type DashboardKpis, type DebtStatus, type RiskLevel, type PortfolioRow } from '@pacific/shared';
+import { balanceAt, deriveStatus, daysRemaining, outstanding, recoverabilityScore, temperatureScore, riskLevel, riskReason, portfolioIntelligence, currentWeeklyPoint, portfolioTrend, weeklySummary, DEFAULT_THRESHOLDS, type DashboardKpis, type DebtStatus, type RiskLevel, type PortfolioRow, type PortfolioIntelligence, type HealthState, type WeeklyPoint, type IntelligenceThresholds } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 
 @Injectable()
@@ -80,21 +80,67 @@ export class DashboardService {
       const days = daysRemaining(terms, asOf);
       const balance = balanceAt(terms, asOf);
       const settled = d.settledAt != null;
-      return {
+      const base: PortfolioRow = {
         id: d.id,
         debtorName: d.debtor.name,
         principal: d.principal.toFixed(2),
         balance,
         amountDue: outstanding(balance, d.paidAmount.toString(), settled),
         paidAmount: d.paidAmount.toFixed(2),
+        expectedReturn: balanceAt(terms, terms.dueDate), // valor final no vencimento (p/ lucro projetado)
         settled,
         daysRemaining: days,
         status: deriveStatus(days),
         recoverability: recoverabilityScore(terms, asOf),
         temperature: temperatureScore(terms, asOf),
+        riskReason: '',
         dueDate: d.dueDate.toISOString(),
         tags: d.tags,
       };
+      // Explicabilidade do risco computada no servidor (não embarca o motor no client).
+      return { ...base, riskReason: riskReason(base) };
     });
+  }
+
+  /**
+   * Camada de inteligência da carteira (saúde, resumo, insights, concentração, rankings, ações).
+   * Tudo DERIVADO da carteira (reusa `portfolio`); nenhuma infra/envio externo. In-app/assistivo.
+   */
+  async intelligence(tenantId: string, asOf: Date = new Date(), thresholds: IntelligenceThresholds = DEFAULT_THRESHOLDS): Promise<PortfolioIntelligence> {
+    const rows = await this.portfolio(tenantId, asOf);
+    const intel = portfolioIntelligence(rows, thresholds);
+    const points = await this.weeklyHistory(tenantId, currentWeeklyPoint(rows, asOf, thresholds));
+    return { ...intel, trend: portfolioTrend(points), weeklySummary: weeklySummary(points) };
+  }
+
+  /**
+   * Persiste o snapshot da semana atual (idempotente por tenant+semana; best-effort, nunca quebra
+   * o dashboard) e devolve as últimas ~6 semanas. In-app — nenhum envio externo.
+   */
+  private async weeklyHistory(tenantId: string, point: WeeklyPoint): Promise<WeeklyPoint[]> {
+    const db = this.scoped.raw();
+    const weekStart = new Date(point.weekStart);
+    const data = { healthScore: point.healthScore, state: point.state, receivable: point.receivable, overdue: point.overdue, expectedProfit: point.expectedProfit, opsActive: point.opsActive };
+    try {
+      await db.portfolioSnapshot.upsert({
+        where: { tenantId_weekStart: { tenantId, weekStart } },
+        create: { tenantId, weekStart, ...data },
+        update: { ...data, capturedAt: new Date() },
+      });
+    } catch {
+      /* best-effort */
+    }
+    const rows = await db.portfolioSnapshot
+      .findMany({ where: { tenantId }, orderBy: { weekStart: 'desc' }, take: 6 })
+      .catch(() => [] as Awaited<ReturnType<typeof db.portfolioSnapshot.findMany>>);
+    return rows.map((s) => ({
+      weekStart: s.weekStart.toISOString(),
+      healthScore: s.healthScore,
+      state: s.state as HealthState,
+      receivable: s.receivable.toString(),
+      overdue: s.overdue.toString(),
+      expectedProfit: s.expectedProfit.toString(),
+      opsActive: s.opsActive,
+    }));
   }
 }

@@ -9,6 +9,7 @@ import { ALERT_TYPES, type AlertType } from './dto/generate-alerts.dto.js';
 function milestoneFor(days: number): AlertType | null {
   if (days < 0) return 'OVERDUE';
   if (days === 0) return 'DUE_TODAY';
+  if (days === 1) return 'DUE_1';
   if (days <= 3) return 'DUE_3';
   if (days <= 7) return 'DUE_7';
   if (days <= 15) return 'DUE_15';
@@ -19,6 +20,7 @@ const ALERT_TITLE: Record<AlertType, string> = {
   DUE_15: 'Vence em 15 dias',
   DUE_7: 'Vence em 7 dias',
   DUE_3: 'Vence em 3 dias',
+  DUE_1: 'Vence amanhã',
   DUE_TODAY: 'Vence hoje',
   OVERDUE: 'Dívida vencida',
 };
@@ -26,6 +28,7 @@ const ALERT_TITLE: Record<AlertType, string> = {
 function alertBody(type: AlertType, days: number): string {
   if (type === 'OVERDUE') return `A dívida venceu há ${Math.abs(days)} dia(s).`;
   if (type === 'DUE_TODAY') return 'A dívida vence hoje.';
+  if (type === 'DUE_1') return 'A dívida vence amanhã.';
   return `A dívida vence em ${days} dia(s).`;
 }
 

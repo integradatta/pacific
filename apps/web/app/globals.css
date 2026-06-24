@@ -14,7 +14,8 @@
   --text: 233 237 245;
   --text-dim: 155 166 188; /* secundário */
   --muted: 107 119 144; /* rótulos / dados frios */
-  --sonar: 43 229 194; /* acento */
+  --sonar: 43 229 194; /* acento (credor / vivo) */
+  --iris: 124 108 245; /* acento de autoridade (super-admin) */
   --green: 54 179 126;
   --yellow: 229 192 75;
   --orange: 240 138 60;
@@ -100,5 +101,15 @@ body {
   *::after {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* Exportação executiva: ao imprimir/salvar PDF, mostra só o relatório (claro). */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff !important;
   }
 }

@@ -4,7 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { apiGet } from '@/lib/api';
+import { apiGet, apiPost } from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,6 +22,8 @@ export default function LoginPage() {
 
     if (authError) {
       setError('Não foi possível entrar. Verifique e-mail e senha.');
+      // Reporta a tentativa falha p/ o monitoramento do super-admin (endpoint público, best-effort).
+      void apiPost('/public/events/login-failed', { email }).catch(() => undefined);
       setLoading(false);
       return;
     }
@@ -29,8 +31,12 @@ export default function LoginPage() {
     // Conta autenticada mas sem carteira (tenant) -> conclui o cadastro; senão, dashboard.
     // Isso resolve o "loga mas não acessa": sem tenant, todo endpoint protegido dá 403.
     try {
-      const me = await apiGet<{ tenantId: string | null }>('/auth/me');
-      router.push(me.tenantId ? '/dashboard' : '/register');
+      const me = await apiGet<{ role: string; tenantId: string | null; approved: boolean }>('/auth/me');
+      void apiPost('/events/session', { type: 'login' }).catch(() => undefined); // tracking (best-effort)
+      if (me.role === 'SUPER_ADMIN') router.push('/admin');
+      else if (!me.tenantId) router.push('/register');
+      else if (!me.approved) router.push('/pendente');
+      else router.push('/dashboard');
     } catch {
       router.push('/dashboard');
     }

@@ -26,7 +26,8 @@ export class CreditorsService {
     // Transacional: evita tenant órfão se o user.create falhar (ex.: supabaseId duplicado).
     try {
       return await db.$transaction(async (tx) => {
-        const tenant = await tx.tenant.create({ data: { name: input.orgName, orgCode } });
+        // Novo credor entra PENDING — opera só após aprovação do super-admin.
+        const tenant = await tx.tenant.create({ data: { name: input.orgName, orgCode, approval: 'PENDING' } });
         await tx.user.create({
           data: { supabaseId: input.supabaseId, email: input.email, role: 'CREDITOR', tenantId: tenant.id },
         });

@@ -1,9 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
 import type { Debt, Prisma } from '@pacific/database';
-import { summarize, normalizeTags, balanceAt, type DebtSummary, type DebtRecord, type DebtEvent } from '@pacific/shared';
+import { summarize, normalizeTags, balanceAt, operationPreview, recoverabilityScore, type DebtSummary, type DebtRecord, type DebtEvent, type OperationPreview } from '@pacific/shared';
 import type { PayDebtInput } from './dto/pay-debt.dto.js';
+import type { PreviewDebtDto } from './dto/preview-debt.dto.js';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
+import { TrackingService } from '../tracking/tracking.service.js';
 import { generateAccessToken, hashAccessToken } from '../auth/access-token.util.js';
 import type { Page } from '../common/pagination.js';
 import type { CreateDebtInput } from './dto/create-debt.dto.js';
@@ -13,7 +15,22 @@ type DebtWithDebtor = Debt & { debtor: { name: string } };
 
 @Injectable()
 export class DebtsService {
-  constructor(private readonly scoped: TenantScopedService) {}
+  constructor(
+    private readonly scoped: TenantScopedService,
+    private readonly tracking: TrackingService,
+  ) {}
+
+  /** Prévia da operação — cálculo proprietário (juros/score) roda AQUI, no servidor (não no client). */
+  preview(input: PreviewDebtDto, now: Date = new Date()): OperationPreview & { recoverability: number } {
+    const terms = {
+      principal: input.principal,
+      rate: input.rate,
+      ratePeriod: input.ratePeriod,
+      startDate: input.startDate ? new Date(input.startDate) : now,
+      dueDate: new Date(input.dueDate),
+    };
+    return { ...operationPreview(terms, now), recoverability: recoverabilityScore(terms, now) };
+  }
 
   /**
    * Cadastro simplificado: cria cliente (devedor) + acesso + operação (dívida) atomicamente.
@@ -38,6 +55,8 @@ export class DebtsService {
           dueDate: new Date(input.dueDate),
         },
       });
+      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'CLIENT_CREATED', targetType: 'debtor', targetId: debtor.id, detail: { name: input.clientName } });
+      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'OPERATION_CREATED', targetType: 'debt', targetId: debt.id });
       return { debtorId: debtor.id, debtId: debt.id };
     });
   }
@@ -45,8 +64,8 @@ export class DebtsService {
   async create(tenantId: string, input: CreateDebtInput): Promise<Debt> {
     return this.scoped.withTenant(tenantId, async (tx) => {
       const debtor = await tx.debtor.findFirst({ where: { id: input.debtorId, tenantId } });
-      if (!debtor) throw new NotFoundException('Devedor não encontrado neste tenant');
-      return tx.debt.create({
+      if (!debtor) throw new NotFoundException('Sobrinho não encontrado neste tenant');
+      const debt = await tx.debt.create({
         data: {
           tenantId,
           debtorId: input.debtorId,
@@ -60,6 +79,8 @@ export class DebtsService {
           dueDate: new Date(input.dueDate),
         },
       });
+      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'OPERATION_CREATED', targetType: 'debt', targetId: debt.id });
+      return debt;
     });
   }
 
@@ -83,6 +104,7 @@ export class DebtsService {
     return this.scoped.withTenant(tenantId, async (tx) => {
       await this.findOne(tx, tenantId, id); // garante existência + paridade de tenant
       await tx.debt.update({ where: { id }, data: { tags: normalizeTags(tags) } });
+      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'OPERATION_UPDATED', targetType: 'debt', targetId: id, detail: { field: 'tags' } });
       return this.toRecord(await this.findOne(tx, tenantId, id));
     });
   }
@@ -136,6 +158,7 @@ export class DebtsService {
       await tx.debt.update({ where: { id }, data: { paidAmount: paid.toFixed(2), settledAt } });
       // Cancela alertas pendentes (não lidos) desta dívida.
       await tx.notification.deleteMany({ where: { tenantId, debtId: id, readAt: null } });
+      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'OPERATION_PAID', targetType: 'debt', targetId: id, detail: { paidAmount: paid.toFixed(2), settled: settledAt != null } });
 
       return this.toRecord(await this.findOne(tx, tenantId, id));
     });
@@ -149,11 +172,16 @@ export class DebtsService {
   async history(tenantId: string, id: string, now: Date = new Date()): Promise<DebtEvent[]> {
     return this.scoped.withTenant(tenantId, async (tx) => {
       const debt = await this.findOne(tx, tenantId, id);
-      const [notifications, access, logins] = await Promise.all([
+      const [notifications, access, logins, changes] = await Promise.all([
         tx.notification.findMany({ where: { tenantId, debtId: id }, orderBy: { createdAt: 'asc' } }),
         tx.debtorAccess.findFirst({ where: { tenantId, debtorId: debt.debtorId } }),
         tx.debtorLoginEvent.findMany({
           where: { tenantId, debtorId: debt.debtorId, success: true },
+          orderBy: { at: 'asc' },
+        }),
+        // Alterações e pagamentos da operação registrados pela camada de tracking (inclui parciais).
+        tx.platformEvent.findMany({
+          where: { tenantId, targetType: 'debt', targetId: id, type: { in: ['OPERATION_UPDATED', 'OPERATION_PAID'] } },
           orderBy: { at: 'asc' },
         }),
       ]);
@@ -168,15 +196,32 @@ export class DebtsService {
         }
       }
       for (const l of logins) {
-        events.push({ at: l.at.toISOString(), kind: 'login', title: 'Devedor acessou o portal' });
+        events.push({ at: l.at.toISOString(), kind: 'login', title: 'Sobrinho acessou o portal' });
       }
       for (const n of notifications) {
         events.push({ at: n.createdAt.toISOString(), kind: 'notification', title: n.title, detail: n.body });
       }
+      // Alterações/pagamentos do tracking (timeline de mudanças, inclui pagamentos parciais).
+      let trackedSettlement = false;
+      for (const c of changes) {
+        const d = (c.detail ?? {}) as { field?: string; paidAmount?: string; settled?: boolean };
+        if (c.type === 'OPERATION_UPDATED') {
+          events.push({ at: c.at.toISOString(), kind: 'updated', title: d.field === 'tags' ? 'Etiquetas atualizadas' : 'Operação alterada' });
+        } else {
+          if (d.settled) trackedSettlement = true;
+          events.push({
+            at: c.at.toISOString(),
+            kind: 'paid',
+            title: d.settled ? 'Operação quitada' : 'Pagamento registrado',
+            detail: d.paidAmount ? `Pagamento de R$ ${d.paidAmount}` : undefined,
+          });
+        }
+      }
       if (debt.dueDate.getTime() < now.getTime()) {
         events.push({ at: debt.dueDate.toISOString(), kind: 'due', title: 'Operação venceu' });
       }
-      if (debt.settledAt) {
+      // Quitação derivada só se o tracking ainda não registrou (operações antigas, pré-tracking).
+      if (debt.settledAt && !trackedSettlement) {
         events.push({ at: debt.settledAt.toISOString(), kind: 'paid', title: 'Operação quitada' });
       }
 

@@ -9,8 +9,9 @@ function pfDebt(id: string, name: string, dueDate: Date, rate = '0', principal =
 function pfDb(debts: ReturnType<typeof pfDebt>[]) {
   return { debt: { findMany: vi.fn(async () => debts) } };
 }
+const snapStore = () => ({ portfolioSnapshot: { upsert: vi.fn(async () => ({})), findMany: vi.fn(async () => []) } });
 const svc = (db: ReturnType<typeof pfDb>) =>
-  new DashboardService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db) } as never);
+  new DashboardService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db), raw: () => snapStore() } as never);
 
 describe('DashboardService.portfolio', () => {
   it('mapeia dívidas para linhas com status/dias/saldo + nome do devedor', async () => {
@@ -37,5 +38,17 @@ describe('DashboardService.portfolio', () => {
     const rows = await svc(db).portfolio('t1', new Date('2026-02-01T00:00:00Z'));
     expect(rows[0]).toMatchObject({ id: 'p', amountDue: '600.00', paidAmount: '400.00', settled: false });
     expect(rows[1]).toMatchObject({ id: 'q', amountDue: '0.00', settled: true });
+  });
+
+  it('intelligence() compõe saúde/resumo/cliente-chave a partir da carteira', async () => {
+    const db = pfDb([
+      pfDebt('a', 'Ana Souza', new Date('2026-01-20T00:00:00Z'), '0.05', '5000.00'), // vencida
+      pfDebt('b', 'Bruno Lima', new Date('2026-06-01T00:00:00Z'), '0.05', '2000.00'),
+    ]);
+    const intel = await svc(db).intelligence('t1', new Date('2026-02-01T00:00:00Z'));
+    expect(intel.summary).toContain('operações ativas');
+    expect(['HEALTHY', 'ATTENTION', 'CRITICAL']).toContain(intel.health.state);
+    expect(intel.topClient?.name).toBe('Ana Souza'); // maior exposição
+    expect(intel.actionItems[0]?.kind).toBe('overdue'); // vencida no topo
   });
 });

@@ -1,18 +1,21 @@
 import { describe, it, expect, vi } from 'vitest';
 import { DebtorExchangeService } from './debtor-exchange.service.js';
+import { TrackingService } from '../tracking/tracking.service.js';
 import { UnauthorizedException } from '@nestjs/common';
 
-function deps(access: { debtorId: string; tenantId: string; active: boolean } | null) {
+function deps(access: { id?: string; debtorId: string; tenantId: string; active: boolean } | null) {
   const tx = {
     debtorAccess: { updateMany: vi.fn(async () => ({ count: 1 })) },
     debtorLoginEvent: { create: vi.fn(async () => ({ id: 'e1' })) },
+    platformEvent: { create: vi.fn(async () => ({})) },
   };
   const scoped = {
     raw: () => ({ debtorAccess: { findUnique: vi.fn(async () => access) } }),
     withTenant: async (_t: string, fn: (t: typeof tx) => unknown) => fn(tx),
   };
   const tokens = { sign: vi.fn(() => 'jwt-xyz') };
-  return { svc: new DebtorExchangeService(scoped as never, tokens as never), tx, tokens };
+  const tracking = new TrackingService(scoped as never);
+  return { svc: new DebtorExchangeService(scoped as never, tokens as never, tracking), tx, tokens };
 }
 
 describe('DebtorExchangeService.exchange', () => {

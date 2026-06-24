@@ -1,4 +1,12 @@
 import { Module } from '@nestjs/common';
+import { APP_FILTER, APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { AllExceptionsFilter } from './common/http-exception.filter.js';
+import { LoggingInterceptor } from './common/logging.interceptor.js';
+import { HealthController } from './common/health.controller.js';
+import { RetentionScheduler } from './common/retention.scheduler.js';
+import { RlsHealthCheck } from './common/rls-healthcheck.service.js';
 import { PrismaService } from './common/prisma.service.js';
 import { TenantDatasourceResolver } from './tenancy/tenant-datasource.resolver.js';
 import { TenantScopedService } from './tenancy/tenant-scoped.service.js';
@@ -12,15 +20,30 @@ import { DashboardController } from './dashboard/dashboard.controller.js';
 import { DashboardService } from './dashboard/dashboard.service.js';
 import { NotificationsController } from './notifications/notifications.controller.js';
 import { NotificationsService } from './notifications/notifications.service.js';
+import { NotificationsScheduler } from './notifications/notifications.scheduler.js';
 import { DebtorExchangeController } from './auth/debtor-exchange.controller.js';
 import { DebtorExchangeService } from './auth/debtor-exchange.service.js';
 import { DebtorTokenService } from './auth/debtor-token.service.js';
 import { DebtorSelfController } from './debtors/debtor-self.controller.js';
 import { DebtorSelfService } from './debtors/debtor-self.service.js';
+import { SuperAdminController } from './admin/super-admin.controller.js';
+import { SuperAdminService } from './admin/super-admin.service.js';
+import { StatsScheduler } from './admin/stats.scheduler.js';
+import { AUTH_ADMIN, createAuthAdmin } from './admin/auth-admin.js';
+import { TrackingService } from './tracking/tracking.service.js';
+import { EventsController, PublicEventsController } from './tracking/events.controller.js';
 
 @Module({
-  controllers: [CreditorsController, DebtorProvisioningController, DebtsController, DashboardController, NotificationsController, DebtorExchangeController, DebtorSelfController],
-  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, DebtorsAdminService, DebtsService, DashboardService, NotificationsService, DebtorExchangeService, DebtorTokenService, DebtorSelfService],
+  imports: [
+    ScheduleModule.forRoot(),
+    // Rate limiting global (anti-scraping/brute) — limite por IP/janela. Em memória (por instância);
+    // p/ múltiplas réplicas, trocar o storage por Redis (@nestjs/throttler storage). Configurável por env.
+    ThrottlerModule.forRoot([
+      { ttl: Number(process.env.THROTTLE_TTL_MS ?? 60_000), limit: Number(process.env.THROTTLE_LIMIT ?? 300) },
+    ]),
+  ],
+  controllers: [HealthController, CreditorsController, DebtorProvisioningController, DebtsController, DashboardController, NotificationsController, DebtorExchangeController, DebtorSelfController, SuperAdminController, EventsController, PublicEventsController],
+  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, DebtorsAdminService, DebtsService, DashboardService, NotificationsService, NotificationsScheduler, RetentionScheduler, RlsHealthCheck, DebtorExchangeService, DebtorTokenService, DebtorSelfService, SuperAdminService, StatsScheduler, TrackingService, { provide: AUTH_ADMIN, useFactory: createAuthAdmin }, { provide: APP_FILTER, useClass: AllExceptionsFilter }, { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor }, { provide: APP_GUARD, useClass: ThrottlerGuard }],
   exports: [PrismaService],
 })
 export class AppModule {}

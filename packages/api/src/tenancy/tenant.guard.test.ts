@@ -18,4 +18,10 @@ describe('TenantGuard', () => {
   it('bloqueia super-admin sem header', () => {
     expect(() => guard.canActivate(ctx({ supabaseId: 's', email: 'e', role: 'SUPER_ADMIN', tenantId: null }))).toThrow();
   });
+  it('bloqueia credor com tenant não aprovado (gate)', () => {
+    expect(() => guard.canActivate(ctx({ supabaseId: 's', email: 'e', role: 'CREDITOR', tenantId: 't1', tenantApproved: false }))).toThrow(/aprova/i);
+  });
+  it('libera credor com tenant aprovado', () => {
+    expect(guard.canActivate(ctx({ supabaseId: 's', email: 'e', role: 'CREDITOR', tenantId: 't1', tenantApproved: true }))).toBe(true);
+  });
 });

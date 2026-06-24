@@ -40,3 +40,17 @@ export async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
   const text = await res.text();
   return (text ? JSON.parse(text) : undefined) as T;
 }
+
+export async function apiDelete<T>(path: string, body?: unknown): Promise<T> {
+  const { data } = await supabase().auth.getSession();
+  const token = data.session?.access_token;
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`Falha (${res.status})`);
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
+}

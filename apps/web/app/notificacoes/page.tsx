@@ -18,6 +18,7 @@ const DEFAULT_ENABLED: Record<AlertRuleType, boolean> = {
   DUE_15: true,
   DUE_7: true,
   DUE_3: true,
+  DUE_1: true,
   DUE_TODAY: true,
   OVERDUE: true,
 };

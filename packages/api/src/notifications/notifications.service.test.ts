@@ -27,18 +27,19 @@ describe('NotificationsService', () => {
   const typesOf = (db: ReturnType<typeof fakeDb>): string[] =>
     (db.notification.upsert.mock.calls as unknown as Array<[{ create: { type: string } }]>).map((c) => c[0].create.type);
 
-  it('gera a régua correta por dias até o vencimento (15/7/3/0/atraso)', async () => {
+  it('gera a régua correta por dias até o vencimento (15/7/3/1/0/atraso)', async () => {
     const db = fakeDb([
       debt('a', new Date('2026-01-20T00:00:00Z')), // -12 -> OVERDUE
       debt('b', new Date('2026-02-01T00:00:00Z')), //   0 -> DUE_TODAY
+      debt('g', new Date('2026-02-02T00:00:00Z')), //   1 -> DUE_1
       debt('c', new Date('2026-02-03T00:00:00Z')), //   2 -> DUE_3
       debt('d', new Date('2026-02-06T00:00:00Z')), //   5 -> DUE_7
       debt('e', new Date('2026-02-12T00:00:00Z')), //  11 -> DUE_15
       debt('f', new Date('2026-06-01T00:00:00Z')), // distante -> nada
     ]);
     const out = await svc(db).generateDueNotifications('t1', undefined, asOf);
-    expect(out.created).toBe(5);
-    expect(typesOf(db).sort()).toEqual(['DUE_15', 'DUE_3', 'DUE_7', 'DUE_TODAY', 'OVERDUE']);
+    expect(out.created).toBe(6);
+    expect(typesOf(db).sort()).toEqual(['DUE_1', 'DUE_15', 'DUE_3', 'DUE_7', 'DUE_TODAY', 'OVERDUE']);
   });
 
   it('respeita as réguas ativas (enabled filtra)', async () => {

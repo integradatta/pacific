@@ -22,4 +22,10 @@ describe('RolesGuard', () => {
   it('permite quando nenhuma role é exigida', () => {
     expect(new RolesGuard(makeReflector([])).canActivate(makeCtx('DEBTOR'))).toBe(true);
   });
+  it('OWNER passa em endpoints de SUPER_ADMIN (superconjunto)', () => {
+    expect(new RolesGuard(makeReflector(['SUPER_ADMIN'])).canActivate(makeCtx('OWNER'))).toBe(true);
+  });
+  it('SUPER_ADMIN NÃO passa em endpoints exclusivos de OWNER', () => {
+    expect(() => new RolesGuard(makeReflector(['OWNER'])).canActivate(makeCtx('SUPER_ADMIN'))).toThrow();
+  });
 });

@@ -56,11 +56,13 @@ export interface PortfolioRow {
   balance: string;     // saldo bruto atual (principal + juros acumulados)
   amountDue: string;   // devido agora (bruto − pago; 0 se quitada)
   paidAmount: string;  // total já pago
+  expectedReturn: string; // valor final no vencimento (principal + juros até o vencimento)
   settled: boolean;    // quitada
   daysRemaining: number;
   status: DebtStatus;
   recoverability: number;
   temperature: number;
+  riskReason: string; // explicabilidade do risco (computada no servidor; não embarca o motor no client)
   dueDate: string; // ISO
   tags: string[];
 }
@@ -84,7 +86,7 @@ export interface DebtRecord {
   createdAt: string; // ISO
 }
 
-export type DebtEventKind = 'created' | 'link' | 'login' | 'notification' | 'due' | 'paid';
+export type DebtEventKind = 'created' | 'updated' | 'link' | 'login' | 'notification' | 'due' | 'paid';
 
 /** Evento do histórico de uma operação (derivado de dados existentes; sem tabela de eventos). */
 export interface DebtEvent {
