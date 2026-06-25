@@ -43,6 +43,7 @@ function fakeDb() {
       count: vi.fn(async () => 1),
       findFirst: vi.fn(async ({ where }: { where: { id: string; tenantId: string } }) =>
         where.id === 'debt1' && where.tenantId === 't1' ? debtRow() : null),
+      delete: vi.fn(async () => ({})),
     },
   };
 }
@@ -204,6 +205,21 @@ describe('DebtsService', () => {
     });
     it('pagamento em dívida de outro tenant → NotFound', async () => {
       await expect(svc(fakeDb()).pay('t2', 'debt1', { full: true }, NOW)).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('remove (excluir operação)', () => {
+    it('apaga a dívida + alertas e registra o tracking', async () => {
+      const db = fakeDb();
+      await svc(db).remove('t1', 'debt1');
+      expect(db.notification.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 't1', debtId: 'debt1' } });
+      expect(db.debt.delete).toHaveBeenCalledWith({ where: { id: 'debt1' } });
+      expect(db.platformEvent.create).toHaveBeenCalled();
+    });
+    it('excluir dívida de outro tenant → NotFound (não apaga)', async () => {
+      const db = fakeDb();
+      await expect(svc(db).remove('t2', 'debt1')).rejects.toBeInstanceOf(NotFoundException);
+      expect(db.debt.delete).not.toHaveBeenCalled();
     });
   });
 });
