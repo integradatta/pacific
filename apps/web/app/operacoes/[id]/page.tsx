@@ -2,13 +2,14 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { DebtEvent, DebtEventKind, DebtSummary } from '@pacific/shared';
 import { Shell } from '@/components/Shell';
 import { Skeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/States';
 import { TagInput } from '@/components/Tags';
 import { RiskBadge } from '@/components/RiskBadge';
-import { useDebt, useDebtSummary, useDebtHistory, useSetDebtTags, usePayDebt } from '@/lib/debts';
+import { useDebt, useDebtSummary, useDebtHistory, useSetDebtTags, usePayDebt, useDeleteDebt } from '@/lib/debts';
 import { formatBRL, venceEm } from '@/lib/format';
 import { STATUS_COLOR, STATUS_LABEL } from '@/lib/status';
 
@@ -179,6 +180,13 @@ export default function OperacaoDetalhePage({ params }: { params: { id: string }
   const history = useDebtHistory(params.id);
   const setTags = useSetDebtTags(params.id);
   const pay = usePayDebt(params.id);
+  const router = useRouter();
+  const del = useDeleteDebt(params.id);
+
+  function handleDelete(): void {
+    if (!window.confirm('Excluir esta operação? Esta ação é permanente e remove os alertas dela.')) return;
+    del.mutate(undefined, { onSuccess: () => router.push('/carteira') });
+  }
 
   const loading = debt.isLoading;
 
@@ -207,10 +215,20 @@ export default function OperacaoDetalhePage({ params }: { params: { id: string }
                   <h2 className="font-display text-2xl font-semibold text-text tracking-tight">{debt.data.debtorName}</h2>
                   {debt.data.description ? <p className="font-sans text-sm text-text-dim mt-1">{debt.data.description}</p> : null}
                 </div>
-                <span className="inline-flex items-center gap-2 font-mono text-xs text-muted">
-                  <span className={`w-2 h-2 rounded-full ${STATUS_COLOR[debt.data.status]}`} />
-                  {STATUS_LABEL[debt.data.status]}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex items-center gap-2 font-mono text-xs text-muted">
+                    <span className={`w-2 h-2 rounded-full ${STATUS_COLOR[debt.data.status]}`} />
+                    {STATUS_LABEL[debt.data.status]}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={del.isPending}
+                    className="font-mono text-[10px] uppercase tracking-widest text-status-red border border-status-red/40 rounded px-2.5 py-1 hover:bg-status-red/10 disabled:opacity-50 transition-colors"
+                  >
+                    {del.isPending ? 'Excluindo…' : 'Excluir'}
+                  </button>
+                </div>
               </div>
 
               {/* Etiquetas */}

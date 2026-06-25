@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtGuard } from '../auth/jwt.guard.js';
 import { TenantGuard } from '../tenancy/tenant.guard.js';
 import { RolesGuard } from '../auth/roles.guard.js';
@@ -73,5 +73,11 @@ export class DebtsController {
   @Post(':id/payments') @Roles('CREDITOR')
   pay(@TenantId() tenantId: string, @Param('id') id: string, @Body() dto: PayDebtDto): Promise<DebtRecord> {
     return this.debts.pay(tenantId, id, dto);
+  }
+
+  // Exclui a operação (destrutivo; só o dono do tenant via gate).
+  @Delete(':id') @Roles('CREDITOR')
+  remove(@TenantId() tenantId: string, @Param('id') id: string): Promise<void> {
+    return this.debts.remove(tenantId, id);
   }
 }

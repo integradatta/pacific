@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { DebtRecord, DebtSummary, DebtEvent } from '@pacific/shared';
-import { apiGet, apiPatch, apiPost } from './api';
+import { apiGet, apiPatch, apiPost, apiDelete } from './api';
 
 export function useDebt(id: string) {
   return useQuery({ queryKey: ['debt', id], queryFn: () => apiGet<DebtRecord>(`/debts/${id}`) });
@@ -40,6 +40,18 @@ export function usePayDebt(id: string) {
       void qc.invalidateQueries({ queryKey: ['portfolio'] });
       void qc.invalidateQueries({ queryKey: ['kpis'] });
       void qc.invalidateQueries({ queryKey: ['notifications'] });
+    },
+  });
+}
+
+/** Exclui a operação (destrutivo). Invalida a carteira/KPIs. */
+export function useDeleteDebt(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiDelete<void>(`/debts/${id}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['portfolio'] });
+      void qc.invalidateQueries({ queryKey: ['kpis'] });
     },
   });
 }

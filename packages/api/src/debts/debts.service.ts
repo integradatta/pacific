@@ -164,6 +164,16 @@ export class DebtsService {
     });
   }
 
+  /** Exclui uma operação e os alertas dela. Destrutivo — auditado via tracking. */
+  async remove(tenantId: string, id: string): Promise<void> {
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      await this.findOne(tx, tenantId, id); // 404 se não existir / for de outro tenant
+      await tx.notification.deleteMany({ where: { tenantId, debtId: id } });
+      await tx.debt.delete({ where: { id } });
+      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'OPERATION_UPDATED', targetType: 'debt', targetId: id, detail: { deleted: true } });
+    });
+  }
+
   /**
    * Histórico da operação — DERIVADO de dados existentes (sem tabela de eventos):
    * criação, link de acesso (gerado/rotacionado), acessos do devedor, alertas emitidos
