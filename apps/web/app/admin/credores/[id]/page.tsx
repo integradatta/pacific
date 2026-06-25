@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
+import { Decimal } from 'decimal.js';
 import { AdminShell } from '@/components/admin/AdminShell';
-import { AdminBadge } from '@/components/admin/ui';
+import { AdminBadge, KpiCard } from '@/components/admin/ui';
 import { useTenantOperations } from '@/lib/admin';
 import { formatBRL, venceEm } from '@/lib/format';
 import { STATUS_LABEL } from '@/lib/status';
@@ -11,10 +12,25 @@ export default function CreditorOperationsPage({ params }: { params: { id: strin
   const ops = useTenantOperations(params.id);
   const rows = ops.data ?? [];
 
+  // Resumo da carteira deste padrinho (somas simples — não é o motor proprietário).
+  const open = rows.filter((r) => !r.settled);
+  const totalLent = rows.reduce((a, r) => a.plus(r.principal), new Decimal(0));
+  const receivable = open.reduce((a, r) => a.plus(r.amountDue), new Decimal(0));
+  const overdue = open.filter((r) => r.status === 'RED').reduce((a, r) => a.plus(r.amountDue), new Decimal(0));
+  const settledCount = rows.filter((r) => r.settled).length;
+
   return (
     <AdminShell title="Operações do padrinho">
       <div className="space-y-4">
         <Link href="/admin/credores" className="inline-block font-mono text-[11px] text-muted hover:text-iris uppercase tracking-widest">← Padrinhos</Link>
+
+        {/* Resumo financeiro da carteira do padrinho */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <KpiCard label="Operações" value={String(rows.length)} sub={settledCount > 0 ? `${settledCount} quitadas` : ''} tone="iris" />
+          <KpiCard label="Total investido" value={formatBRL(totalLent.toFixed(2))} />
+          <KpiCard label="A receber" value={formatBRL(receivable.toFixed(2))} />
+          <KpiCard label="Vencido" value={formatBRL(overdue.toFixed(2))} tone={overdue.gt(0) ? 'red' : undefined} />
+        </div>
 
         <section className="panel overflow-hidden">
           <div className="px-6 py-4 border-b border-line flex items-baseline justify-between">
