@@ -33,7 +33,7 @@ export default function LoginPage() {
     try {
       const me = await apiGet<{ role: string; tenantId: string | null; approved: boolean }>('/auth/me');
       void apiPost('/events/session', { type: 'login' }).catch(() => undefined); // tracking (best-effort)
-      if (me.role === 'SUPER_ADMIN') router.push('/admin');
+      if (me.role === 'SUPER_ADMIN' || me.role === 'OWNER') router.push('/admin');
       else if (!me.tenantId) router.push('/register');
       else if (!me.approved) router.push('/pendente');
       else router.push('/dashboard');
