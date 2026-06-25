@@ -4,7 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { apiPost } from '@/lib/api';
+import { apiGet, apiPost } from '@/lib/api';
 
 const inputClass =
   'w-full bg-surface2 border border-line rounded-lg px-3.5 py-2.5 text-text font-sans text-sm placeholder:text-muted focus:outline-none focus:border-sonar focus:shadow-glow transition-all';
@@ -54,7 +54,9 @@ export default function RegisterPage() {
     try {
       // Idempotente no backend: cria a carteira ou devolve a existente.
       await apiPost('/auth/register-creditor', { orgName });
-      router.push('/dashboard');
+      // Conta nova entra PENDENTE → vai pra tela "em análise". Recuperação de conta já aprovada → dashboard.
+      const me = await apiGet<{ approved: boolean }>('/auth/me');
+      router.push(me.approved ? '/dashboard' : '/pendente');
     } catch {
       setError('Não foi possível concluir o cadastro da carteira. Tente novamente.');
       setLoading(false);
