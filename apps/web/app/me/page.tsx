@@ -1,19 +1,22 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Decimal } from 'decimal.js';
 import type { DebtStatus } from '@pacific/shared';
-import { debtorApiGet } from '@/lib/debtor';
+import { debtorApiGet, debtorApiPost } from '@/lib/debtor';
 import { formatBRL } from '@/lib/format';
 import { Skeleton } from '@/components/Skeleton';
 import { ErrorState, EmptyState } from '@/components/States';
 
 interface PaymentPoint { at: string; total: string }
+interface PendingClaim { amount: string; claimedAt: string }
 interface MyDebt {
   id: string;
   principal: string;
   dueDate: string;
   payments: PaymentPoint[];
+  pendingClaim: PendingClaim | null;
   summary: {
     balance: string;
     accruedInterest: string;
@@ -144,6 +147,82 @@ function History({ payments }: { payments: PaymentPoint[] }) {
   );
 }
 
+// "Informar que paguei": o sobrinho avisa um pagamento; o padrinho confirma depois. Não move dinheiro.
+function ClaimBox({ debt }: { debt: MyDebt }) {
+  const qc = useQueryClient();
+  const s = debt.summary;
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState(s.amountDue);
+  const [note, setNote] = useState('');
+  const claim = useMutation({
+    mutationFn: () => debtorApiPost(`/debtor/me/debts/${debt.id}/claim`, { amount, note: note.trim() || undefined }),
+    onSuccess: () => {
+      setOpen(false);
+      void qc.invalidateQueries({ queryKey: ['me-debts'] });
+    },
+  });
+
+  // Já informou e aguarda confirmação do padrinho.
+  if (debt.pendingClaim) {
+    return (
+      <section className="panel p-5 border-l-2 border-status-yellow/60">
+        <p className="font-mono text-[10px] text-status-yellow uppercase tracking-widest mb-1">Pagamento informado</p>
+        <p className="font-sans text-sm text-text">Você informou {formatBRL(debt.pendingClaim.amount)} em {fmtDate(debt.pendingClaim.claimedAt)}.</p>
+        <p className="font-sans text-sm text-text-dim mt-0.5">Aguardando a confirmação do seu padrinho.</p>
+      </section>
+    );
+  }
+
+  const valid = Number(amount) > 0;
+  return (
+    <section className="panel p-5">
+      {!open ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="w-full bg-sonar text-ink font-mono text-sm font-semibold uppercase tracking-widest py-2.5 rounded-lg shadow-[0_8px_24px_-10px_rgb(var(--sonar)/0.7)] hover:brightness-110 active:translate-y-px transition-all"
+        >
+          Informar que paguei
+        </button>
+      ) : (
+        <div className="space-y-3">
+          <p className="font-mono text-[10px] text-muted uppercase tracking-widest">Informar pagamento</p>
+          <div>
+            <label htmlFor="claim-amount" className="block font-mono text-[10px] text-muted uppercase tracking-wider mb-1">Valor pago</label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-xs text-muted">R$</span>
+              <input
+                id="claim-amount" type="number" inputMode="decimal" min="0" step="0.01" value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="w-full bg-surface2 border border-line rounded-lg pl-9 pr-3 py-2.5 text-text font-mono text-sm tabular-nums focus:outline-none focus:border-sonar focus:shadow-glow transition-all"
+              />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="claim-note" className="block font-mono text-[10px] text-muted uppercase tracking-wider mb-1">Observação (opcional)</label>
+            <input
+              id="claim-note" type="text" maxLength={280} value={note} onChange={(e) => setNote(e.target.value)}
+              placeholder="Ex.: paguei por PIX hoje"
+              className="w-full bg-surface2 border border-line rounded-lg px-3 py-2.5 text-text font-sans text-sm placeholder:text-muted focus:outline-none focus:border-sonar focus:shadow-glow transition-all"
+            />
+          </div>
+          {claim.isError && <p role="alert" className="font-mono text-xs text-status-red">Não foi possível enviar. Tente novamente.</p>}
+          <div className="flex gap-2">
+            <button
+              type="button" onClick={() => claim.mutate()} disabled={!valid || claim.isPending}
+              className="flex-1 bg-sonar text-ink font-mono text-xs font-semibold uppercase tracking-widest py-2.5 rounded-lg hover:brightness-110 active:translate-y-px disabled:opacity-40 transition-all"
+            >
+              {claim.isPending ? 'Enviando…' : 'Enviar aviso'}
+            </button>
+            <button type="button" onClick={() => setOpen(false)} className="font-mono text-[10px] uppercase tracking-widest text-muted hover:text-text px-3">Cancelar</button>
+          </div>
+          <p className="font-mono text-[10px] text-muted">Isso avisa seu padrinho. O pagamento vale após ele confirmar.</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function DebtView({ debt }: { debt: MyDebt }) {
   const s = debt.summary;
   const sem = semaphore(s.status, s.settled);
@@ -189,6 +268,9 @@ function DebtView({ debt }: { debt: MyDebt }) {
           <p className="font-sans text-sm text-text-dim">{sem.action}</p>
         </div>
       </section>
+
+      {/* Informar pagamento (loop de mão dupla) — só quando há saldo em aberto */}
+      {!s.settled && <ClaimBox debt={debt} />}
 
       <Evolution debt={debt} />
       <UpcomingEvents debt={debt} />

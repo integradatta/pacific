@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
 import type { Debt, Prisma } from '@pacific/database';
 import { summarize, normalizeTags, balanceAt, operationPreview, recoverabilityScore, type DebtSummary, type DebtRecord, type DebtEvent, type OperationPreview } from '@pacific/shared';
@@ -12,6 +12,16 @@ import type { CreateDebtInput } from './dto/create-debt.dto.js';
 import type { CreateQuickDebtInput } from './dto/create-quick-debt.dto.js';
 
 type DebtWithDebtor = Debt & { debtor: { name: string } };
+
+/** Pagamento informado pelo sobrinho, aguardando o padrinho confirmar (loop de mão dupla). */
+export interface PaymentClaimRow {
+  id: string;
+  debtId: string;
+  debtorName: string;
+  amount: string;
+  note: string | null;
+  claimedAt: string;
+}
 
 @Injectable()
 export class DebtsService {
@@ -87,8 +97,8 @@ export class DebtsService {
   async list(tenantId: string, page: { limit: number; offset: number }): Promise<Page<Debt>> {
     return this.scoped.withTenant(tenantId, async (tx) => {
       const [items, total] = await Promise.all([
-        tx.debt.findMany({ where: { tenantId }, take: page.limit, skip: page.offset, orderBy: { createdAt: 'desc' } }),
-        tx.debt.count({ where: { tenantId } }),
+        tx.debt.findMany({ where: { tenantId, deletedAt: null }, take: page.limit, skip: page.offset, orderBy: { createdAt: 'desc' } }),
+        tx.debt.count({ where: { tenantId, deletedAt: null } }),
       ]);
       return { items, total, limit: page.limit, offset: page.offset };
     });
@@ -135,42 +145,182 @@ export class DebtsService {
   async pay(tenantId: string, id: string, input: PayDebtInput, now: Date = new Date()): Promise<DebtRecord> {
     return this.scoped.withTenant(tenantId, async (tx) => {
       const debt = await this.findOne(tx, tenantId, id);
-      if (debt.settledAt) return this.toRecord(debt);
-
-      const gross = new Decimal(
-        balanceAt(
-          {
-            principal: debt.principal.toString(),
-            rate: debt.rate.toString(),
-            ratePeriod: debt.ratePeriod,
-            startDate: debt.startDate,
-            dueDate: debt.dueDate,
-          },
-          now,
-        ),
-      );
-      const already = new Decimal(debt.paidAmount.toString());
-      const delta = Decimal.max(0, new Decimal(input.amount ?? '0')); // ignora valores negativos
-      let paid = input.full ? gross : already.plus(delta);
-      if (paid.greaterThan(gross)) paid = gross; // não paga além do devido
-      const settledAt = input.full || paid.greaterThanOrEqualTo(gross) ? now : null;
-
-      await tx.debt.update({ where: { id }, data: { paidAmount: paid.toFixed(2), settledAt } });
-      // Cancela alertas pendentes (não lidos) desta dívida.
-      await tx.notification.deleteMany({ where: { tenantId, debtId: id, readAt: null } });
-      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'OPERATION_PAID', targetType: 'debt', targetId: id, detail: { paidAmount: paid.toFixed(2), settled: settledAt != null } });
-
+      await this.applyPayment(tx, tenantId, debt, input, now);
       return this.toRecord(await this.findOne(tx, tenantId, id));
     });
   }
 
-  /** Exclui uma operação e os alertas dela. Destrutivo — auditado via tracking. */
-  async remove(tenantId: string, id: string): Promise<void> {
+  /**
+   * Aplica um pagamento à dívida dentro da transação do caller. Núcleo reutilizado por `pay`
+   * (padrinho) e por `confirmClaim` (confirmação de um pagamento informado pelo sobrinho).
+   * Idempotente sobre dívida já quitada (não faz nada).
+   */
+  private async applyPayment(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    debt: DebtWithDebtor,
+    input: PayDebtInput,
+    now: Date,
+  ): Promise<void> {
+    if (debt.settledAt) return;
+    const gross = new Decimal(
+      balanceAt(
+        {
+          principal: debt.principal.toString(),
+          rate: debt.rate.toString(),
+          ratePeriod: debt.ratePeriod,
+          startDate: debt.startDate,
+          dueDate: debt.dueDate,
+        },
+        now,
+      ),
+    );
+    const already = new Decimal(debt.paidAmount.toString());
+    const delta = Decimal.max(0, new Decimal(input.amount ?? '0')); // ignora valores negativos
+    let paid = input.full ? gross : already.plus(delta);
+    if (paid.greaterThan(gross)) paid = gross; // não paga além do devido
+    const settledAt = input.full || paid.greaterThanOrEqualTo(gross) ? now : null;
+
+    await tx.debt.update({ where: { id: debt.id }, data: { paidAmount: paid.toFixed(2), settledAt } });
+    // Cancela alertas pendentes (não lidos) desta dívida.
+    await tx.notification.deleteMany({ where: { tenantId, debtId: debt.id, readAt: null } });
+    await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'OPERATION_PAID', targetType: 'debt', targetId: debt.id, detail: { paidAmount: paid.toFixed(2), settled: settledAt != null } });
+  }
+
+  /** Pagamentos informados pelo sobrinho aguardando confirmação do padrinho (toda a carteira). */
+  async pendingClaims(tenantId: string): Promise<PaymentClaimRow[]> {
     return this.scoped.withTenant(tenantId, async (tx) => {
-      await this.findOne(tx, tenantId, id); // 404 se não existir / for de outro tenant
+      const claims = await tx.paymentClaim.findMany({ where: { tenantId, status: 'PENDING' }, orderBy: { claimedAt: 'desc' } });
+      if (claims.length === 0) return [];
+      const debts = await tx.debt.findMany({
+        where: { tenantId, deletedAt: null, id: { in: claims.map((c) => c.debtId) } },
+        include: { debtor: { select: { name: true } } },
+      });
+      const byId = new Map(debts.map((d) => [d.id, d]));
+      return claims.map((c) => ({
+        id: c.id,
+        debtId: c.debtId,
+        debtorName: byId.get(c.debtId)?.debtor.name ?? '—',
+        amount: c.amount.toFixed(2),
+        note: c.note,
+        claimedAt: c.claimedAt.toISOString(),
+      }));
+    });
+  }
+
+  /** Confirma um pagamento informado: vira pagamento de fato (reusa applyPayment) e marca o claim. */
+  async confirmClaim(tenantId: string, claimId: string, now: Date = new Date()): Promise<void> {
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      const claim = await tx.paymentClaim.findFirst({ where: { id: claimId, tenantId } });
+      if (!claim || claim.status !== 'PENDING') throw new NotFoundException('Pagamento informado não encontrado');
+      const debt = await this.findOne(tx, tenantId, claim.debtId);
+      await this.applyPayment(tx, tenantId, debt, { amount: claim.amount.toString() }, now);
+      await tx.paymentClaim.update({ where: { id: claimId }, data: { status: 'CONFIRMED', resolvedAt: now } });
+    });
+  }
+
+  /** Recusa um pagamento informado (não bate). Registra no tracking; não altera a dívida. */
+  async rejectClaim(tenantId: string, claimId: string, now: Date = new Date()): Promise<void> {
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      const claim = await tx.paymentClaim.findFirst({ where: { id: claimId, tenantId } });
+      if (!claim || claim.status !== 'PENDING') throw new NotFoundException('Pagamento informado não encontrado');
+      await tx.paymentClaim.update({ where: { id: claimId }, data: { status: 'REJECTED', resolvedAt: now } });
+      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'OPERATION_UPDATED', targetType: 'debt', targetId: claim.debtId, detail: { claimRejected: true } });
+    });
+  }
+
+  /**
+   * Renegocia (refaz o acordo) de uma operação em aberto: o valor DEVIDO agora vira o novo
+   * principal, o relógio reinicia (startDate = agora, pago = 0) e aplicam-se novo vencimento e,
+   * opcionalmente, nova taxa. Os termos antigos ficam registrados no histórico. Quitada → erro.
+   */
+  async renegotiate(
+    tenantId: string,
+    id: string,
+    input: { dueDate: string; rate?: string; ratePeriod?: 'MONTHLY' | 'ANNUAL' },
+    now: Date = new Date(),
+  ): Promise<DebtRecord> {
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      const debt = await this.findOne(tx, tenantId, id);
+      if (debt.settledAt) throw new BadRequestException('Operação quitada não pode ser renegociada.');
+
+      const newDue = new Date(input.dueDate);
+      if (Number.isNaN(newDue.getTime()) || newDue.getTime() <= now.getTime()) {
+        throw new BadRequestException('Novo vencimento deve ser uma data futura.');
+      }
+      const gross = new Decimal(
+        balanceAt(
+          { principal: debt.principal.toString(), rate: debt.rate.toString(), ratePeriod: debt.ratePeriod, startDate: debt.startDate, dueDate: debt.dueDate },
+          now,
+        ),
+      );
+      const amountDue = Decimal.max(0, gross.minus(debt.paidAmount.toString()));
+      if (amountDue.lessThanOrEqualTo(0)) throw new BadRequestException('Não há saldo em aberto para renegociar.');
+
+      const newRate = input.rate ?? debt.rate.toString();
+      const newRatePeriod = input.ratePeriod ?? debt.ratePeriod;
+      await tx.debt.update({
+        where: { id },
+        data: { principal: amountDue.toFixed(2), paidAmount: '0', settledAt: null, startDate: now, dueDate: newDue, rate: newRate, ratePeriod: newRatePeriod },
+      });
+      // Alertas antigos ficam obsoletos (vencimento mudou) — limpa os não lidos; regeneram depois.
+      await tx.notification.deleteMany({ where: { tenantId, debtId: id, readAt: null } });
+      await this.tracking.record(tx, {
+        tenantId, actorType: 'CREDITOR', type: 'OPERATION_UPDATED', targetType: 'debt', targetId: id,
+        detail: {
+          renegotiated: true,
+          fromDueDate: debt.dueDate.toISOString(), toDueDate: newDue.toISOString(),
+          fromRate: debt.rate.toString(), toRate: newRate, newPrincipal: amountDue.toFixed(2),
+        },
+      });
+      return this.toRecord(await this.findOne(tx, tenantId, id));
+    });
+  }
+
+  /**
+   * Move a operação para a LIXEIRA (soft-delete): marca deletedAt e cancela os alertas dela.
+   * Restaurável por 30 dias (depois um job depura). Reversível — não apaga dados ainda.
+   */
+  async remove(tenantId: string, id: string, now: Date = new Date()): Promise<void> {
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      await this.findOne(tx, tenantId, id); // 404 se não existir / for de outro tenant / já na lixeira
       await tx.notification.deleteMany({ where: { tenantId, debtId: id } });
-      await tx.debt.delete({ where: { id } });
-      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'OPERATION_UPDATED', targetType: 'debt', targetId: id, detail: { deleted: true } });
+      await tx.debt.update({ where: { id }, data: { deletedAt: now } });
+      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'OPERATION_UPDATED', targetType: 'debt', targetId: id, detail: { trashed: true } });
+    });
+  }
+
+  /** Lista a lixeira do tenant: operações excluídas (restauráveis), mais recentes primeiro. */
+  async listTrash(tenantId: string): Promise<Array<{ id: string; debtorName: string; principal: string; deletedAt: string }>> {
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      const rows = await tx.debt.findMany({
+        where: { tenantId, deletedAt: { not: null } },
+        include: { debtor: { select: { name: true } } },
+        orderBy: { deletedAt: 'desc' },
+      });
+      return rows.map((d) => ({ id: d.id, debtorName: d.debtor.name, principal: d.principal.toString(), deletedAt: d.deletedAt!.toISOString() }));
+    });
+  }
+
+  /** Restaura uma operação da lixeira (deletedAt = null). 404 se não estiver na lixeira. */
+  async restore(tenantId: string, id: string): Promise<void> {
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      const trashed = await tx.debt.findFirst({ where: { id, tenantId, deletedAt: { not: null } } });
+      if (!trashed) throw new NotFoundException('Operação não está na lixeira');
+      await tx.debt.update({ where: { id }, data: { deletedAt: null } });
+      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'OPERATION_UPDATED', targetType: 'debt', targetId: id, detail: { restored: true } });
+    });
+  }
+
+  /**
+   * Depuração definitiva (job): apaga de vez as dívidas de UM tenant na lixeira há mais de `days`
+   * dias. Roda dentro de withTenant (Debt é RLS-forçado → precisa do contexto do tenant).
+   */
+  async purgeTrashed(tenantId: string, days = 30, now: Date = new Date()): Promise<number> {
+    const cutoff = new Date(now.getTime() - days * 86_400_000);
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      const res = await tx.debt.deleteMany({ where: { tenantId, deletedAt: { not: null, lt: cutoff } } });
+      return res.count;
     });
   }
 
@@ -214,9 +364,13 @@ export class DebtsService {
       // Alterações/pagamentos do tracking (timeline de mudanças, inclui pagamentos parciais).
       let trackedSettlement = false;
       for (const c of changes) {
-        const d = (c.detail ?? {}) as { field?: string; paidAmount?: string; settled?: boolean };
+        const d = (c.detail ?? {}) as { field?: string; paidAmount?: string; settled?: boolean; renegotiated?: boolean; toDueDate?: string };
         if (c.type === 'OPERATION_UPDATED') {
-          events.push({ at: c.at.toISOString(), kind: 'updated', title: d.field === 'tags' ? 'Etiquetas atualizadas' : 'Operação alterada' });
+          if (d.renegotiated) {
+            events.push({ at: c.at.toISOString(), kind: 'updated', title: 'Operação renegociada', detail: d.toDueDate ? `Novo vencimento em ${new Date(d.toDueDate).toLocaleDateString('pt-BR')}` : undefined });
+          } else {
+            events.push({ at: c.at.toISOString(), kind: 'updated', title: d.field === 'tags' ? 'Etiquetas atualizadas' : 'Operação alterada' });
+          }
         } else {
           if (d.settled) trackedSettlement = true;
           events.push({
@@ -259,8 +413,9 @@ export class DebtsService {
     };
   }
 
+  // Finder padrão: só dívidas ATIVAS (fora da lixeira). Usado por get/summary/history/pay/renegotiate/remove.
   private async findOne(tx: Prisma.TransactionClient, tenantId: string, id: string): Promise<DebtWithDebtor> {
-    const debt = await tx.debt.findFirst({ where: { id, tenantId }, include: { debtor: { select: { name: true } } } });
+    const debt = await tx.debt.findFirst({ where: { id, tenantId, deletedAt: null }, include: { debtor: { select: { name: true } } } });
     if (!debt) throw new NotFoundException('Dívida não encontrada');
     return debt;
   }

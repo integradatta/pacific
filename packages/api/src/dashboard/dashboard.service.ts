@@ -11,7 +11,7 @@ export class DashboardService {
   // pelo motor financeiro; somatórios em Decimal.js. Operações quitadas saem de "a receber"
   // e das contagens em aberto; o "a receber"/"vencido" usam o DEVIDO (bruto − pago).
   async kpis(tenantId: string, asOf: Date = new Date()): Promise<DashboardKpis> {
-    const debts = await this.scoped.withTenant(tenantId, (tx) => tx.debt.findMany({ where: { tenantId } }));
+    const debts = await this.scoped.withTenant(tenantId, (tx) => tx.debt.findMany({ where: { tenantId, deletedAt: null } }));
     let totalLent = new Decimal(0);
     let totalReceivable = new Decimal(0);
     let totalOverdue = new Decimal(0);
@@ -64,7 +64,7 @@ export class DashboardService {
   async portfolio(tenantId: string, asOf: Date = new Date()): Promise<PortfolioRow[]> {
     const debts = await this.scoped.withTenant(tenantId, (tx) =>
       tx.debt.findMany({
-        where: { tenantId },
+        where: { tenantId, deletedAt: null },
         include: { debtor: { select: { name: true } } },
         orderBy: { dueDate: 'asc' },
       }),

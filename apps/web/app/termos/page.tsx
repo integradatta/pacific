@@ -79,16 +79,16 @@ export default function TermosPage() {
           <h1 className="font-display text-2xl font-semibold text-text tracking-tight">Termos de Responsabilidade</h1>
         </div>
 
-        {/* Texto do aceite (termos + aviso legal de isenção) */}
+        {/* Texto do aceite (termos de responsabilidade) */}
         <div className="space-y-4 text-sm text-text-dim font-sans leading-relaxed border-l-2 border-line pl-4">
           <p>
-            A <span className="text-text font-medium">Pacific</span> fornece exclusivamente infraestrutura tecnológica
-            (software) para o acompanhamento de operações entre os usuários.
+            A <span className="text-text font-medium">Pacific</span> oferece exclusivamente uma infraestrutura
+            tecnológica (software) para organização e troca de informações entre usuários.
           </p>
           <p>
-            Não somos parte das operações de crédito realizadas na plataforma e{' '}
-            <span className="text-text">não nos responsabilizamos</span> pelas transações, acordos ou eventuais perdas
-            entre os usuários. As decisões, valores e condições são de responsabilidade exclusiva de quem opera.
+            <span className="text-text">Não somos parte</span> de nenhum acordo, combinado ou entendimento estabelecido
+            entre os usuários da plataforma. Cada usuário é o único responsável pelas informações que insere, pelas
+            decisões que toma e pelos resultados decorrentes do uso da plataforma.
           </p>
           <p>Ao continuar, você declara estar ciente e de acordo com estes termos.</p>
         </div>

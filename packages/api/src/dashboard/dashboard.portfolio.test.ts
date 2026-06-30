@@ -28,7 +28,7 @@ describe('DashboardService.portfolio', () => {
   it('filtra por tenantId', async () => {
     const db = pfDb([]);
     await svc(db).portfolio('t9', new Date('2026-02-01T00:00:00Z'));
-    expect(db.debt.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { tenantId: 't9' } }));
+    expect(db.debt.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { tenantId: 't9', deletedAt: null } }));
   });
   it('reflete pagamento: parcial abate o devido; quitada zera', async () => {
     const db = pfDb([

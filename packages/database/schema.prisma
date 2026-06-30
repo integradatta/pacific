@@ -51,11 +51,18 @@ enum PlatformEventType {
   OPERATION_CREATED
   OPERATION_UPDATED
   OPERATION_PAID
+  PAYMENT_CLAIMED // sobrinho informou um pagamento (aguarda confirmação do padrinho)
   CLIENT_CREATED
   TENANT_APPROVED
   TENANT_SUSPENDED
   ERROR
   IMPORTANT
+}
+
+enum PaymentClaimStatus {
+  PENDING // sobrinho informou, padrinho ainda não decidiu
+  CONFIRMED // padrinho confirmou → vira pagamento de fato
+  REJECTED // padrinho recusou (não bate)
 }
 
 enum NotificationType {
@@ -179,6 +186,9 @@ model Debt {
   // saldo bruto − paidAmount (piso 0); settledAt != null ⇒ quitada (devido 0).
   paidAmount  Decimal    @default(0) @db.Decimal(14, 2)
   settledAt   DateTime?
+  // Soft-delete (lixeira): excluir marca deletedAt; restaurável por 30 dias; um job depura.
+  // TODAS as leituras de carteira/dashboard filtram deletedAt = null.
+  deletedAt   DateTime?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
@@ -186,6 +196,27 @@ model Debt {
   @@index([debtorId])
   // Carteira ordena por vencimento dentro do tenant (dashboard/portfolio) — escala com o volume.
   @@index([tenantId, dueDate])
+  // Lixeira: lista por tenant filtrando deletedAt; o job de depuração varre por data.
+  @@index([tenantId, deletedAt])
+}
+
+// Pagamento INFORMADO pelo sobrinho, aguardando confirmação do padrinho (loop de mão dupla).
+// Confirmar → vira pagamento de fato (DebtsService.pay). Não move dinheiro; é registro/acordo.
+// Global (filtrado por tenantId em código + RLS).
+model PaymentClaim {
+  id         String             @id @default(uuid())
+  tenantId   String
+  debtId     String
+  debtorId   String
+  amount     Decimal            @db.Decimal(14, 2)
+  note       String?
+  status     PaymentClaimStatus @default(PENDING)
+  claimedAt  DateTime           @default(now())
+  resolvedAt DateTime?
+  createdAt  DateTime           @default(now())
+
+  @@index([tenantId, status])
+  @@index([debtId])
 }
 
 model Notification {

@@ -29,3 +29,16 @@ export async function debtorApiGet<T>(path: string): Promise<T> {
   if (!res.ok) throw new Error(`Falha ao carregar (${res.status})`);
   return (await res.json()) as T;
 }
+
+export async function debtorApiPost<T>(path: string, body?: unknown): Promise<T> {
+  const jwt = getDebtorJwt();
+  const res = await fetch(`${BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}) },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    cache: 'no-store',
+  });
+  if (!res.ok) throw new Error(`Falha (${res.status})`);
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
+}

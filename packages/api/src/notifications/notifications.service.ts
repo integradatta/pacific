@@ -59,7 +59,7 @@ export class NotificationsService {
   ): Promise<{ created: number }> {
     const active = new Set<AlertType>(enabled);
     return this.scoped.withTenant(tenantId, async (tx) => {
-      const debts = await tx.debt.findMany({ where: { tenantId } });
+      const debts = await tx.debt.findMany({ where: { tenantId, deletedAt: null } });
       let created = 0;
       for (const d of debts) {
         const days = daysRemaining(

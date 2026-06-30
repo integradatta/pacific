@@ -41,3 +41,9 @@ ALTER TABLE "DebtorLoginEvent" FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation_debtor_login_event ON "DebtorLoginEvent"
   USING ("tenantId" = current_setting('app.current_tenant', true))
   WITH CHECK ("tenantId" = current_setting('app.current_tenant', true));
+
+ALTER TABLE "PaymentClaim" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "PaymentClaim" FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_payment_claim ON "PaymentClaim"
+  USING ("tenantId" = current_setting('app.current_tenant', true))
+  WITH CHECK ("tenantId" = current_setting('app.current_tenant', true));

@@ -9,8 +9,9 @@ import { Roles } from '../auth/roles.decorator.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import type { AuthUser } from '@pacific/shared';
 
-// Versão atual do aceite (termos + aviso legal). Bump invalida aceites antigos se um dia mudar o texto.
-export const CURRENT_TERMS_VERSION = 'v1';
+// Versão atual do aceite. Bump registra a versão nova nas próximas aceitações (não re-exige de
+// quem já aceitou — o gate considera "aceito" quem tem data). v2: texto de responsabilidade revisado.
+export const CURRENT_TERMS_VERSION = 'v2';
 
 export interface MeResponse {
   supabaseId: string;
