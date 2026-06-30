@@ -1,10 +1,29 @@
 import { describe, it, expect } from 'vitest';
-import { monthlyRate, balanceAt, accruedInterest, deriveStatus, daysRemaining, summarize, recoverabilityScore, temperatureScore, operationPreview, riskLevel, outstanding } from './finance.js';
+import { monthlyRate, balanceAt, accruedInterest, deriveStatus, daysRemaining, summarize, recoverabilityScore, temperatureScore, paymentProbability, operationPreview, riskLevel, outstanding } from './finance.js';
 import type { DebtTerms } from '../types/financial.types.js';
 
 const terms = (over: Partial<DebtTerms> = {}): DebtTerms => ({
   principal: '1000.00', rate: '0.10', ratePeriod: 'MONTHLY',
   startDate: new Date('2026-01-01T00:00:00Z'), dueDate: new Date('2026-03-01T00:00:00Z'), ...over,
+});
+
+describe('paymentProbability (IA-2)', () => {
+  const asOf = new Date('2026-02-15T00:00:00Z'); // antes do vencimento (2026-03-01)
+  it('quitada → 100%', () => {
+    expect(paymentProbability(terms(), asOf, { settled: true })).toBe(100);
+  });
+  it('sem pagamento = recuperabilidade pura', () => {
+    expect(paymentProbability(terms({ rate: '0' }), asOf)).toBe(recoverabilityScore(terms({ rate: '0' }), asOf));
+  });
+  it('quem já abateu parte tem probabilidade MAIOR que quem não pagou nada (dívida em atraso)', () => {
+    const t = terms({ rate: '0' });
+    const atraso = new Date('2026-06-01T00:00:00Z'); // ~92 dias após o vencimento → base < 100
+    const semPagar = paymentProbability(t, atraso);
+    const pagandoMetade = paymentProbability(t, atraso, { paidAmount: '500.00' });
+    expect(semPagar).toBeLessThan(100);
+    expect(pagandoMetade).toBeGreaterThan(semPagar);
+    expect(pagandoMetade).toBeLessThanOrEqual(100);
+  });
 });
 
 describe('motor financeiro (Decimal.js)', () => {

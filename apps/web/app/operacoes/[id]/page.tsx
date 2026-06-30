@@ -199,6 +199,23 @@ function PaymentBox({ amountDue, pending, onPay }: { amountDue: string; pending:
   );
 }
 
+// IA-2 — Probabilidade de pagamento: barra + %, cor por faixa. Ajuda a priorizar cobranças.
+function PaymentProbability({ value }: { value: number }) {
+  const color = value >= 70 ? 'bg-status-green' : value >= 40 ? 'bg-status-yellow' : 'bg-status-red';
+  const text = value >= 70 ? 'text-status-green' : value >= 40 ? 'text-status-yellow' : 'text-status-red';
+  return (
+    <div className="mt-3" role="group" aria-label={`Probabilidade de pagamento: ${value} por cento`}>
+      <div className="flex items-baseline justify-between mb-1">
+        <span className="font-mono text-[10px] text-muted uppercase tracking-widest">Probabilidade de pagamento</span>
+        <span className={`font-mono text-sm tabular-nums font-medium ${text}`}>{value}%</span>
+      </div>
+      <span className="block h-1.5 rounded-full bg-line overflow-hidden" aria-hidden>
+        <span className={`block h-full ${color}`} style={{ width: `${value}%` }} />
+      </span>
+    </div>
+  );
+}
+
 function SituacaoAtual({ s, principal, pending, onPay }: { s: DebtSummary; principal: string; pending: boolean; onPay: (i: { amount?: string; full?: boolean }) => void }) {
   const hasPaid = Number(s.paidAmount) > 0;
   return (
@@ -215,6 +232,9 @@ function SituacaoAtual({ s, principal, pending, onPay }: { s: DebtSummary; princ
         {formatBRL(s.settled ? s.paidAmount : s.amountDue)}
       </p>
       <p className="font-mono text-[11px] text-muted mt-1">{venceEm(s.daysRemaining)}</p>
+
+      {/* IA-2 — Probabilidade de pagamento (recuperabilidade + comportamento de pagamento) */}
+      {!s.settled ? <PaymentProbability value={s.scores.paymentProbability} /> : null}
 
       {/* Breakdown: original + juros = atual (− pago = devido) */}
       <div className="mt-4 space-y-1.5">

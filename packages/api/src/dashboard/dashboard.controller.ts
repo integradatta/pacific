@@ -5,7 +5,7 @@ import { RolesGuard } from '../auth/roles.guard.js';
 import { PrincipalGuard } from '../auth/principal.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { TenantId } from '../tenancy/tenant-id.decorator.js';
-import { DashboardService } from './dashboard.service.js';
+import { DashboardService, type CopilotResponse } from './dashboard.service.js';
 import { normalizeThresholds, type DashboardKpis, type PortfolioRow, type PortfolioIntelligence } from '@pacific/shared';
 
 const num = (v: string | undefined): number | undefined => (v == null || v === '' ? undefined : Number(v));
@@ -23,6 +23,12 @@ export class DashboardController {
   @Get('portfolio') @Roles('CREDITOR')
   portfolio(@TenantId() tenantId: string): Promise<PortfolioRow[]> {
     return this.dashboard.portfolio(tenantId);
+  }
+
+  // IA-1 — Copiloto: respostas prontas (quem cobrar hoje, maiores riscos, resumo).
+  @Get('copilot') @Roles('CREDITOR')
+  copilot(@TenantId() tenantId: string): Promise<CopilotResponse> {
+    return this.dashboard.copilot(tenantId);
   }
 
   @Get('intelligence') @Roles('CREDITOR')

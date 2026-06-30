@@ -30,6 +30,23 @@ describe('DashboardService.portfolio', () => {
     await svc(db).portfolio('t9', new Date('2026-02-01T00:00:00Z'));
     expect(db.debt.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { tenantId: 't9', deletedAt: null } }));
   });
+
+  describe('copilot (IA-1)', () => {
+    it('"quem cobrar hoje" lista vencidas/vencendo ≤3d, vencidas primeiro', async () => {
+      const db = pfDb([
+        pfDebt('a', 'Ana', new Date('2026-01-20T00:00:00Z')), // vencida
+        pfDebt('b', 'Bruno', new Date('2026-06-01T00:00:00Z')), // distante
+      ]);
+      const out = await svc(db).copilot('t1', new Date('2026-02-01T00:00:00Z'));
+      expect(out.collectToday.rows.map((r) => r.debtorName)).toEqual(['Ana']);
+      expect(out.collectToday.text).toContain('atenção hoje');
+    });
+    it('carteira vazia → textos amigáveis sem linhas', async () => {
+      const out = await svc(pfDb([])).copilot('t1', new Date('2026-02-01T00:00:00Z'));
+      expect(out.collectToday.rows).toEqual([]);
+      expect(out.summary.text).toContain('não tem operações');
+    });
+  });
   it('reflete pagamento: parcial abate o devido; quitada zera', async () => {
     const db = pfDb([
       pfDebt('p', 'Parcial', new Date('2026-06-01T00:00:00Z'), '0', '1000.00', [], '400.00'),

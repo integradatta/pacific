@@ -21,6 +21,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/carteira', label: 'Carteira', icon: '◈' },
   { href: '/vencimentos', label: 'Vencimentos', icon: '◷' },
   { href: '/recebiveis', label: 'Recebíveis', icon: '▦' },
+  { href: '/relatorios', label: 'Relatórios', icon: '◆' },
   { href: '/localizacao', label: 'Localização', icon: '◉' },
   { href: '/notificacoes', label: 'Notificações', icon: '◎' },
   { href: '/configuracoes', label: 'Configurações', icon: '⚙' },
@@ -53,6 +54,7 @@ export function Shell({ title, orgCode = 'ORG-000', children }: ShellProps) {
 
   return (
     <div className="min-h-screen flex">
+      <a href="#conteudo" className="skip-link">Pular para o conteúdo</a>
       {/* Left Rail */}
       <nav
         aria-label="Navegação principal"
@@ -162,7 +164,7 @@ export function Shell({ title, orgCode = 'ORG-000', children }: ShellProps) {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 p-6 animate-rise">
+        <main id="conteudo" tabIndex={-1} className="flex-1 p-6 animate-rise">
           {children}
         </main>
       </div>

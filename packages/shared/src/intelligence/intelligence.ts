@@ -107,6 +107,7 @@ export interface PortfolioIntelligence {
   actionItems: ActionItem[];
   trend?: PortfolioTrend; // preenchido pelo serviço (precisa do histórico de snapshots)
   weeklySummary?: string; // resumo da semana (in-app; sem envio externo)
+  patterns?: string[]; // IA-3: padrões detectados automaticamente (frases prontas)
 }
 
 /** Limiares do credor (com defaults sensatos). Mantidos configuráveis sem regra fixa global. */

@@ -78,3 +78,9 @@ ALTER TABLE "GeofenceEvent" FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation_geofenceevent ON "GeofenceEvent"
   USING ("tenantId" = current_setting('app.current_tenant', true))
   WITH CHECK ("tenantId" = current_setting('app.current_tenant', true));
+
+ALTER TABLE "MonthlyReport" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "MonthlyReport" FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_monthlyreport ON "MonthlyReport"
+  USING ("tenantId" = current_setting('app.current_tenant', true))
+  WITH CHECK ("tenantId" = current_setting('app.current_tenant', true));

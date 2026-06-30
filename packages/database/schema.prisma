@@ -352,6 +352,26 @@ model GeofenceEvent {
   @@index([tenantId, debtorId, occurredAt])
 }
 
+// REL-1 — Relatório mensal automático (in-app; sem envio externo). Um por (tenant, mês).
+// Gerado por um job mensal (ou sob demanda); arquiva os números do mês para retenção/histórico.
+model MonthlyReport {
+  id              String   @id @default(uuid())
+  tenantId        String
+  month           String // 'YYYY-MM'
+  totalLent       Decimal  @db.Decimal(14, 2)
+  totalReceivable Decimal  @db.Decimal(14, 2)
+  totalReceived   Decimal  @db.Decimal(14, 2)
+  totalOverdue    Decimal  @db.Decimal(14, 2)
+  opsActive       Int
+  opsSettled      Int
+  healthScore     Int
+  healthState     String
+  generatedAt     DateTime @default(now())
+
+  @@unique([tenantId, month])
+  @@index([tenantId, month])
+}
+
 // Estatísticas materializadas por tenant — agregados caros (computados a partir de Debt sob RLS)
 // pré-calculados por um job diário. O overview do super-admin LÊ daqui (1 linha por tenant) em vez
 // de varrer todas as dívidas de todos os credores a cada acesso → escala p/ milhares de credores.

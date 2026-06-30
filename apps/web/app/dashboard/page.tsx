@@ -9,6 +9,7 @@ import { CarteiraTable } from '@/components/CarteiraTable';
 import { IntelligenceBlock } from '@/components/Intelligence';
 import { PendingClaims } from '@/components/PendingClaims';
 import { LocationDeclines } from '@/components/LocationDeclines';
+import { Copilot } from '@/components/Copilot';
 import { DashboardSkeleton } from '@/components/Skeleton';
 
 export default function DashboardPage() {
@@ -36,6 +37,8 @@ export default function DashboardPage() {
           <PendingClaims />
           {/* Sobrinhos que recusaram compartilhar localização (some quando vazio) */}
           <LocationDeclines />
+          {/* IA-1 — Copiloto da carteira (perguntas sugeridas) */}
+          <Copilot />
           {intelligence.data ? (
             <>
               <div className="flex justify-end gap-2">
