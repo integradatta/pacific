@@ -1,6 +1,7 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Optional } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { TrackingService } from '../tracking/tracking.service.js';
+import { captureException } from './sentry.js';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -14,16 +15,21 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const status = exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
     const message = exception instanceof HttpException ? exception.getResponse() : 'Internal server error';
 
-    // Monitoramento: registra erros do servidor (5xx) no log de eventos. Best-effort, nunca relança.
-    if (status >= 500 && this.tracking) {
-      void this.tracking.recordRaw({
-        actorType: 'SYSTEM',
-        type: 'ERROR',
-        targetType: 'http',
-        targetId: `${req?.method ?? ''} ${req?.path ?? req?.url ?? ''}`.trim() || undefined,
-        detail: { message: exception instanceof Error ? exception.message : String(message) },
-        ip: req?.ip,
-      });
+    // Monitoramento: registra erros do servidor (5xx) no log de eventos + Sentry (stack trace).
+    // Best-effort, nunca relança.
+    if (status >= 500) {
+      const route = `${req?.method ?? ''} ${req?.path ?? req?.url ?? ''}`.trim() || undefined;
+      captureException(exception, { route, status });
+      if (this.tracking) {
+        void this.tracking.recordRaw({
+          actorType: 'SYSTEM',
+          type: 'ERROR',
+          targetType: 'http',
+          targetId: route,
+          detail: { message: exception instanceof Error ? exception.message : String(message) },
+          ip: req?.ip,
+        });
+      }
     }
 
     res.status(status).json({ error: { status, message, timestamp: new Date().toISOString() } });
