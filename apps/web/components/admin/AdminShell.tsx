@@ -1,11 +1,11 @@
 'use client';
 
-import { type ReactNode, useState, type FormEvent } from 'react';
+import { type ReactNode, useState, useEffect, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { LogoutButton } from '@/components/LogoutButton';
-import { apiGet } from '@/lib/api';
+import { fetchMe } from '@/lib/auth-redirect';
 
 const NAV = [
   { href: '/admin', label: 'Visão geral', icon: '◈' },
@@ -27,13 +27,38 @@ export function AdminShell({ title, children }: { title: string; children: React
   const pathname = usePathname();
   const router = useRouter();
   const [q, setQ] = useState('');
-  // O item "Admin Supremo" só aparece para o proprietário (OWNER).
-  const me = useQuery({ queryKey: ['auth-me'], queryFn: () => apiGet<{ role: string }>('/auth/me') });
+  // Guard do painel: sem isto, sem sessão a tela só mostra "—"/erros (parece "quebrado no PC").
+  // Resolve papel/tenant pelo nosso banco (fetchMe c/ retry → falha transitória não derruba admin).
+  const me = useQuery({ queryKey: ['auth-me'], queryFn: () => fetchMe(), retry: false });
+  const isAdmin = me.data?.role === 'SUPER_ADMIN' || me.data?.role === 'OWNER';
+
+  useEffect(() => {
+    if (me.isError) router.replace('/login'); // sem sessão / API indisponível → login
+    else if (me.data && !isAdmin) router.replace('/dashboard'); // logado, mas não é admin
+  }, [me.isError, me.data, isAdmin, router]);
+
   const nav = me.data?.role === 'OWNER' ? [...NAV, OWNER_ITEM] : NAV;
 
   function search(e: FormEvent) {
     e.preventDefault();
     if (q.trim()) router.push(`/admin/credores?q=${encodeURIComponent(q.trim())}`);
+  }
+
+  // Enquanto verifica a sessão (ou já decidiu redirecionar), não pisca o painel vazio.
+  if (me.isLoading || me.isError || !isAdmin) {
+    return (
+      <main className="min-h-screen flex items-center justify-center px-4">
+        <div className="flex items-center gap-2.5">
+          <span className="relative flex w-2 h-2">
+            <span className="absolute inline-flex w-full h-full rounded-full bg-iris/60 animate-ping2" />
+            <span className="relative inline-flex w-2 h-2 rounded-full bg-iris" />
+          </span>
+          <p className="font-mono text-sm text-text-dim tracking-wider">
+            {me.isError ? 'Redirecionando para o login…' : !isAdmin && me.data ? 'Acesso restrito…' : 'Verificando acesso…'}
+          </p>
+        </div>
+      </main>
+    );
   }
 
   return (

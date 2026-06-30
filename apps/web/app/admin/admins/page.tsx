@@ -50,7 +50,8 @@ export default function AdminsPage() {
             <h2 className="font-display text-lg font-semibold text-text tracking-tight">Administradores</h2>
             <p className="font-mono text-[10px] text-muted uppercase tracking-widest mt-0.5">o proprietário pode revogar o acesso de um super-admin</p>
           </div>
-          <table className="w-full">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[560px]">
             <thead>
               <tr className="font-mono text-[10px] text-muted uppercase tracking-widest border-b border-line">
                 <th className="text-left font-normal px-6 py-2.5">E-mail</th>
@@ -66,6 +67,7 @@ export default function AdminsPage() {
               )}
             </tbody>
           </table>
+          </div>
         </section>
 
         {/* Promover um usuário a administrador */}

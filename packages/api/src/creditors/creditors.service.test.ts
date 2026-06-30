@@ -23,6 +23,11 @@ function fakeDb() {
         users.push(u);
         return u;
       }),
+      update: vi.fn(async ({ where, data }: { where: { supabaseId: string }; data: Record<string, unknown> }) => {
+        const u = users.find((x) => x.supabaseId === where.supabaseId);
+        if (u) Object.assign(u, data);
+        return u;
+      }),
     },
   };
   // $transaction interativo: executa o callback com o próprio db (mesmos mocks).
@@ -61,5 +66,19 @@ describe('CreditorsService.register', () => {
     await expect(svc.register({ orgName: 'X', supabaseId: 'sb1', email: 'c@x.com' })).rejects.toBeInstanceOf(
       ConflictException,
     );
+  });
+});
+
+describe('CreditorsService — aceite de termos', () => {
+  it('hasAcceptedTerms é false antes e true depois de acceptTerms', async () => {
+    const db = fakeDb();
+    await db.user.create({ data: { supabaseId: 'sb1', tenantId: 't1' } });
+    const svc = new CreditorsService({ forTenant: () => db } as never);
+    expect(await svc.hasAcceptedTerms('sb1')).toBe(false);
+    await svc.acceptTerms('sb1', 'v1');
+    expect(db.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { supabaseId: 'sb1' }, data: expect.objectContaining({ termsVersion: 'v1', termsAcceptedAt: expect.any(Date) }) }),
+    );
+    expect(await svc.hasAcceptedTerms('sb1')).toBe(true);
   });
 });

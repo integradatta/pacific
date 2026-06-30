@@ -125,6 +125,11 @@ model User {
   debtor     Debtor?
   // Force-logout instantâneo: tokens emitidos ANTES deste instante são rejeitados (denylist).
   revokedAfter DateTime?
+  // Aceite único do PADRINHO (credor) ao primeiro acesso: termos de responsabilidade + aviso
+  // legal de isenção, numa tela só. Null = ainda não aceitou (gate manda para /termos).
+  // Só se aplica a CREDITOR; OWNER/SUPER_ADMIN/DEBTOR não veem a tela.
+  termsAcceptedAt DateTime?
+  termsVersion    String?
   createdAt  DateTime @default(now())
 
   @@index([tenantId])

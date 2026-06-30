@@ -54,7 +54,8 @@ export function CarteiraTable({ rows }: { rows: PortfolioRow[] }) {
         <h2 className="font-display text-lg font-semibold text-text tracking-tight">Carteira</h2>
         <span className="font-mono text-[10px] text-muted uppercase tracking-widest tabular-nums">{rows.length} ajudas</span>
       </div>
-      <table className="w-full">
+      <div className="overflow-x-auto">
+      <table className="w-full min-w-[760px]">
         <thead>
           <tr className="font-mono text-[10px] text-muted uppercase tracking-widest border-b border-line">
             <th className="text-left font-normal px-6 py-2.5">Sobrinho</th>
@@ -101,6 +102,7 @@ export function CarteiraTable({ rows }: { rows: PortfolioRow[] }) {
           ))}
         </tbody>
       </table>
+      </div>
     </section>
   );
 }

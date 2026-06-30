@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { apiGet, apiPost } from '@/lib/api';
+import { apiPost } from '@/lib/api';
+import { fetchMe, pathForMe } from '@/lib/auth-redirect';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,6 +13,29 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Já autenticado ao abrir /login? Não fica preso no formulário — manda pro painel do papel.
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      const { data } = await supabase().auth.getSession();
+      if (!active) return;
+      if (!data.session) {
+        setChecking(false);
+        return;
+      }
+      try {
+        const me = await fetchMe();
+        if (active) router.replace(pathForMe(me));
+      } catch {
+        if (active) setChecking(false); // sessão sem /auth/me acessível: mostra o formulário
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [router]);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -28,18 +52,30 @@ export default function LoginPage() {
       return;
     }
 
-    // Conta autenticada mas sem carteira (tenant) -> conclui o cadastro; senão, dashboard.
-    // Isso resolve o "loga mas não acessa": sem tenant, todo endpoint protegido dá 403.
+    // Roteia pelo papel (fonte única em pathForMe). fetchMe tem retry: uma falha transitória
+    // não pode misroutar (ex.: jogar um admin no /dashboard de credor). Falha dura → mensagem.
     try {
-      const me = await apiGet<{ role: string; tenantId: string | null; approved: boolean }>('/auth/me');
+      const me = await fetchMe();
       void apiPost('/events/session', { type: 'login' }).catch(() => undefined); // tracking (best-effort)
-      if (me.role === 'SUPER_ADMIN' || me.role === 'OWNER') router.push('/admin');
-      else if (!me.tenantId) router.push('/register');
-      else if (!me.approved) router.push('/pendente');
-      else router.push('/dashboard');
+      router.push(pathForMe(me));
     } catch {
-      router.push('/dashboard');
+      setError('Entramos na sua conta, mas a plataforma não respondeu. Tente novamente em instantes.');
+      setLoading(false);
     }
+  }
+
+  if (checking) {
+    return (
+      <main className="min-h-screen flex items-center justify-center px-4">
+        <div className="flex items-center gap-2.5">
+          <span className="relative flex w-2 h-2">
+            <span className="absolute inline-flex w-full h-full rounded-full bg-sonar/60 animate-ping2" />
+            <span className="relative inline-flex w-2 h-2 rounded-full bg-sonar" />
+          </span>
+          <p className="font-mono text-sm text-text-dim tracking-wider">Verificando sessão…</p>
+        </div>
+      </main>
+    );
   }
 
   return (

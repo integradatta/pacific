@@ -151,14 +151,14 @@ function DebtView({ debt }: { debt: MyDebt }) {
     <div className="space-y-4">
       {/* Hero — valor + vencimento + dias (leitura em segundos) */}
       <section className="panel p-6 space-y-5 border-l-2" style={{ borderLeftColor: 'rgb(var(--sonar))' }}>
-        <div className="flex items-start justify-between">
-          <div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-1">{s.settled ? 'Ajuda quitada' : 'Valor atual · em aberto'}</p>
-            <p className={`font-mono text-4xl font-medium tabular-nums tracking-tight ${s.settled ? 'text-status-green' : 'text-text'}`}>
+            <p className={`font-mono text-3xl sm:text-4xl font-medium tabular-nums tracking-tight break-words ${s.settled ? 'text-status-green' : 'text-text'}`}>
               {formatBRL(s.settled ? '0.00' : s.amountDue)}
             </p>
           </div>
-          <span className={`inline-flex items-center gap-1.5 font-mono text-xs ${sem.text}`}>
+          <span className={`inline-flex items-center gap-1.5 font-mono text-xs shrink-0 ${sem.text}`}>
             <span className={`w-2 h-2 rounded-full ${sem.dot}`} /> {sem.label}
           </span>
         </div>

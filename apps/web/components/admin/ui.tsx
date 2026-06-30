@@ -3,10 +3,10 @@ import type { ReactNode } from 'react';
 export function KpiCard({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: 'iris' | 'red' | 'sonar' }) {
   const valueColor = tone === 'red' ? 'text-status-red' : tone === 'iris' ? 'text-iris' : tone === 'sonar' ? 'text-sonar' : 'text-text';
   return (
-    <div className="panel panel-hover p-5">
+    <div className="panel panel-hover p-4 sm:p-5 min-w-0">
       <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-2">{label}</p>
-      <p className={`font-mono text-2xl font-medium tabular-nums tracking-tight ${valueColor}`}>{value}</p>
-      {sub ? <p className="font-mono text-[10px] text-muted mt-1 tracking-wider">{sub}</p> : null}
+      <p className={`font-mono text-xl sm:text-2xl font-medium tabular-nums tracking-tight break-words ${valueColor}`}>{value}</p>
+      {sub ? <p className="font-mono text-[10px] text-muted mt-1 tracking-wider break-words">{sub}</p> : null}
     </div>
   );
 }
