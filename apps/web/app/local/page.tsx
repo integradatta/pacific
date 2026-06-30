@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { useMyConsent, useSetMyConsent, useLocationSharing } from '@/lib/debtor-location';
+import { useMyConsent, useSetMyConsent } from '@/lib/debtor-location';
 import { DebtorTabBar } from '@/components/DebtorTabBar';
+import { LocationSync } from '@/components/LocationSync';
 
 const sans = { fontFamily: 'var(--font-dmsans)' } as const;
 const CARD = 'bg-white rounded-[16px] border border-[#E5E7EB] shadow-[0_2px_8px_rgba(0,0,0,0.06)]';
@@ -13,7 +14,6 @@ export default function LocalPage() {
   const setConsent = useSetMyConsent();
   const [permDenied, setPermDenied] = useState(false);
   const state = consent.data?.state ?? 'NEVER';
-  useLocationSharing(state === 'GRANTED');
 
   function enable() {
     setPermDenied(false);
@@ -100,6 +100,7 @@ export default function LocalPage() {
           </section>
         )}
       </div>
+      <LocationSync />
       <DebtorTabBar />
     </main>
   );

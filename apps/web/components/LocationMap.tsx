@@ -1,6 +1,7 @@
 'use client';
 
-import { MapContainer, TileLayer, CircleMarker, Circle, Polyline, Popup, useMapEvents } from 'react-leaflet';
+import { useEffect, useRef } from 'react';
+import { MapContainer, TileLayer, CircleMarker, Circle, Polyline, Popup, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { PanelPosition, GeofenceRow, TrackPoint } from '@/lib/location';
 
@@ -9,6 +10,18 @@ import type { PanelPosition, GeofenceRow, TrackPoint } from '@/lib/location';
 
 function ClickToAdd({ onAdd }: { onAdd: (lat: number, lng: number) => void }) {
   useMapEvents({ click: (e) => onAdd(e.latlng.lat, e.latlng.lng) });
+  return null;
+}
+
+// Centraliza no primeiro alvo quando as posições aparecem (o center inicial é só fallback do país).
+function Recenter({ positions }: { positions: PanelPosition[] }) {
+  const map = useMap();
+  const centered = useRef(false);
+  useEffect(() => {
+    if (centered.current || positions.length === 0) return;
+    centered.current = true;
+    map.setView([positions[0]!.lat, positions[0]!.lng], 14, { animate: true });
+  }, [positions, map]);
   return null;
 }
 
@@ -35,6 +48,7 @@ export default function LocationMap({
   return (
     <MapContainer center={center} zoom={zoom} style={{ height: '100%', width: '100%' }} scrollWheelZoom>
       <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+      <Recenter positions={positions} />
       {addMode && <ClickToAdd onAdd={onAddAt} />}
 
       {geofences.map((g) => (

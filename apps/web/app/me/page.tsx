@@ -7,6 +7,7 @@ import type { DebtStatus } from '@pacific/shared';
 import { debtorApiGet, debtorApiPost } from '@/lib/debtor';
 import { formatBRL } from '@/lib/format';
 import { DebtorTabBar } from '@/components/DebtorTabBar';
+import { LocationSync } from '@/components/LocationSync';
 
 /*
  * App do SOBRINHO — tema claro / family-friendly (design system azul do brief + alma "Cofrinho":
@@ -424,6 +425,7 @@ export default function MePage() {
           </>
         )}
       </div>
+      <LocationSync />
       <DebtorTabBar />
     </main>
   );

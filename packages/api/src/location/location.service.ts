@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 import { TrackingService } from '../tracking/tracking.service.js';
 
@@ -9,6 +9,8 @@ export type ConsentState = 'NEVER' | 'DECLINED' | 'GRANTED' | 'REVOKED';
 type SettableConsent = 'GRANTED' | 'DECLINED' | 'REVOKED';
 
 export interface PingPoint { lat: number; lng: number; accuracy?: number | null; battery?: number | null; recordedAt: string }
+// Tolerância de relógio: pings com timestamp além de agora + skew são rejeitados (relógio adiantado/abuso).
+const MAX_FUTURE_SKEW_MS = Number(process.env.LOCATION_MAX_FUTURE_SKEW_MS ?? 5 * 60_000);
 export interface PanelPosition {
   debtorId: string;
   debtorName: string;
@@ -34,6 +36,7 @@ function distanceM(a: { lat: number; lng: number }, b: { lat: number; lng: numbe
 
 @Injectable()
 export class LocationService {
+  private readonly log = new Logger('LocationService');
   constructor(
     private readonly scoped: TenantScopedService,
     private readonly tracking: TrackingService,
@@ -65,28 +68,55 @@ export class LocationService {
     });
   }
 
-  /** Recebe pings em lote (só se GRANTED). Atualiza última posição, histórico e avalia geofences. */
-  async recordPings(tenantId: string, debtorId: string, points: PingPoint[]): Promise<{ accepted: number }> {
+  /**
+   * Recebe pings em lote (só se GRANTED). Resiliente a lotes fora de ordem e a relógio adiantado:
+   * - rejeita pings com timestamp no futuro (além do skew) — não envenena a "última posição";
+   * - grava TODO ping válido no histórico (inclui backfill de lotes offline atrasados);
+   * - atualiza a última posição de forma ATÔMICA e NÃO-REGRESSIVA (updateMany condicional por
+   *   recordedAt) — um lote mais antigo nunca sobrescreve uma posição mais recente;
+   * - só avalia geofences quando a posição realmente avança.
+   */
+  async recordPings(tenantId: string, debtorId: string, points: PingPoint[], now: Date = new Date()): Promise<{ accepted: number }> {
     if (points.length === 0) return { accepted: 0 };
     return this.scoped.withTenant(tenantId, async (tx) => {
       const consent = await tx.locationConsent.findUnique({ where: { debtorId } });
       if (consent?.state !== 'GRANTED') throw new ForbiddenException('Compartilhamento de localização não está ativo.');
 
-      const sorted = [...points].sort((a, b) => +new Date(a.recordedAt) - +new Date(b.recordedAt));
+      const horizon = now.getTime() + MAX_FUTURE_SKEW_MS;
+      const valid = points
+        .filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng) && Number.isFinite(+new Date(p.recordedAt)) && +new Date(p.recordedAt) <= horizon)
+        .sort((a, b) => +new Date(a.recordedAt) - +new Date(b.recordedAt));
+      const dropped = points.length - valid.length;
+      if (dropped > 0) this.log.warn(`Pings descartados (timestamp futuro/inválido): ${dropped}/${points.length} (devedor ${debtorId.slice(0, 8)}).`);
+      if (valid.length === 0) return { accepted: 0 };
+
       await tx.locationPing.createMany({
-        data: sorted.map((p) => ({ tenantId, debtorId, lat: p.lat, lng: p.lng, accuracy: p.accuracy ?? null, battery: p.battery ?? null, recordedAt: new Date(p.recordedAt) })),
+        data: valid.map((p) => ({ tenantId, debtorId, lat: p.lat, lng: p.lng, accuracy: p.accuracy ?? null, battery: p.battery ?? null, recordedAt: new Date(p.recordedAt) })),
       });
 
       const prev = await tx.debtorPosition.findUnique({ where: { debtorId } });
-      const latest = sorted[sorted.length - 1]!;
-      await tx.debtorPosition.upsert({
-        where: { debtorId },
-        create: { debtorId, tenantId, lat: latest.lat, lng: latest.lng, accuracy: latest.accuracy ?? null, battery: latest.battery ?? null, recordedAt: new Date(latest.recordedAt) },
-        update: { lat: latest.lat, lng: latest.lng, accuracy: latest.accuracy ?? null, battery: latest.battery ?? null, recordedAt: new Date(latest.recordedAt) },
-      });
+      const latest = valid[valid.length - 1]!;
+      const latestAt = new Date(latest.recordedAt);
+      const data = { tenantId, lat: latest.lat, lng: latest.lng, accuracy: latest.accuracy ?? null, battery: latest.battery ?? null, recordedAt: latestAt };
 
-      await this.evaluateGeofences(tx, tenantId, debtorId, prev ? { lat: Number(prev.lat), lng: Number(prev.lng) } : null, { lat: latest.lat, lng: latest.lng });
-      return { accepted: sorted.length };
+      // Atualiza só se o novo é mais recente (condição atômica). Senão, cria (se ainda não existe).
+      let advanced = false;
+      const updated = await tx.debtorPosition.updateMany({ where: { debtorId, recordedAt: { lt: latestAt } }, data });
+      if (updated.count > 0) {
+        advanced = true;
+      } else if (!prev) {
+        try {
+          await tx.debtorPosition.create({ data: { debtorId, ...data } });
+          advanced = true;
+        } catch {
+          /* corrida criou a linha entre o updateMany e o create → outra posição prevalece */
+        }
+      } // else: já existe uma posição mais recente → ignora (lote atrasado)
+
+      if (advanced) {
+        await this.evaluateGeofences(tx, tenantId, debtorId, prev ? { lat: Number(prev.lat), lng: Number(prev.lng) } : null, { lat: latest.lat, lng: latest.lng });
+      }
+      return { accepted: valid.length };
     });
   }
 
