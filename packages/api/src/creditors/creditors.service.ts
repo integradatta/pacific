@@ -51,4 +51,17 @@ export class CreditorsService {
     const tenant = await db.tenant.findUnique({ where: { id: tenantId } });
     return { tenantId, orgCode: tenant?.orgCode ?? '' };
   }
+
+  /** Registra o aceite único (termos + aviso legal) do padrinho. Idempotente: re-aceitar regrava a data. */
+  async acceptTerms(supabaseId: string, version: string): Promise<void> {
+    const db = this.resolver.forTenant('__provisioning__');
+    await db.user.update({ where: { supabaseId }, data: { termsAcceptedAt: new Date(), termsVersion: version } });
+  }
+
+  /** O padrinho já aceitou os termos? (Usado pelo /auth/me para o gate de primeiro acesso.) */
+  async hasAcceptedTerms(supabaseId: string): Promise<boolean> {
+    const db = this.resolver.forTenant('__provisioning__');
+    const u = await db.user.findUnique({ where: { supabaseId }, select: { termsAcceptedAt: true } });
+    return u?.termsAcceptedAt != null;
+  }
 }

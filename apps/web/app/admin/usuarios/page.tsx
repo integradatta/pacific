@@ -44,7 +44,8 @@ export default function UsuariosPage() {
       <div className="space-y-4">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filtrar por e-mail…" className="w-full max-w-md bg-surface2 border border-line rounded-lg px-3.5 py-2 text-text font-sans text-sm placeholder:text-muted focus:outline-none focus:border-iris focus:shadow-glow transition-all" />
         <section className="panel overflow-hidden">
-          <table className="w-full">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[680px]">
             <thead>
               <tr className="font-mono text-[10px] text-muted uppercase tracking-widest border-b border-line">
                 <th className="text-left font-normal px-6 py-2.5">E-mail</th>
@@ -67,6 +68,7 @@ export default function UsuariosPage() {
               {rows.length === 0 && <tr><td colSpan={5} className="px-6 py-6 text-center font-sans text-sm text-text-dim">{users.isLoading ? 'Carregando…' : 'Nenhum usuário encontrado.'}</td></tr>}
             </tbody>
           </table>
+          </div>
         </section>
         <p className="font-mono text-[10px] text-muted tracking-wider">
           Senhas nunca são exibidas (hash no Supabase). O controle seguro é reset + força logout, tudo auditado.

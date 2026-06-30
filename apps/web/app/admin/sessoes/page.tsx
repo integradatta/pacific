@@ -17,7 +17,8 @@ export default function SessoesPage() {
           <h2 className="font-display text-lg font-semibold text-text tracking-tight">Acessos recentes</h2>
           <span className="font-mono text-[10px] text-muted uppercase tracking-widest tabular-nums">{rows.length}</span>
         </div>
-        <table className="w-full">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[560px]">
           <thead>
             <tr className="font-mono text-[10px] text-muted uppercase tracking-widest border-b border-line">
               <th className="text-left font-normal px-6 py-2.5">Tipo</th>
@@ -38,6 +39,7 @@ export default function SessoesPage() {
             {rows.length === 0 && <tr><td colSpan={4} className="px-6 py-6 text-center font-sans text-sm text-text-dim">{events.isLoading ? 'Carregando…' : 'Nenhum acesso registrado ainda.'}</td></tr>}
           </tbody>
         </table>
+        </div>
         <p className="px-6 py-3 border-t border-line font-mono text-[10px] text-muted tracking-wider">
           device · navegador · localização não são capturados (sessões geridas pelo Supabase).
         </p>

@@ -190,6 +190,12 @@ describe('SuperAdminService', () => {
     });
   });
 
+  it('listUsers oculta OWNER da listagem (nem na resposta da API)', async () => {
+    const db = fakeDb();
+    await svc(db).listUsers();
+    expect(db.user.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { role: { not: 'OWNER' } } }));
+  });
+
   it('forceLogout marca revokedAfter por id do usuário (corte instantâneo) + audita', async () => {
     const db = fakeDb();
     await svc(db).forceLogout(ACTOR, 'u1');

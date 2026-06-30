@@ -1,10 +1,12 @@
 'use client';
 
-import { type ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { useNotifications } from '@/lib/notifications';
 import { LogoutButton } from '@/components/LogoutButton';
+import { fetchMe, pathForMe } from '@/lib/auth-redirect';
 
 interface NavItem {
   href: string;
@@ -30,8 +32,22 @@ interface ShellProps {
 
 export function Shell({ title, orgCode = 'ORG-000', children }: ShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const notifs = useNotifications();
   const unread = (notifs.data?.items ?? []).filter((n) => !n.readAt).length;
+
+  // Gate do credor: redireciona em casos bloqueantes (sem aceite → /termos, pendente → /pendente,
+  // sem carteira → /register, admin → /admin). Credor pronto (pathForMe = /dashboard) navega livre.
+  const me = useQuery({ queryKey: ['auth-me'], queryFn: () => fetchMe(), retry: false });
+  useEffect(() => {
+    if (me.isError) {
+      router.replace('/login');
+      return;
+    }
+    if (!me.data) return;
+    const target = pathForMe(me.data);
+    if (target !== '/dashboard' && pathname !== target) router.replace(target);
+  }, [me.isError, me.data, pathname, router]);
 
   return (
     <div className="min-h-screen flex">

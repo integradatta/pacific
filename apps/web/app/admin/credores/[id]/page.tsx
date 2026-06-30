@@ -4,13 +4,16 @@ import Link from 'next/link';
 import { Decimal } from 'decimal.js';
 import { AdminShell } from '@/components/admin/AdminShell';
 import { AdminBadge, KpiCard } from '@/components/admin/ui';
-import { useTenantOperations } from '@/lib/admin';
+import { useTenantOperations, useAdminCreditors } from '@/lib/admin';
 import { formatBRL, venceEm } from '@/lib/format';
 import { STATUS_LABEL } from '@/lib/status';
 
 export default function CreditorOperationsPage({ params }: { params: { id: string } }) {
   const ops = useTenantOperations(params.id);
   const rows = ops.data ?? [];
+  // Identidade do padrinho (nome/e-mail/situação) — vem do cache de /admin/creditors.
+  const creditors = useAdminCreditors();
+  const padrinho = (creditors.data ?? []).find((c) => c.tenantId === params.id);
 
   // Resumo da carteira deste padrinho (somas simples — não é o motor proprietário).
   const open = rows.filter((r) => !r.settled);
@@ -23,6 +26,20 @@ export default function CreditorOperationsPage({ params }: { params: { id: strin
     <AdminShell title="Operações do padrinho">
       <div className="space-y-4">
         <Link href="/admin/credores" className="inline-block font-mono text-[11px] text-muted hover:text-iris uppercase tracking-widest">← Padrinhos</Link>
+
+        {/* Cabeçalho do padrinho inspecionado */}
+        {padrinho && (
+          <div className="panel p-5 flex items-center justify-between gap-4 flex-wrap">
+            <div className="min-w-0">
+              <h2 className="font-display text-lg font-semibold text-text tracking-tight truncate">{padrinho.name}</h2>
+              <p className="font-mono text-xs text-muted truncate">{padrinho.email ?? 'sem e-mail'} · {padrinho.orgCode}</p>
+            </div>
+            <span className="flex gap-1.5 shrink-0">
+              <AdminBadge tone={padrinho.approval === 'APPROVED' ? 'green' : padrinho.approval === 'PENDING' ? 'yellow' : 'red'}>{padrinho.approval}</AdminBadge>
+              {padrinho.status === 'SUSPENDED' && <AdminBadge tone="red">suspenso</AdminBadge>}
+            </span>
+          </div>
+        )}
 
         {/* Resumo financeiro da carteira do padrinho */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -40,7 +57,8 @@ export default function CreditorOperationsPage({ params }: { params: { id: strin
           {ops.isError ? (
             <p className="px-6 py-4 font-mono text-sm text-status-red">Não foi possível carregar (a API não está acessível ou a carteira está vazia).</p>
           ) : (
-            <table className="w-full">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px]">
               <thead>
                 <tr className="font-mono text-[10px] text-muted uppercase tracking-widest border-b border-line">
                   <th className="text-left font-normal px-6 py-2.5">Sobrinho</th>
@@ -63,6 +81,7 @@ export default function CreditorOperationsPage({ params }: { params: { id: strin
                 {rows.length === 0 && !ops.isError && <tr><td colSpan={5} className="px-6 py-6 text-center font-sans text-sm text-text-dim">{ops.isLoading ? 'Carregando…' : 'Nenhuma operação nesta carteira.'}</td></tr>}
               </tbody>
             </table>
+            </div>
           )}
         </section>
 

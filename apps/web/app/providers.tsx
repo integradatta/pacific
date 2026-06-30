@@ -1,6 +1,7 @@
 'use client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
+import { ToastHost } from '@/components/Toast';
 
 // Defaults pensados p/ muitos usuários simultâneos: cache curto evita rajadas de refetch
 // (sem refetch a cada foco de janela), 1 retry, e dados "frescos" por 30s reduzem carga na API.
@@ -18,5 +19,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
         },
       }),
   );
-  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  return (
+    <QueryClientProvider client={client}>
+      {children}
+      <ToastHost />
+    </QueryClientProvider>
+  );
 }

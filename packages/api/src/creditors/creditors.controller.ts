@@ -4,8 +4,13 @@ import { RegisterCreditorDto } from './dto/register-creditor.dto.js';
 import { JwtGuard } from '../auth/jwt.guard.js';
 import { IpRateLimitGuard } from '../auth/ip-rate-limit.guard.js';
 import { PrincipalGuard } from '../auth/principal.guard.js';
+import { RolesGuard } from '../auth/roles.guard.js';
+import { Roles } from '../auth/roles.decorator.js';
 import { CurrentUser } from '../auth/current-user.decorator.js';
 import type { AuthUser } from '@pacific/shared';
+
+// Versão atual do aceite (termos + aviso legal). Bump invalida aceites antigos se um dia mudar o texto.
+export const CURRENT_TERMS_VERSION = 'v1';
 
 export interface MeResponse {
   supabaseId: string;
@@ -13,6 +18,7 @@ export interface MeResponse {
   role: AuthUser['role'];
   tenantId: string | null; // null = autenticado mas ainda sem carteira (precisa concluir o cadastro)
   approved: boolean; // credor com tenant aprovado E ativo (super-admin/devedor: sempre true)
+  termsAccepted: boolean; // padrinho já aceitou termos+aviso legal? (não-credor: sempre true)
 }
 
 @Controller('auth')
@@ -33,7 +39,25 @@ export class CreditorsController {
   // O web usa isto após o login: com tenantId -> dashboard; sem tenantId -> concluir carteira.
   @Get('me')
   @UseGuards(new JwtGuard(), PrincipalGuard)
-  me(@CurrentUser() user: AuthUser): MeResponse {
-    return { supabaseId: user.supabaseId, email: user.email, role: user.role, tenantId: user.tenantId, approved: user.tenantApproved ?? true };
+  async me(@CurrentUser() user: AuthUser): Promise<MeResponse> {
+    // Aceite de termos só importa para o padrinho (credor). Demais papéis: sempre true (não veem a tela).
+    const termsAccepted = user.role === 'CREDITOR' ? await this.creditors.hasAcceptedTerms(user.supabaseId) : true;
+    return {
+      supabaseId: user.supabaseId,
+      email: user.email,
+      role: user.role,
+      tenantId: user.tenantId,
+      approved: user.tenantApproved ?? true,
+      termsAccepted,
+    };
+  }
+
+  // Aceite único (termos de responsabilidade + aviso legal de isenção). Só o padrinho (credor).
+  @Post('accept-terms')
+  @UseGuards(new JwtGuard(), PrincipalGuard, RolesGuard)
+  @Roles('CREDITOR')
+  async acceptTerms(@CurrentUser() user: AuthUser): Promise<{ success: true }> {
+    await this.creditors.acceptTerms(user.supabaseId, CURRENT_TERMS_VERSION);
+    return { success: true };
   }
 }

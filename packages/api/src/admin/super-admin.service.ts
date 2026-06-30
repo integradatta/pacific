@@ -304,6 +304,9 @@ export class SuperAdminService {
 
   async listUsers(limit?: number, offset?: number): Promise<AdminUserRow[]> {
     const rows = await this.db.user.findMany({
+      // OWNER (proprietário) é invisível na listagem — nem na resposta da API. SUPER_ADMIN e
+      // demais papéis continuam aparecendo (um admin pode ver outros admins).
+      where: { role: { not: 'OWNER' } },
       select: { id: true, email: true, role: true, tenantId: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
       take: clampTake(limit),
