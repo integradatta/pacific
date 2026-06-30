@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 import { DebtsService } from '../debts/debts.service.js';
+import { LocationService } from '../location/location.service.js';
 
 /**
  * Retenção automática: mantém as tabelas append-only limitadas (custo de banco perto de zero a
@@ -15,10 +16,12 @@ export class RetentionScheduler {
   private readonly eventDays = Number(process.env.RETENTION_DAYS ?? 180);
   private readonly snapshotDays = Number(process.env.SNAPSHOT_RETENTION_DAYS ?? 540);
   private readonly trashDays = Number(process.env.TRASH_RETENTION_DAYS ?? 30);
+  private readonly locationDays = Number(process.env.LOCATION_RETENTION_DAYS ?? 30);
 
   constructor(
     private readonly scoped: TenantScopedService,
     private readonly debts: DebtsService,
+    private readonly location: LocationService,
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_3AM)
@@ -32,13 +35,15 @@ export class RetentionScheduler {
       // DebtorLoginEvent e Debt(lixeira) são RLS-forçados → por tenant (cron de madrugada; N+1 ok).
       let logins = 0;
       let purged = 0;
+      let pings = 0;
       const tenants = await db.tenant.findMany({ select: { id: true } });
       for (const t of tenants) {
         const r = await this.scoped.withTenant(t.id, (tx) => tx.debtorLoginEvent.deleteMany({ where: { tenantId: t.id, at: { lt: eventCut } } }));
         logins += r.count;
         purged += await this.debts.purgeTrashed(t.id, this.trashDays, now);
+        pings += await this.location.purgePings(t.id, this.locationDays, now);
       }
-      this.log.log(`Retenção: ${ev.count} eventos, ${logins} logins, ${sn.count} snapshots, ${purged} da lixeira removidos.`);
+      this.log.log(`Retenção: ${ev.count} eventos, ${logins} logins, ${sn.count} snapshots, ${purged} da lixeira, ${pings} pings removidos.`);
     } catch (e) {
       this.log.warn(`Falha na retenção: ${String(e)}`);
     }

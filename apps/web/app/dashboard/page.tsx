@@ -8,6 +8,7 @@ import { KpiReadouts } from '@/components/KpiReadouts';
 import { CarteiraTable } from '@/components/CarteiraTable';
 import { IntelligenceBlock } from '@/components/Intelligence';
 import { PendingClaims } from '@/components/PendingClaims';
+import { LocationDeclines } from '@/components/LocationDeclines';
 import { DashboardSkeleton } from '@/components/Skeleton';
 
 export default function DashboardPage() {
@@ -33,6 +34,8 @@ export default function DashboardPage() {
         <div className="space-y-6">
           {/* Pagamentos informados pelos sobrinhos aguardando confirmação (some quando vazio) */}
           <PendingClaims />
+          {/* Sobrinhos que recusaram compartilhar localização (some quando vazio) */}
+          <LocationDeclines />
           {intelligence.data ? (
             <>
               <div className="flex justify-end gap-2">

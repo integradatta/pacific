@@ -52,11 +52,19 @@ enum PlatformEventType {
   OPERATION_UPDATED
   OPERATION_PAID
   PAYMENT_CLAIMED // sobrinho informou um pagamento (aguarda confirmação do padrinho)
+  LOCATION_CONSENT // sobrinho concedeu/recusou/revogou o compartilhamento de localização
   CLIENT_CREATED
   TENANT_APPROVED
   TENANT_SUSPENDED
   ERROR
   IMPORTANT
+}
+
+enum LocationConsentState {
+  NEVER // ainda não decidiu
+  DECLINED // recusou no opt-in (→ notifica o padrinho)
+  GRANTED // compartilhando (envia pings)
+  REVOKED // parou (desligou nas configurações / removeu permissão do SO)
 }
 
 enum PaymentClaimStatus {
@@ -273,6 +281,75 @@ model DebtorLoginEvent {
 
   @@index([tenantId])
   @@index([debtorId, at])
+}
+
+// ── Módulo de Localização (compartilhamento CONSENTIDO; ver docs/LOCATION_DESIGN.md) ──────────
+// Tudo tenant-scoped + RLS FORCE. Posição real só de devedores com consentimento GRANTED.
+
+// Consentimento por devedor (1 linha). Máquina de estados NEVER→GRANTED→REVOKED, DECLINED na recusa.
+model LocationConsent {
+  debtorId    String               @id
+  tenantId    String
+  state       LocationConsentState @default(NEVER)
+  consentText String? // versão do texto aceito (para auditoria/LGPD)
+  grantedAt   DateTime?
+  revokedAt   DateTime?
+  declinedAt  DateTime?
+  updatedAt   DateTime             @updatedAt
+
+  @@index([tenantId, state])
+}
+
+// Última posição conhecida (1 por devedor) — leitura barata do mapa do padrinho.
+model DebtorPosition {
+  debtorId   String   @id
+  tenantId   String
+  lat        Decimal  @db.Decimal(9, 6)
+  lng        Decimal  @db.Decimal(9, 6)
+  accuracy   Int? // metros
+  battery    Int? // 0-100
+  recordedAt DateTime
+
+  @@index([tenantId])
+}
+
+// Histórico de posições (trajeto). Alto volume → retenção curta (RetentionScheduler).
+model LocationPing {
+  id         String   @id @default(uuid())
+  tenantId   String
+  debtorId   String
+  lat        Decimal  @db.Decimal(9, 6)
+  lng        Decimal  @db.Decimal(9, 6)
+  accuracy   Int?
+  battery    Int?
+  recordedAt DateTime
+
+  @@index([tenantId, debtorId, recordedAt])
+}
+
+// Cercas / locais frequentes (por tenant).
+model Geofence {
+  id        String   @id @default(uuid())
+  tenantId  String
+  label     String
+  lat       Decimal  @db.Decimal(9, 6)
+  lng       Decimal  @db.Decimal(9, 6)
+  radiusM   Int
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+// Entrada/saída de cerca (derivado dos pings).
+model GeofenceEvent {
+  id         String   @id @default(uuid())
+  tenantId   String
+  debtorId   String
+  geofenceId String
+  type       String // ARRIVAL | DEPARTURE
+  occurredAt DateTime @default(now())
+
+  @@index([tenantId, debtorId, occurredAt])
 }
 
 // Estatísticas materializadas por tenant — agregados caros (computados a partir de Debt sob RLS)

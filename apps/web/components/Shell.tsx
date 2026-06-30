@@ -21,6 +21,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/carteira', label: 'Carteira', icon: '◈' },
   { href: '/vencimentos', label: 'Vencimentos', icon: '◷' },
   { href: '/recebiveis', label: 'Recebíveis', icon: '▦' },
+  { href: '/localizacao', label: 'Localização', icon: '◉' },
   { href: '/notificacoes', label: 'Notificações', icon: '◎' },
   { href: '/configuracoes', label: 'Configurações', icon: '⚙' },
 ];
