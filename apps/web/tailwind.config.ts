@@ -45,12 +45,17 @@ const config: Config = {
           '70%, 100%': { transform: 'scale(2.6)', opacity: '0' },
         },
         rise: { '0%': { opacity: '0', transform: 'translateY(6px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+        // Acolhimento do app do sobrinho: "pop" gentil (check de sucesso) e "float" suave (avatares).
+        pop: { '0%': { opacity: '0', transform: 'scale(0.7)' }, '60%': { transform: 'scale(1.08)' }, '100%': { opacity: '1', transform: 'scale(1)' } },
+        floaty: { '0%,100%': { transform: 'translateY(0)' }, '50%': { transform: 'translateY(-4px)' } },
       },
       animation: {
         shimmer: 'shimmer 1.5s ease-in-out infinite',
         sweep: 'sweep 6.5s cubic-bezier(0.6, 0, 0.4, 1) infinite',
         ping2: 'ping2 2.4s cubic-bezier(0, 0, 0.2, 1) infinite',
         rise: 'rise 0.4s ease-out both',
+        pop: 'pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both',
+        floaty: 'floaty 4s ease-in-out infinite',
       },
     },
   },

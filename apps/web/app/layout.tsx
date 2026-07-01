@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Space_Grotesk, Inter, IBM_Plex_Mono, DM_Sans, DM_Mono } from 'next/font/google';
+import { Space_Grotesk, Inter, IBM_Plex_Mono, DM_Sans, DM_Mono, Baloo_2 } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
 import { PwaRegister } from '@/components/PwaRegister';
@@ -14,6 +14,8 @@ const mono = IBM_Plex_Mono({
 // Fontes do app do sobrinho (tema claro/family-friendly). Disponíveis via CSS var; só a tela /me usa.
 const dmSans = DM_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700'], variable: '--font-dmsans' });
 const dmMono = DM_Mono({ subsets: ['latin'], weight: ['400', '500'], variable: '--font-dmmono' });
+// Display arredondada/acolhedora do app do sobrinho (tom Life360/Family Link — títulos calorosos).
+const round = Baloo_2({ subsets: ['latin'], weight: ['500', '600', '700'], variable: '--font-round' });
 
 export const metadata: Metadata = {
   title: 'Pacific — Torre de Controle',
@@ -32,7 +34,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className={`${display.variable} ${sans.variable} ${mono.variable} ${dmSans.variable} ${dmMono.variable}`}>
+    <html lang="pt-BR" className={`${display.variable} ${sans.variable} ${mono.variable} ${dmSans.variable} ${dmMono.variable} ${round.variable}`}>
       <body>
         <Providers>{children}</Providers>
         <PwaRegister />

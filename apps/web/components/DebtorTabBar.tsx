@@ -2,11 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { C, sans, HomeGlyph, LocationGlyph, TripGlyph, ProfileGlyph } from '@/components/family';
 
-// Tab bar do app do sobrinho (tema claro). 2 abas: Sua ajuda + Localização.
+// Navegação do app do sobrinho — rede de confiança (nada de vigilância). 4 abas.
 const TABS = [
-  { href: '/me', label: 'Sua ajuda', icon: HomeIcon },
-  { href: '/local', label: 'Localização', icon: PinIcon },
+  { href: '/me', label: 'Início', icon: HomeGlyph },
+  { href: '/local', label: 'Localização', icon: LocationGlyph },
+  { href: '/viagem', label: 'Viagem', icon: TripGlyph },
+  { href: '/perfil', label: 'Perfil', icon: ProfileGlyph },
 ];
 
 export function DebtorTabBar() {
@@ -14,8 +17,8 @@ export function DebtorTabBar() {
   return (
     <nav
       aria-label="Navegação"
-      className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-[#E5E7EB]"
-      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      className="fixed bottom-0 inset-x-0 z-30"
+      style={{ background: 'rgba(255,255,255,0.92)', backdropFilter: 'blur(12px)', borderTop: `1px solid ${C.line}`, paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <div className="max-w-[480px] mx-auto flex">
         {TABS.map((t) => {
@@ -23,32 +26,18 @@ export function DebtorTabBar() {
           const Icon = t.icon;
           return (
             <Link
-              key={t.href} href={t.href} aria-current={active ? 'page' : undefined}
-              className="flex-1 flex flex-col items-center justify-center gap-1 py-2.5 min-h-[56px]"
-              style={{ color: active ? '#4A7DFF' : '#9CA3AF' }}
+              key={t.href}
+              href={t.href}
+              aria-current={active ? 'page' : undefined}
+              className="flex-1 flex flex-col items-center justify-center gap-1 py-2 min-h-[58px] transition-colors"
+              style={{ color: active ? C.coral : C.faint }}
             >
               <Icon active={active} />
-              <span className="text-[11px] font-semibold" style={{ fontFamily: 'var(--font-dmsans)' }}>{t.label}</span>
+              <span className="text-[11px] font-semibold" style={sans}>{t.label}</span>
             </Link>
           );
         })}
       </div>
     </nav>
-  );
-}
-
-function HomeIcon({ active }: { active: boolean }) {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? '#EBF0FF' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V9.5Z" />
-    </svg>
-  );
-}
-function PinIcon({ active }: { active: boolean }) {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? '#EBF0FF' : 'none'} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M12 21s-7-5.5-7-11a7 7 0 1 1 14 0c0 5.5-7 11-7 11Z" />
-      <circle cx="12" cy="10" r="2.5" />
-    </svg>
   );
 }
