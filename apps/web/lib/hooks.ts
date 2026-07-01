@@ -13,6 +13,15 @@ export function usePortfolio() {
   return useQuery({ queryKey: ['portfolio'], queryFn: () => apiGet<PortfolioRow[]>('/dashboard/portfolio') });
 }
 
+// IA-1 — Copiloto (respostas prontas derivadas da carteira).
+export interface CopilotRow { id: string; debtorName: string; amountDue: string; daysRemaining: number; paymentProbability: number }
+export interface CopilotAnswer { text: string; rows: CopilotRow[] }
+export interface CopilotResponse { collectToday: CopilotAnswer; topRisks: CopilotAnswer; summary: CopilotAnswer }
+
+export function useCopilot() {
+  return useQuery({ queryKey: ['copilot'], queryFn: () => apiGet<CopilotResponse>('/dashboard/copilot') });
+}
+
 export function useIntelligence(t?: IntelligenceThresholds) {
   const qs = t ? `?highRiskBelow=${t.highRiskBelow}&concentrationLimitPct=${t.concentrationLimitPct}&dueSoonDays=${t.dueSoonDays}` : '';
   return useQuery({

@@ -1,18 +1,25 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Decimal } from 'decimal.js';
 import { summarize, type DebtSummary } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
+import { TrackingService } from '../tracking/tracking.service.js';
 
 /** Um pagamento registrado: data + total pago acumulado naquele momento (o app calcula o incremento). */
 export interface PaymentPoint { at: string; total: string; }
-export interface MyDebt { id: string; principal: string; dueDate: string; summary: DebtSummary; payments: PaymentPoint[]; }
+/** Pagamento informado pelo sobrinho, ainda aguardando o padrinho confirmar. */
+export interface PendingClaim { amount: string; claimedAt: string; }
+export interface MyDebt { id: string; principal: string; dueDate: string; summary: DebtSummary; payments: PaymentPoint[]; pendingClaim: PendingClaim | null; }
 
 @Injectable()
 export class DebtorSelfService {
-  constructor(private readonly scoped: TenantScopedService) {}
+  constructor(
+    private readonly scoped: TenantScopedService,
+    private readonly tracking: TrackingService,
+  ) {}
 
   async myDebts(tenantId: string, debtorId: string): Promise<MyDebt[]> {
     return this.scoped.withTenant(tenantId, async (tx) => {
-      const debts = await tx.debt.findMany({ where: { tenantId, debtorId }, orderBy: { dueDate: 'asc' } });
+      const debts = await tx.debt.findMany({ where: { tenantId, debtorId, deletedAt: null }, orderBy: { dueDate: 'asc' } });
       const ids = debts.map((d) => d.id);
       // Histórico de pagamentos a partir do tracking (cada OPERATION_PAID guarda o total acumulado).
       const payEvents = ids.length
@@ -29,23 +36,50 @@ export class DebtorSelfService {
         list.push({ at: e.at.toISOString(), total: detail.paidAmount ?? '0.00' });
         paymentsByDebt.set(e.targetId, list);
       }
-      return debts.map((d) => ({
-        id: d.id,
-        principal: d.principal.toFixed(2),
-        dueDate: d.dueDate.toISOString(),
-        summary: summarize(
-          {
-            principal: d.principal.toString(),
-            rate: d.rate.toString(),
-            ratePeriod: d.ratePeriod,
-            startDate: d.startDate,
-            dueDate: d.dueDate,
-          },
-          new Date(),
-          { paidAmount: d.paidAmount.toString(), settledAt: d.settledAt },
-        ),
-        payments: paymentsByDebt.get(d.id) ?? [],
-      }));
+      // Pagamentos informados ainda pendentes (1 por dívida) — para mostrar "aguardando confirmação".
+      const claims = ids.length
+        ? await tx.paymentClaim.findMany({ where: { tenantId, debtorId, status: 'PENDING', debtId: { in: ids } } })
+        : [];
+      const claimByDebt = new Map(claims.map((c) => [c.debtId, c]));
+      return debts.map((d) => {
+        const claim = claimByDebt.get(d.id);
+        return {
+          id: d.id,
+          principal: d.principal.toFixed(2),
+          dueDate: d.dueDate.toISOString(),
+          summary: summarize(
+            {
+              principal: d.principal.toString(),
+              rate: d.rate.toString(),
+              ratePeriod: d.ratePeriod,
+              startDate: d.startDate,
+              dueDate: d.dueDate,
+            },
+            new Date(),
+            { paidAmount: d.paidAmount.toString(), settledAt: d.settledAt },
+          ),
+          payments: paymentsByDebt.get(d.id) ?? [],
+          pendingClaim: claim ? { amount: claim.amount.toFixed(2), claimedAt: claim.claimedAt.toISOString() } : null,
+        };
+      });
+    });
+  }
+
+  /**
+   * O sobrinho INFORMA um pagamento (não move dinheiro): cria um PaymentClaim PENDING que o padrinho
+   * confirma ou recusa. Valida que a dívida é dele e não está quitada; impede duplicar um pendente.
+   */
+  async claimPayment(tenantId: string, debtorId: string, debtId: string, amount: string, note?: string): Promise<void> {
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      const debt = await tx.debt.findFirst({ where: { id: debtId, tenantId, debtorId, deletedAt: null } });
+      if (!debt) throw new NotFoundException('Ajuda não encontrada');
+      if (debt.settledAt) throw new BadRequestException('Esta ajuda já está quitada.');
+      const existing = await tx.paymentClaim.findFirst({ where: { tenantId, debtId, status: 'PENDING' } });
+      if (existing) throw new BadRequestException('Já há um pagamento informado aguardando confirmação.');
+      const amt = Decimal.max(0, new Decimal(amount || '0'));
+      if (amt.lessThanOrEqualTo(0)) throw new BadRequestException('Informe um valor maior que zero.');
+      await tx.paymentClaim.create({ data: { tenantId, debtId, debtorId, amount: amt.toFixed(2), note: note?.trim().slice(0, 280) || null } });
+      await this.tracking.record(tx, { tenantId, actorType: 'DEBTOR', actorId: debtorId, type: 'PAYMENT_CLAIMED', targetType: 'debt', targetId: debtId, detail: { amount: amt.toFixed(2) } });
     });
   }
 

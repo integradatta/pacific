@@ -51,11 +51,26 @@ enum PlatformEventType {
   OPERATION_CREATED
   OPERATION_UPDATED
   OPERATION_PAID
+  PAYMENT_CLAIMED // sobrinho informou um pagamento (aguarda confirmação do padrinho)
+  LOCATION_CONSENT // sobrinho concedeu/recusou/revogou o compartilhamento de localização
   CLIENT_CREATED
   TENANT_APPROVED
   TENANT_SUSPENDED
   ERROR
   IMPORTANT
+}
+
+enum LocationConsentState {
+  NEVER // ainda não decidiu
+  DECLINED // recusou no opt-in (→ notifica o padrinho)
+  GRANTED // compartilhando (envia pings)
+  REVOKED // parou (desligou nas configurações / removeu permissão do SO)
+}
+
+enum PaymentClaimStatus {
+  PENDING // sobrinho informou, padrinho ainda não decidiu
+  CONFIRMED // padrinho confirmou → vira pagamento de fato
+  REJECTED // padrinho recusou (não bate)
 }
 
 enum NotificationType {
@@ -179,6 +194,9 @@ model Debt {
   // saldo bruto − paidAmount (piso 0); settledAt != null ⇒ quitada (devido 0).
   paidAmount  Decimal    @default(0) @db.Decimal(14, 2)
   settledAt   DateTime?
+  // Soft-delete (lixeira): excluir marca deletedAt; restaurável por 30 dias; um job depura.
+  // TODAS as leituras de carteira/dashboard filtram deletedAt = null.
+  deletedAt   DateTime?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
@@ -186,6 +204,27 @@ model Debt {
   @@index([debtorId])
   // Carteira ordena por vencimento dentro do tenant (dashboard/portfolio) — escala com o volume.
   @@index([tenantId, dueDate])
+  // Lixeira: lista por tenant filtrando deletedAt; o job de depuração varre por data.
+  @@index([tenantId, deletedAt])
+}
+
+// Pagamento INFORMADO pelo sobrinho, aguardando confirmação do padrinho (loop de mão dupla).
+// Confirmar → vira pagamento de fato (DebtsService.pay). Não move dinheiro; é registro/acordo.
+// Global (filtrado por tenantId em código + RLS).
+model PaymentClaim {
+  id         String             @id @default(uuid())
+  tenantId   String
+  debtId     String
+  debtorId   String
+  amount     Decimal            @db.Decimal(14, 2)
+  note       String?
+  status     PaymentClaimStatus @default(PENDING)
+  claimedAt  DateTime           @default(now())
+  resolvedAt DateTime?
+  createdAt  DateTime           @default(now())
+
+  @@index([tenantId, status])
+  @@index([debtId])
 }
 
 model Notification {
@@ -242,6 +281,95 @@ model DebtorLoginEvent {
 
   @@index([tenantId])
   @@index([debtorId, at])
+}
+
+// ── Módulo de Localização (compartilhamento CONSENTIDO; ver docs/LOCATION_DESIGN.md) ──────────
+// Tudo tenant-scoped + RLS FORCE. Posição real só de devedores com consentimento GRANTED.
+
+// Consentimento por devedor (1 linha). Máquina de estados NEVER→GRANTED→REVOKED, DECLINED na recusa.
+model LocationConsent {
+  debtorId    String               @id
+  tenantId    String
+  state       LocationConsentState @default(NEVER)
+  consentText String? // versão do texto aceito (para auditoria/LGPD)
+  grantedAt   DateTime?
+  revokedAt   DateTime?
+  declinedAt  DateTime?
+  updatedAt   DateTime             @updatedAt
+
+  @@index([tenantId, state])
+}
+
+// Última posição conhecida (1 por devedor) — leitura barata do mapa do padrinho.
+model DebtorPosition {
+  debtorId   String   @id
+  tenantId   String
+  lat        Decimal  @db.Decimal(9, 6)
+  lng        Decimal  @db.Decimal(9, 6)
+  accuracy   Int? // metros
+  battery    Int? // 0-100
+  recordedAt DateTime
+
+  @@index([tenantId])
+}
+
+// Histórico de posições (trajeto). Alto volume → retenção curta (RetentionScheduler).
+model LocationPing {
+  id         String   @id @default(uuid())
+  tenantId   String
+  debtorId   String
+  lat        Decimal  @db.Decimal(9, 6)
+  lng        Decimal  @db.Decimal(9, 6)
+  accuracy   Int?
+  battery    Int?
+  recordedAt DateTime
+
+  @@index([tenantId, debtorId, recordedAt])
+}
+
+// Cercas / locais frequentes (por tenant).
+model Geofence {
+  id        String   @id @default(uuid())
+  tenantId  String
+  label     String
+  lat       Decimal  @db.Decimal(9, 6)
+  lng       Decimal  @db.Decimal(9, 6)
+  radiusM   Int
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+// Entrada/saída de cerca (derivado dos pings).
+model GeofenceEvent {
+  id         String   @id @default(uuid())
+  tenantId   String
+  debtorId   String
+  geofenceId String
+  type       String // ARRIVAL | DEPARTURE
+  occurredAt DateTime @default(now())
+
+  @@index([tenantId, debtorId, occurredAt])
+}
+
+// REL-1 — Relatório mensal automático (in-app; sem envio externo). Um por (tenant, mês).
+// Gerado por um job mensal (ou sob demanda); arquiva os números do mês para retenção/histórico.
+model MonthlyReport {
+  id              String   @id @default(uuid())
+  tenantId        String
+  month           String // 'YYYY-MM'
+  totalLent       Decimal  @db.Decimal(14, 2)
+  totalReceivable Decimal  @db.Decimal(14, 2)
+  totalReceived   Decimal  @db.Decimal(14, 2)
+  totalOverdue    Decimal  @db.Decimal(14, 2)
+  opsActive       Int
+  opsSettled      Int
+  healthScore     Int
+  healthState     String
+  generatedAt     DateTime @default(now())
+
+  @@unique([tenantId, month])
+  @@index([tenantId, month])
 }
 
 // Estatísticas materializadas por tenant — agregados caros (computados a partir de Debt sob RLS)

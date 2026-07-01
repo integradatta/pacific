@@ -41,3 +41,46 @@ ALTER TABLE "DebtorLoginEvent" FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation_debtor_login_event ON "DebtorLoginEvent"
   USING ("tenantId" = current_setting('app.current_tenant', true))
   WITH CHECK ("tenantId" = current_setting('app.current_tenant', true));
+
+ALTER TABLE "PaymentClaim" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "PaymentClaim" FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_payment_claim ON "PaymentClaim"
+  USING ("tenantId" = current_setting('app.current_tenant', true))
+  WITH CHECK ("tenantId" = current_setting('app.current_tenant', true));
+
+-- Módulo de Localização (compartilhamento consentido) — todas tenant-scoped.
+ALTER TABLE "LocationConsent" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "LocationConsent" FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_locationconsent ON "LocationConsent"
+  USING ("tenantId" = current_setting('app.current_tenant', true))
+  WITH CHECK ("tenantId" = current_setting('app.current_tenant', true));
+
+ALTER TABLE "DebtorPosition" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "DebtorPosition" FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_debtorposition ON "DebtorPosition"
+  USING ("tenantId" = current_setting('app.current_tenant', true))
+  WITH CHECK ("tenantId" = current_setting('app.current_tenant', true));
+
+ALTER TABLE "LocationPing" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "LocationPing" FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_locationping ON "LocationPing"
+  USING ("tenantId" = current_setting('app.current_tenant', true))
+  WITH CHECK ("tenantId" = current_setting('app.current_tenant', true));
+
+ALTER TABLE "Geofence" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "Geofence" FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_geofence ON "Geofence"
+  USING ("tenantId" = current_setting('app.current_tenant', true))
+  WITH CHECK ("tenantId" = current_setting('app.current_tenant', true));
+
+ALTER TABLE "GeofenceEvent" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "GeofenceEvent" FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_geofenceevent ON "GeofenceEvent"
+  USING ("tenantId" = current_setting('app.current_tenant', true))
+  WITH CHECK ("tenantId" = current_setting('app.current_tenant', true));
+
+ALTER TABLE "MonthlyReport" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "MonthlyReport" FORCE ROW LEVEL SECURITY;
+CREATE POLICY tenant_isolation_monthlyreport ON "MonthlyReport"
+  USING ("tenantId" = current_setting('app.current_tenant', true))
+  WITH CHECK ("tenantId" = current_setting('app.current_tenant', true));

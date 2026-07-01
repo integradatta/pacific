@@ -45,7 +45,7 @@ describe('DashboardService.kpis', () => {
   it('filtra por tenantId no findMany', async () => {
     const db = fakeDb();
     await svc(db).kpis('t9', new Date('2026-02-01T00:00:00Z'));
-    expect(db.debt.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { tenantId: 't9' } }));
+    expect(db.debt.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { tenantId: 't9', deletedAt: null } }));
   });
   it('quitada sai de a receber/contagens e entra em recebido + countSettled', async () => {
     const db = fakeDb([

@@ -55,6 +55,15 @@ export default function ConfiguracoesPage() {
           </div>
           <Link href="/notificacoes" className="font-mono text-[11px] text-sonar uppercase tracking-widest border border-sonar/40 rounded-lg px-3 py-2 hover:bg-sonar/10 transition-colors shrink-0">Gerenciar →</Link>
         </section>
+
+        {/* Lixeira */}
+        <section className="panel p-6 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="font-display text-base font-semibold text-text tracking-tight">Lixeira</h2>
+            <p className="font-sans text-sm text-text-dim">Operações excluídas, restauráveis por 30 dias.</p>
+          </div>
+          <Link href="/lixeira" className="font-mono text-[11px] text-muted uppercase tracking-widest border border-line rounded-lg px-3 py-2 hover:border-sonar/40 hover:text-sonar transition-colors shrink-0">Abrir →</Link>
+        </section>
       </div>
     </Shell>
   );

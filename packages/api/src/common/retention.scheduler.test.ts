@@ -10,15 +10,19 @@ function make() {
     debtorLoginEvent,
   };
   const scoped = { raw: () => db, withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db) };
-  return { sched: new RetentionScheduler(scoped as never), db, debtorLoginEvent };
+  const debts = { purgeTrashed: vi.fn(async () => 2) };
+  const location = { purgePings: vi.fn(async () => 5) };
+  return { sched: new RetentionScheduler(scoped as never, debts as never, location as never), db, debtorLoginEvent, debts, location };
 }
 
 describe('RetentionScheduler', () => {
-  it('poda eventos/snapshots por data e logins por tenant (best-effort)', async () => {
-    const { sched, db, debtorLoginEvent } = make();
+  it('poda eventos/snapshots por data, logins e lixeira por tenant (best-effort)', async () => {
+    const { sched, db, debtorLoginEvent, debts, location } = make();
     await sched.prune(new Date('2026-06-24T00:00:00Z'));
     expect(db.platformEvent.deleteMany).toHaveBeenCalledWith(expect.objectContaining({ where: { at: { lt: expect.any(Date) } } }));
     expect(db.portfolioSnapshot.deleteMany).toHaveBeenCalled();
     expect(debtorLoginEvent.deleteMany).toHaveBeenCalledTimes(2); // um por tenant
+    expect(debts.purgeTrashed).toHaveBeenCalledTimes(2); // depura a lixeira por tenant
+    expect(location.purgePings).toHaveBeenCalledTimes(2); // depura pings por tenant
   });
 });

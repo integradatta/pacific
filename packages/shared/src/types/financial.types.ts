@@ -22,8 +22,9 @@ export interface OperationPreview {
   daysRemaining: number;    // dias até o vencimento
 }
 
-/** Scores 0–100. recoverability = potencial de recuperação; temperature = urgência temporal. */
-export interface DebtScores { recoverability: number; temperature: number; }
+/** Scores 0–100. recoverability = potencial de recuperação; temperature = urgência temporal;
+ *  paymentProbability = probabilidade de pagamento (recuperabilidade + comportamento de pagamento). */
+export interface DebtScores { recoverability: number; temperature: number; paymentProbability: number; }
 
 export interface DebtSummary {
   balance: string;          // saldo bruto: principal + juros acumulados até a data
@@ -62,6 +63,7 @@ export interface PortfolioRow {
   status: DebtStatus;
   recoverability: number;
   temperature: number;
+  paymentProbability: number; // IA-2: probabilidade de pagamento (0–100), computada no servidor
   riskReason: string; // explicabilidade do risco (computada no servidor; não embarca o motor no client)
   dueDate: string; // ISO
   tags: string[];

@@ -9,9 +9,82 @@ import { Skeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/States';
 import { TagInput } from '@/components/Tags';
 import { RiskBadge } from '@/components/RiskBadge';
-import { useDebt, useDebtSummary, useDebtHistory, useSetDebtTags, usePayDebt, useDeleteDebt } from '@/lib/debts';
+import { useDebt, useDebtSummary, useDebtHistory, useSetDebtTags, usePayDebt, useDeleteDebt, useRenegotiateDebt } from '@/lib/debts';
 import { formatBRL, venceEm } from '@/lib/format';
 import { STATUS_COLOR, STATUS_LABEL } from '@/lib/status';
+
+const todayISO = (): string => new Date().toISOString().slice(0, 10);
+
+// Renegociar: novo vencimento (obrigatório) + taxa opcional. O devido atual vira o novo principal.
+function RenegotiateBox({ id }: { id: string }) {
+  const reneg = useRenegotiateDebt(id);
+  const [open, setOpen] = useState(false);
+  const [dueDate, setDueDate] = useState('');
+  const [ratePct, setRatePct] = useState('');
+  const [ratePeriod, setRatePeriod] = useState<'MONTHLY' | 'ANNUAL'>('MONTHLY');
+
+  function submit(): void {
+    if (!dueDate) return;
+    const input: { dueDate: string; rate?: string; ratePeriod?: 'MONTHLY' | 'ANNUAL' } = { dueDate: new Date(dueDate).toISOString() };
+    if (ratePct.trim() && Number(ratePct) >= 0) {
+      input.rate = (Number(ratePct) / 100).toFixed(6);
+      input.ratePeriod = ratePeriod;
+    }
+    if (!window.confirm('Renegociar esta operação? O valor devido atual vira o novo principal e o vencimento é atualizado.')) return;
+    reneg.mutate(input, { onSuccess: () => { setOpen(false); setDueDate(''); setRatePct(''); } });
+  }
+
+  return (
+    <section className="panel p-6">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="font-mono text-xs text-muted uppercase tracking-widest">Renegociar</h3>
+          <p className="font-sans text-sm text-text-dim mt-1">Refaça o acordo: o devido de hoje vira o novo valor e você define um novo vencimento.</p>
+        </div>
+        {!open && (
+          <button type="button" onClick={() => setOpen(true)} className="font-mono text-[10px] uppercase tracking-widest text-iris border border-iris/40 rounded px-3 py-1.5 hover:bg-iris/10 transition-colors shrink-0">
+            Renegociar
+          </button>
+        )}
+      </div>
+      {open && (
+        <div className="mt-4 space-y-3 border-t border-line pt-4">
+          <div>
+            <label htmlFor="reneg-due" className="block font-mono text-[10px] text-muted uppercase tracking-wider mb-1">Novo vencimento</label>
+            <input id="reneg-due" type="date" min={todayISO()} value={dueDate} onChange={(e) => setDueDate(e.target.value)}
+              className="w-full bg-surface2 border border-line rounded-lg px-3 py-2.5 text-text font-mono text-sm focus:outline-none focus:border-iris transition-all" />
+          </div>
+          <div>
+            <label htmlFor="reneg-rate" className="block font-mono text-[10px] text-muted uppercase tracking-wider mb-1">Nova taxa de gratidão (opcional)</label>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input id="reneg-rate" type="number" inputMode="decimal" min="0" step="0.01" value={ratePct} onChange={(e) => setRatePct(e.target.value)} placeholder="manter atual"
+                  className="w-full bg-surface2 border border-line rounded-lg px-3 pr-7 py-2.5 text-text font-mono text-sm tabular-nums focus:outline-none focus:border-iris transition-all" />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-xs text-muted">%</span>
+              </div>
+              <div className="flex rounded-lg border border-line overflow-hidden shrink-0" role="group" aria-label="Período da taxa">
+                {(['MONTHLY', 'ANNUAL'] as const).map((p) => (
+                  <button key={p} type="button" onClick={() => setRatePeriod(p)}
+                    className={`font-mono text-[10px] uppercase tracking-wider px-3 ${ratePeriod === p ? 'bg-iris/15 text-iris' : 'text-muted hover:text-text'}`}>
+                    {p === 'MONTHLY' ? 'mês' : 'ano'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          {reneg.isError && <p role="alert" className="font-mono text-xs text-status-red">Não foi possível renegociar. Verifique os dados.</p>}
+          <div className="flex gap-2">
+            <button type="button" onClick={submit} disabled={!dueDate || reneg.isPending}
+              className="bg-iris text-ink font-mono text-xs font-semibold uppercase tracking-widest px-4 py-2.5 rounded-lg hover:brightness-110 active:translate-y-px disabled:opacity-40 transition-all">
+              {reneg.isPending ? 'Renegociando…' : 'Confirmar renegociação'}
+            </button>
+            <button type="button" onClick={() => setOpen(false)} className="font-mono text-[10px] uppercase tracking-widest text-muted hover:text-text px-3">Cancelar</button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
 
 const HORIZON_LABEL: Record<number, string> = { 0: 'Hoje', 30: '30 dias', 90: '90 dias', 180: '180 dias', 365: '1 ano' };
 const RATE_PERIOD_LABEL = { MONTHLY: 'ao mês', ANNUAL: 'ao ano' } as const;
@@ -126,6 +199,23 @@ function PaymentBox({ amountDue, pending, onPay }: { amountDue: string; pending:
   );
 }
 
+// IA-2 — Probabilidade de pagamento: barra + %, cor por faixa. Ajuda a priorizar cobranças.
+function PaymentProbability({ value }: { value: number }) {
+  const color = value >= 70 ? 'bg-status-green' : value >= 40 ? 'bg-status-yellow' : 'bg-status-red';
+  const text = value >= 70 ? 'text-status-green' : value >= 40 ? 'text-status-yellow' : 'text-status-red';
+  return (
+    <div className="mt-3" role="group" aria-label={`Probabilidade de pagamento: ${value} por cento`}>
+      <div className="flex items-baseline justify-between mb-1">
+        <span className="font-mono text-[10px] text-muted uppercase tracking-widest">Probabilidade de pagamento</span>
+        <span className={`font-mono text-sm tabular-nums font-medium ${text}`}>{value}%</span>
+      </div>
+      <span className="block h-1.5 rounded-full bg-line overflow-hidden" aria-hidden>
+        <span className={`block h-full ${color}`} style={{ width: `${value}%` }} />
+      </span>
+    </div>
+  );
+}
+
 function SituacaoAtual({ s, principal, pending, onPay }: { s: DebtSummary; principal: string; pending: boolean; onPay: (i: { amount?: string; full?: boolean }) => void }) {
   const hasPaid = Number(s.paidAmount) > 0;
   return (
@@ -142,6 +232,9 @@ function SituacaoAtual({ s, principal, pending, onPay }: { s: DebtSummary; princ
         {formatBRL(s.settled ? s.paidAmount : s.amountDue)}
       </p>
       <p className="font-mono text-[11px] text-muted mt-1">{venceEm(s.daysRemaining)}</p>
+
+      {/* IA-2 — Probabilidade de pagamento (recuperabilidade + comportamento de pagamento) */}
+      {!s.settled ? <PaymentProbability value={s.scores.paymentProbability} /> : null}
 
       {/* Breakdown: original + juros = atual (− pago = devido) */}
       <div className="mt-4 space-y-1.5">
@@ -184,7 +277,7 @@ export default function OperacaoDetalhePage({ params }: { params: { id: string }
   const del = useDeleteDebt(params.id);
 
   function handleDelete(): void {
-    if (!window.confirm('Excluir esta operação? Esta ação é permanente e remove os alertas dela.')) return;
+    if (!window.confirm('Mover esta operação para a lixeira? Você pode restaurá-la por 30 dias.')) return;
     del.mutate(undefined, { onSuccess: () => router.push('/carteira') });
   }
 
@@ -274,6 +367,9 @@ export default function OperacaoDetalhePage({ params }: { params: { id: string }
                 </dl>
               </section>
             </div>
+
+            {/* Renegociação — só faz sentido em operação aberta */}
+            {summary.data && !summary.data.settled && <RenegotiateBox id={params.id} />}
 
             {/* Histórico */}
             <section className="panel p-6">

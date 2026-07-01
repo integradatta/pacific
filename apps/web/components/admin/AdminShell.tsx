@@ -63,6 +63,7 @@ export function AdminShell({ title, children }: { title: string; children: React
 
   return (
     <div className="min-h-screen flex">
+      <a href="#conteudo" className="skip-link">Pular para o conteúdo</a>
       <nav aria-label="Navegação do administrador" className="hidden md:flex flex-col w-60 shrink-0 glass border-r border-line sticky top-0 h-screen">
         <div className="px-5 py-6 border-b border-line">
           <p className="font-mono text-[10px] text-muted uppercase tracking-[0.2em] mb-1 flex items-center gap-1.5">
@@ -131,7 +132,7 @@ export function AdminShell({ title, children }: { title: string; children: React
           <div aria-label="Administrador" className="w-9 h-9 rounded-full bg-iris/15 border border-iris/40 flex items-center justify-center text-iris text-sm shrink-0">◉</div>
           <LogoutButton />
         </header>
-        <main className="flex-1 p-6 animate-rise">{children}</main>
+        <main id="conteudo" tabIndex={-1} className="flex-1 p-6 animate-rise">{children}</main>
       </div>
     </div>
   );

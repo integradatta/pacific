@@ -1,7 +1,9 @@
 'use client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ToastHost } from '@/components/Toast';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { initWebSentry } from '@/lib/sentry';
 
 // Defaults pensados p/ muitos usuários simultâneos: cache curto evita rajadas de refetch
 // (sem refetch a cada foco de janela), 1 retry, e dados "frescos" por 30s reduzem carga na API.
@@ -19,10 +21,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
         },
       }),
   );
+  useEffect(() => {
+    initWebSentry();
+  }, []);
   return (
-    <QueryClientProvider client={client}>
-      {children}
-      <ToastHost />
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={client}>
+        {children}
+        <ToastHost />
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { DebtsService } from './debts.service.js';
 import { TrackingService } from '../tracking/tracking.service.js';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 
 const dec = (v: string) => ({ toString: () => v });
 function debtRow(over: Record<string, unknown> = {}) {
@@ -44,6 +44,15 @@ function fakeDb() {
       findFirst: vi.fn(async ({ where }: { where: { id: string; tenantId: string } }) =>
         where.id === 'debt1' && where.tenantId === 't1' ? debtRow() : null),
       delete: vi.fn(async () => ({})),
+      deleteMany: vi.fn(async () => ({ count: 1 })),
+    },
+    paymentClaim: {
+      findMany: vi.fn(async () => []),
+      findFirst: vi.fn(async ({ where }: { where: { id: string; tenantId: string } }) =>
+        where.id === 'claim1' && where.tenantId === 't1'
+          ? { id: 'claim1', tenantId: 't1', debtId: 'debt1', status: 'PENDING', amount: dec('300.00') }
+          : null),
+      update: vi.fn(async () => ({})),
     },
   };
 }
@@ -72,7 +81,7 @@ describe('DebtsService', () => {
   it('list filtra por tenantId e pagina', async () => {
     const db = fakeDb();
     const page = await svc(db).list('t1', { limit: 20, offset: 0 });
-    expect(db.debt.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { tenantId: 't1' }, take: 20, skip: 0 }));
+    expect(db.debt.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { tenantId: 't1', deletedAt: null }, take: 20, skip: 0 }));
     expect(page.total).toBe(1);
   });
   it('get devolve registro com nome do devedor e tags', async () => {
@@ -208,18 +217,98 @@ describe('DebtsService', () => {
     });
   });
 
-  describe('remove (excluir operação)', () => {
-    it('apaga a dívida + alertas e registra o tracking', async () => {
+  describe('remove (lixeira / soft-delete)', () => {
+    it('marca deletedAt (não apaga) + limpa alertas + registra o tracking', async () => {
       const db = fakeDb();
-      await svc(db).remove('t1', 'debt1');
+      const NOW = new Date('2026-06-10T00:00:00Z');
+      await svc(db).remove('t1', 'debt1', NOW);
       expect(db.notification.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 't1', debtId: 'debt1' } });
-      expect(db.debt.delete).toHaveBeenCalledWith({ where: { id: 'debt1' } });
+      expect(db.debt.update).toHaveBeenCalledWith({ where: { id: 'debt1' }, data: { deletedAt: NOW } });
+      expect(db.debt.delete).not.toHaveBeenCalled();
       expect(db.platformEvent.create).toHaveBeenCalled();
     });
-    it('excluir dívida de outro tenant → NotFound (não apaga)', async () => {
+    it('excluir dívida de outro tenant → NotFound (não marca)', async () => {
       const db = fakeDb();
       await expect(svc(db).remove('t2', 'debt1')).rejects.toBeInstanceOf(NotFoundException);
-      expect(db.debt.delete).not.toHaveBeenCalled();
+      expect(db.debt.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('lixeira (restore / purge)', () => {
+    it('restore só funciona em dívida que está na lixeira', async () => {
+      const db = fakeDb();
+      db.debt.findFirst = vi.fn(async ({ where }: { where: { deletedAt?: unknown } }) =>
+        where.deletedAt ? { id: 'debt1', tenantId: 't1' } : null) as never;
+      await svc(db).restore('t1', 'debt1');
+      expect(db.debt.update).toHaveBeenCalledWith({ where: { id: 'debt1' }, data: { deletedAt: null } });
+    });
+    it('restore de dívida que não está na lixeira → NotFound', async () => {
+      const db = fakeDb();
+      db.debt.findFirst = vi.fn(async () => null) as never;
+      await expect(svc(db).restore('t1', 'debt1')).rejects.toBeInstanceOf(NotFoundException);
+    });
+    it('purgeTrashed apaga de vez as dívidas na lixeira além do corte', async () => {
+      const db = fakeDb();
+      const NOW = new Date('2026-06-30T00:00:00Z');
+      await svc(db).purgeTrashed('t1', 30, NOW);
+      expect(db.debt.deleteMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ tenantId: 't1', deletedAt: expect.objectContaining({ not: null }) }) }));
+    });
+  });
+
+  describe('renegotiate (refazer o acordo)', () => {
+    const NOW = new Date('2026-06-01T00:00:00Z');
+    it('re-baseia: devido vira novo principal, pago=0, novo vencimento; registra renegociação', async () => {
+      const db = fakeDb();
+      db.debt.findFirst = vi.fn(async () => debtRow({ rate: dec('0') })) as never; // bruto = principal = 1000
+      await svc(db).renegotiate('t1', 'debt1', { dueDate: '2026-09-01T00:00:00Z' }, NOW);
+      expect(db.debt.update).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ principal: '1000.00', paidAmount: '0', settledAt: null, dueDate: new Date('2026-09-01T00:00:00Z') }),
+      }));
+      expect(db.platformEvent.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ type: 'OPERATION_UPDATED', detail: expect.objectContaining({ renegotiated: true }) }),
+      }));
+    });
+    it('recusa renegociar operação quitada', async () => {
+      const db = fakeDb();
+      db.debt.findFirst = vi.fn(async () => debtRow({ settledAt: new Date('2026-05-01T00:00:00Z') })) as never;
+      await expect(svc(db).renegotiate('t1', 'debt1', { dueDate: '2026-09-01T00:00:00Z' }, NOW)).rejects.toBeInstanceOf(BadRequestException);
+    });
+    it('recusa novo vencimento no passado', async () => {
+      const db = fakeDb();
+      db.debt.findFirst = vi.fn(async () => debtRow({ rate: dec('0') })) as never;
+      await expect(svc(db).renegotiate('t1', 'debt1', { dueDate: '2026-05-01T00:00:00Z' }, NOW)).rejects.toBeInstanceOf(BadRequestException);
+    });
+    it('renegociar de outro tenant → NotFound', async () => {
+      await expect(svc(fakeDb()).renegotiate('t2', 'debt1', { dueDate: '2026-09-01T00:00:00Z' }, NOW)).rejects.toBeInstanceOf(NotFoundException);
+    });
+  });
+
+  describe('claims (confirmação de pagamento informado pelo sobrinho)', () => {
+    it('confirmClaim aplica o pagamento (valor do claim) e marca CONFIRMED', async () => {
+      const db = fakeDb();
+      db.debt.findFirst = vi.fn(async () => debtRow({ rate: dec('0') })) as never; // bruto = 1000
+      await svc(db).confirmClaim('t1', 'claim1', new Date('2026-06-01T00:00:00Z'));
+      // aplica 300 (valor do claim)
+      expect(db.debt.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ paidAmount: '300.00' }) }));
+      expect(db.paymentClaim.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'claim1' }, data: expect.objectContaining({ status: 'CONFIRMED' }) }));
+    });
+    it('confirmClaim de claim inexistente/não-PENDENTE → NotFound', async () => {
+      const db = fakeDb();
+      db.paymentClaim.findFirst = vi.fn(async () => null) as never;
+      await expect(svc(db).confirmClaim('t1', 'x')).rejects.toBeInstanceOf(NotFoundException);
+    });
+    it('rejectClaim marca REJECTED e não toca na dívida', async () => {
+      const db = fakeDb();
+      await svc(db).rejectClaim('t1', 'claim1');
+      expect(db.paymentClaim.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'claim1' }, data: expect.objectContaining({ status: 'REJECTED' }) }));
+      expect(db.debt.update).not.toHaveBeenCalled();
+    });
+    it('pendingClaims devolve as informações pendentes com nome do sobrinho', async () => {
+      const db = fakeDb();
+      db.paymentClaim.findMany = vi.fn(async () => [{ id: 'claim1', debtId: 'debt1', amount: { toFixed: () => '300.00' }, note: 'pix', claimedAt: new Date('2026-06-01T00:00:00Z') }]) as never;
+      db.debt.findMany = vi.fn(async () => [{ id: 'debt1', debtor: { name: 'Cliente A' } }]) as never;
+      const out = await svc(db).pendingClaims('t1');
+      expect(out).toEqual([{ id: 'claim1', debtId: 'debt1', debtorName: 'Cliente A', amount: '300.00', note: 'pix', claimedAt: '2026-06-01T00:00:00.000Z' }]);
     });
   });
 });

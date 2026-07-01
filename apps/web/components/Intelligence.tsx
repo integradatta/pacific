@@ -296,10 +296,31 @@ export function ThresholdSettings({ thresholds, onChange }: { thresholds: Intell
 }
 
 /** Bloco completo de inteligência para o dashboard. */
+// IA-3 — Padrões detectados automaticamente (frases prontas vindas do servidor).
+function PatternsCard({ patterns }: { patterns: string[] }) {
+  if (patterns.length === 0) return null;
+  return (
+    <section className="panel p-5" aria-label="Padrões detectados">
+      <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-3 flex items-center gap-1.5">
+        <span aria-hidden>◑</span> Padrões detectados
+      </p>
+      <ul className="space-y-2">
+        {patterns.map((p, i) => (
+          <li key={i} className="flex items-start gap-2.5">
+            <span aria-hidden className="mt-1.5 w-1.5 h-1.5 rounded-full bg-iris shrink-0" />
+            <span className="font-sans text-sm text-text-dim leading-relaxed">{p}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function IntelligenceBlock({ intel }: { intel: PortfolioIntelligence }) {
   return (
     <div className="space-y-6">
       <HealthHero health={intel.health} summary={intel.summary} />
+      {intel.patterns && <PatternsCard patterns={intel.patterns} />}
       <InsightStrip insights={intel.insights} />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         <ActionCenter items={intel.actionItems} />

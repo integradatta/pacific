@@ -7,6 +7,7 @@ import { usePortfolio } from '@/lib/hooks';
 import { CarteiraTable } from '@/components/CarteiraTable';
 import { ListSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/States';
+import { exportCarteiraCsv } from '@/lib/csv';
 import { riskLevel, type DebtStatus, type RiskLevel } from '@pacific/shared';
 
 const STATUS_OPTS: { v: DebtStatus | 'ALL'; label: string }[] = [
@@ -90,6 +91,15 @@ function CarteiraInner() {
                 ))}
               </select>
             )}
+            <button
+              type="button"
+              onClick={() => exportCarteiraCsv(rows)}
+              disabled={rows.length === 0}
+              title="Baixar a carteira filtrada em CSV (Excel)"
+              className="ml-auto font-mono text-[11px] uppercase tracking-widest text-muted hover:text-sonar border border-line hover:border-sonar/40 rounded-lg px-3 py-2 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Exportar CSV
+            </button>
           </div>
 
           <CarteiraTable rows={rows} />

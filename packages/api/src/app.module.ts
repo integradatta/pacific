@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_INTERCEPTOR, APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
+import { getRedis } from './common/redis.js';
 import { AllExceptionsFilter } from './common/http-exception.filter.js';
 import { LoggingInterceptor } from './common/logging.interceptor.js';
 import { HealthController } from './common/health.controller.js';
@@ -32,18 +34,29 @@ import { StatsScheduler } from './admin/stats.scheduler.js';
 import { AUTH_ADMIN, createAuthAdmin } from './admin/auth-admin.js';
 import { TrackingService } from './tracking/tracking.service.js';
 import { EventsController, PublicEventsController } from './tracking/events.controller.js';
+import { LocationService } from './location/location.service.js';
+import { LocationController } from './location/location.controller.js';
+import { LocationDebtorController } from './location/location-debtor.controller.js';
+import { ReportsService } from './reports/reports.service.js';
+import { ReportsScheduler } from './reports/reports.scheduler.js';
+import { ReportsController } from './reports/reports.controller.js';
+
+// A1 — Storage do rate limit: Redis (correto entre réplicas) quando REDIS_URL existe; senão in-memory.
+const _redis = getRedis();
+const throttlerStorage = _redis ? new ThrottlerStorageRedisService(_redis) : undefined;
 
 @Module({
   imports: [
     ScheduleModule.forRoot(),
-    // Rate limiting global (anti-scraping/brute) — limite por IP/janela. Em memória (por instância);
-    // p/ múltiplas réplicas, trocar o storage por Redis (@nestjs/throttler storage). Configurável por env.
-    ThrottlerModule.forRoot([
-      { ttl: Number(process.env.THROTTLE_TTL_MS ?? 60_000), limit: Number(process.env.THROTTLE_LIMIT ?? 300) },
-    ]),
+    // Rate limiting global (anti-scraping/brute) por IP/janela. Com REDIS_URL, o storage é Redis
+    // (limite correto entre réplicas); sem ele, in-memory (1 réplica). Configurável por env.
+    ThrottlerModule.forRoot({
+      throttlers: [{ ttl: Number(process.env.THROTTLE_TTL_MS ?? 60_000), limit: Number(process.env.THROTTLE_LIMIT ?? 300) }],
+      ...(throttlerStorage ? { storage: throttlerStorage } : {}),
+    }),
   ],
-  controllers: [HealthController, CreditorsController, DebtorProvisioningController, DebtsController, DashboardController, NotificationsController, DebtorExchangeController, DebtorSelfController, SuperAdminController, EventsController, PublicEventsController],
-  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, DebtorsAdminService, DebtsService, DashboardService, NotificationsService, NotificationsScheduler, RetentionScheduler, RlsHealthCheck, DebtorExchangeService, DebtorTokenService, DebtorSelfService, SuperAdminService, StatsScheduler, TrackingService, { provide: AUTH_ADMIN, useFactory: createAuthAdmin }, { provide: APP_FILTER, useClass: AllExceptionsFilter }, { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor }, { provide: APP_GUARD, useClass: ThrottlerGuard }],
+  controllers: [HealthController, CreditorsController, DebtorProvisioningController, DebtsController, DashboardController, NotificationsController, DebtorExchangeController, DebtorSelfController, SuperAdminController, EventsController, PublicEventsController, LocationController, LocationDebtorController, ReportsController],
+  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, DebtorsAdminService, DebtsService, DashboardService, NotificationsService, NotificationsScheduler, RetentionScheduler, RlsHealthCheck, DebtorExchangeService, DebtorTokenService, DebtorSelfService, SuperAdminService, StatsScheduler, TrackingService, LocationService, ReportsService, ReportsScheduler, { provide: AUTH_ADMIN, useFactory: createAuthAdmin }, { provide: APP_FILTER, useClass: AllExceptionsFilter }, { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor }, { provide: APP_GUARD, useClass: ThrottlerGuard }],
   exports: [PrismaService],
 })
 export class AppModule {}

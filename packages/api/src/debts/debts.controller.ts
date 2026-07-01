@@ -6,12 +6,13 @@ import { PrincipalGuard } from '../auth/principal.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { TenantId } from '../tenancy/tenant-id.decorator.js';
 import { PaginationQuery, Page } from '../common/pagination.js';
-import { DebtsService } from './debts.service.js';
+import { DebtsService, type PaymentClaimRow } from './debts.service.js';
 import { CreateDebtDto } from './dto/create-debt.dto.js';
 import { PreviewDebtDto } from './dto/preview-debt.dto.js';
 import { CreateQuickDebtDto } from './dto/create-quick-debt.dto.js';
 import { UpdateDebtTagsDto } from './dto/update-debt-tags.dto.js';
 import { PayDebtDto } from './dto/pay-debt.dto.js';
+import { RenegotiateDebtDto } from './dto/renegotiate-debt.dto.js';
 import type { Debt } from '@pacific/database';
 import type { DebtSummary, DebtRecord, DebtEvent } from '@pacific/shared';
 
@@ -45,6 +46,28 @@ export class DebtsController {
     return this.debts.list(tenantId, q);
   }
 
+  // Pagamentos informados pelo sobrinho aguardando confirmação (declarado ANTES de :id).
+  @Get('claims/pending') @Roles('CREDITOR')
+  pendingClaims(@TenantId() tenantId: string): Promise<PaymentClaimRow[]> {
+    return this.debts.pendingClaims(tenantId);
+  }
+
+  // Lixeira: operações excluídas (restauráveis por 30 dias). Declarado ANTES de :id.
+  @Get('trash') @Roles('CREDITOR')
+  trash(@TenantId() tenantId: string) {
+    return this.debts.listTrash(tenantId);
+  }
+
+  @Post('claims/:id/confirm') @Roles('CREDITOR')
+  confirmClaim(@TenantId() tenantId: string, @Param('id') id: string): Promise<void> {
+    return this.debts.confirmClaim(tenantId, id);
+  }
+
+  @Post('claims/:id/reject') @Roles('CREDITOR')
+  rejectClaim(@TenantId() tenantId: string, @Param('id') id: string): Promise<void> {
+    return this.debts.rejectClaim(tenantId, id);
+  }
+
   @Get(':id') @Roles('CREDITOR')
   get(@TenantId() tenantId: string, @Param('id') id: string): Promise<DebtRecord> {
     return this.debts.get(tenantId, id);
@@ -75,7 +98,19 @@ export class DebtsController {
     return this.debts.pay(tenantId, id, dto);
   }
 
-  // Exclui a operação (destrutivo; só o dono do tenant via gate).
+  // Renegocia (refaz o acordo): novo vencimento e, opcionalmente, nova taxa.
+  @Post(':id/renegotiate') @Roles('CREDITOR')
+  renegotiate(@TenantId() tenantId: string, @Param('id') id: string, @Body() dto: RenegotiateDebtDto): Promise<DebtRecord> {
+    return this.debts.renegotiate(tenantId, id, dto);
+  }
+
+  // Restaura uma operação da lixeira.
+  @Post(':id/restore') @Roles('CREDITOR')
+  restore(@TenantId() tenantId: string, @Param('id') id: string): Promise<void> {
+    return this.debts.restore(tenantId, id);
+  }
+
+  // Move a operação para a lixeira (soft-delete; restaurável por 30 dias).
   @Delete(':id') @Roles('CREDITOR')
   remove(@TenantId() tenantId: string, @Param('id') id: string): Promise<void> {
     return this.debts.remove(tenantId, id);

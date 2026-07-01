@@ -5,8 +5,11 @@ import { json, urlencoded } from 'express';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module.js';
+import { initSentry } from './common/sentry.js';
 
 async function bootstrap(): Promise<void> {
+  // Observabilidade: inicia o Sentry o mais cedo possível (no-op sem SENTRY_DSN).
+  initSentry();
   // bodyParser próprio com LIMITE de tamanho — mitiga DoS por payload grande/aninhado
   // (body-parser/qs/express). 100kb cobre os payloads JSON da API com folga.
   const app = await NestFactory.create(AppModule, { bodyParser: false });

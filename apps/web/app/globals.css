@@ -13,7 +13,7 @@
   --line-strong: 44 55 76; /* hairline em foco/hover */
   --text: 233 237 245;
   --text-dim: 155 166 188; /* secundário */
-  --muted: 107 119 144; /* rótulos / dados frios */
+  --muted: 126 139 166; /* rótulos / dados frios (clareado p/ contraste AA ~5:1) */
   --sonar: 43 229 194; /* acento (credor / vivo) */
   --iris: 124 108 245; /* acento de autoridade (super-admin) */
   --green: 54 179 126;
@@ -47,6 +47,39 @@ body {
 :focus-visible {
   outline: 2px solid rgb(var(--sonar));
   outline-offset: 2px;
+}
+
+/* Acessibilidade: texto só para leitor de tela + "pular para o conteúdo" (visível ao focar). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.skip-link {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  transform: translateY(-120%);
+  background: rgb(var(--sonar));
+  color: rgb(var(--ink));
+  padding: 0.6rem 1rem;
+  border-radius: 0 0 0.5rem 0;
+  font:
+    600 0.78rem var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  transition: transform 0.15s ease;
+}
+.skip-link:focus {
+  transform: translateY(0);
+  outline: none;
 }
 
 @layer components {

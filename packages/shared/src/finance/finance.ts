@@ -86,6 +86,25 @@ export function recoverabilityScore(terms: DebtTerms, asOf: Date): number {
   return clampPct(Math.round(100 - overduePenalty - burdenPenalty));
 }
 
+/**
+ * Probabilidade de pagamento 0–100 (IA-2). Parte da recuperabilidade (que pondera atraso e carga
+ * de juros) e adiciona o sinal de COMPORTAMENTO: quem já abateu parte da dívida tende mais a pagar
+ * (bônus de até +20 proporcional ao quanto já foi pago). Quitada ⇒ 100. Determinístico/explicável.
+ */
+export function paymentProbability(
+  terms: DebtTerms,
+  asOf: Date,
+  settlement: { paidAmount?: string; settled?: boolean } = {},
+): number {
+  if (settlement.settled) return 100;
+  const base = recoverabilityScore(terms, asOf);
+  const gross = new Decimal(balanceAt(terms, asOf));
+  const paid = new Decimal(settlement.paidAmount || '0');
+  const paidFraction = gross.isZero() ? 0 : Math.max(0, Math.min(1, paid.div(gross).toNumber()));
+  const payingBonus = Math.round(paidFraction * 20);
+  return clampPct(base + payingBonus);
+}
+
 export function projections(terms: DebtTerms, asOf: Date): Projection[] {
   return HORIZONS.map((h) => {
     const at = new Date(asOf.getTime() + h * 86_400_000);
@@ -113,6 +132,7 @@ export function summarize(
     scores: {
       recoverability: recoverabilityScore(terms, asOf),
       temperature: temperatureScore(terms, asOf),
+      paymentProbability: paymentProbability(terms, asOf, { paidAmount, settled }),
     },
     projections: projections(terms, asOf),
   };
