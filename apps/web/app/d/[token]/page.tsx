@@ -1,23 +1,25 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { exchangeLink } from '@/lib/debtor';
 
 // Tela de entrada pelo link mágico — tema claro/family-friendly, igual ao app do sobrinho (/me).
-export default function DebtorLinkPage({ params }: { params: { token: string } }) {
+// Next 15: params é uma Promise; em client component, desempacotamos com use().
+export default function DebtorLinkPage({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = use(params);
   const router = useRouter();
   const [error, setError] = useState(false);
 
   useEffect(() => {
     let active = true;
-    exchangeLink(params.token)
+    exchangeLink(token)
       .then(() => active && router.replace('/me'))
       .catch(() => active && setError(true));
     return () => {
       active = false;
     };
-  }, [params.token, router]);
+  }, [token, router]);
 
   return (
     <main className="min-h-screen flex items-center justify-center px-6 bg-[#F7F8FA]" style={{ fontFamily: 'var(--font-dmsans)' }}>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { use, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { DebtEvent, DebtEventKind, DebtSummary } from '@pacific/shared';
@@ -267,14 +267,16 @@ function SituacaoAtual({ s, principal, pending, onPay }: { s: DebtSummary; princ
   );
 }
 
-export default function OperacaoDetalhePage({ params }: { params: { id: string } }) {
-  const debt = useDebt(params.id);
-  const summary = useDebtSummary(params.id);
-  const history = useDebtHistory(params.id);
-  const setTags = useSetDebtTags(params.id);
-  const pay = usePayDebt(params.id);
+// Next 15: params é uma Promise; em client component, desempacotamos com use().
+export default function OperacaoDetalhePage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const debt = useDebt(id);
+  const summary = useDebtSummary(id);
+  const history = useDebtHistory(id);
+  const setTags = useSetDebtTags(id);
+  const pay = usePayDebt(id);
   const router = useRouter();
-  const del = useDeleteDebt(params.id);
+  const del = useDeleteDebt(id);
 
   function handleDelete(): void {
     if (!window.confirm('Mover esta operação para a lixeira? Você pode restaurá-la por 30 dias.')) return;
@@ -369,7 +371,7 @@ export default function OperacaoDetalhePage({ params }: { params: { id: string }
             </div>
 
             {/* Renegociação — só faz sentido em operação aberta */}
-            {summary.data && !summary.data.settled && <RenegotiateBox id={params.id} />}
+            {summary.data && !summary.data.settled && <RenegotiateBox id={id} />}
 
             {/* Histórico */}
             <section className="panel p-6">

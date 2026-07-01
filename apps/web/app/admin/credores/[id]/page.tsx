@@ -1,5 +1,6 @@
 'use client';
 
+import { use } from 'react';
 import Link from 'next/link';
 import { Decimal } from 'decimal.js';
 import { AdminShell } from '@/components/admin/AdminShell';
@@ -8,12 +9,14 @@ import { useTenantOperations, useAdminCreditors } from '@/lib/admin';
 import { formatBRL, venceEm } from '@/lib/format';
 import { STATUS_LABEL } from '@/lib/status';
 
-export default function CreditorOperationsPage({ params }: { params: { id: string } }) {
-  const ops = useTenantOperations(params.id);
+// Next 15: params é uma Promise; em client component, desempacotamos com use().
+export default function CreditorOperationsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const ops = useTenantOperations(id);
   const rows = ops.data ?? [];
   // Identidade do padrinho (nome/e-mail/situação) — vem do cache de /admin/creditors.
   const creditors = useAdminCreditors();
-  const padrinho = (creditors.data ?? []).find((c) => c.tenantId === params.id);
+  const padrinho = (creditors.data ?? []).find((c) => c.tenantId === id);
 
   // Resumo da carteira deste padrinho (somas simples — não é o motor proprietário).
   const open = rows.filter((r) => !r.settled);
