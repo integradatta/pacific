@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, UseGuards, ForbiddenException } fro
 import { IsIn, IsOptional, IsString, MaxLength, Matches } from 'class-validator';
 import { JwtGuard } from '../auth/jwt.guard.js';
 import { TenantGuard } from '../tenancy/tenant.guard.js';
+import { DebtorGuard } from '../auth/debtor.guard.js';
 import { RolesGuard } from '../auth/roles.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { TenantId } from '../tenancy/tenant-id.decorator.js';
@@ -21,7 +22,7 @@ export class ClaimPaymentDto {
 }
 
 @Controller('debtor')
-@UseGuards(new JwtGuard(), TenantGuard, RolesGuard)
+@UseGuards(new JwtGuard(), TenantGuard, DebtorGuard, RolesGuard)
 export class DebtorSelfController {
   constructor(private readonly self: DebtorSelfService) {}
 
