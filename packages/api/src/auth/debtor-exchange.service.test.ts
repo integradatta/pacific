@@ -6,7 +6,9 @@ import { UnauthorizedException } from '@nestjs/common';
 function deps(access: { id?: string; debtorId: string; tenantId: string; active: boolean } | null) {
   const tx = {
     debtorAccess: { updateMany: vi.fn(async () => ({ count: 1 })) },
-    debtorLoginEvent: { create: vi.fn(async () => ({ id: 'e1' })) },
+    debtorLoginEvent: { create: vi.fn(async () => ({ id: 'e1' })), count: vi.fn(async () => 0) },
+    debtor: { findUnique: vi.fn(async () => ({ name: 'Sobrinho' })) },
+    notification: { create: vi.fn(async () => ({})) },
     platformEvent: { create: vi.fn(async () => ({})) },
   };
   const scoped = {

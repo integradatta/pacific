@@ -26,6 +26,23 @@ export default function AdminOverviewPage() {
           <KpiCard label="A receber" value={o ? formatBRL(o.outstanding) : '—'} sub={o ? `${o.operationsOverdue} vencidas` : ''} />
         </div>
 
+        {/* Alerta de segurança — só aparece quando há tentativas de login falhas nas últimas 24h. */}
+        {o && o.loginFailures24h > 0 && (
+          <Link
+            href="/admin/seguranca"
+            className="flex items-center justify-between gap-3 rounded-lg px-4 py-3 border transition-colors hover:brightness-110"
+            style={{ background: 'rgb(var(--status-red) / 0.08)', borderColor: 'rgb(var(--status-red) / 0.35)' }}
+          >
+            <span className="flex items-center gap-2.5">
+              <span aria-hidden>🛡️</span>
+              <span className="font-sans text-sm text-text">
+                <strong className="tabular-nums">{o.loginFailures24h}</strong> tentativa{o.loginFailures24h === 1 ? '' : 's'} de login falha{o.loginFailures24h === 1 ? '' : 's'} nas últimas 24h.
+              </span>
+            </span>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-status-red shrink-0">Revisar →</span>
+          </Link>
+        )}
+
         {/* Assinatura */}
         {creditors.data ? <Constellation creditors={creditors.data} /> : <div className="panel p-6"><div className="skeleton h-64 w-full rounded-lg" /></div>}
 

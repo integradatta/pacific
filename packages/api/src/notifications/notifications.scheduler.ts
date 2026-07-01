@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 import { NotificationsService } from './notifications.service.js';
+import { LocationService } from '../location/location.service.js';
 
 /**
  * Alertas automáticos: diariamente gera as réguas de vencimento (15/7/3/1/hoje/atraso) para todas
@@ -15,6 +16,7 @@ export class NotificationsScheduler {
   constructor(
     private readonly scoped: TenantScopedService,
     private readonly notifications: NotificationsService,
+    private readonly location: LocationService,
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_8AM)
@@ -24,6 +26,7 @@ export class NotificationsScheduler {
       .tenant.findMany({ where: { approval: 'APPROVED', status: 'ACTIVE' }, select: { id: true } })
       .catch(() => [] as { id: string }[]);
     let total = 0;
+    let silent = 0;
     for (const t of tenants) {
       try {
         const { created } = await this.notifications.generateDueNotifications(t.id);
@@ -31,7 +34,12 @@ export class NotificationsScheduler {
       } catch (e) {
         this.log.warn(`Falha ao gerar alertas da carteira ${t.id}: ${String(e)}`);
       }
+      try {
+        silent += await this.location.notifySilent(t.id);
+      } catch (e) {
+        this.log.warn(`Falha ao checar 'sem sinal' da carteira ${t.id}: ${String(e)}`);
+      }
     }
-    this.log.log(`Alertas automáticos gerados: ${total} em ${tenants.length} carteiras.`);
+    this.log.log(`Alertas automáticos: ${total} de vencimento + ${silent} 'sem sinal' em ${tenants.length} carteiras.`);
   }
 }

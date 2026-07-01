@@ -30,12 +30,13 @@ function fakeDb() {
   return {
     debtor: {
       findFirst: vi.fn(async () => ({ id: 'd1', tenantId: 't1' })),
+      findUnique: vi.fn(async () => ({ name: 'Cliente A' })),
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'dq', ...data })),
     },
     debtorAccess: { create: vi.fn(async () => ({})), findFirst: vi.fn(async () => null) },
     debtorLoginEvent: { findMany: vi.fn(async () => []) },
     platformEvent: { create: vi.fn(async () => ({})), findMany: vi.fn(async () => []) },
-    notification: { findMany: vi.fn(async () => []), deleteMany: vi.fn(async () => ({ count: 0 })) },
+    notification: { findMany: vi.fn(async () => []), deleteMany: vi.fn(async () => ({ count: 0 })), upsert: vi.fn(async () => ({})) },
     debt: {
       create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => ({ id: 'debt1', ...data })),
       update: vi.fn(async () => ({})),

@@ -3,6 +3,7 @@ import { Decimal } from 'decimal.js';
 import { summarize, type DebtSummary } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 import { TrackingService } from '../tracking/tracking.service.js';
+import { notifyCreditor, brl } from '../notifications/notify.js';
 
 /** Um pagamento registrado: data + total pago acumulado naquele momento (o app calcula o incremento). */
 export interface PaymentPoint { at: string; total: string; }
@@ -80,6 +81,9 @@ export class DebtorSelfService {
       if (amt.lessThanOrEqualTo(0)) throw new BadRequestException('Informe um valor maior que zero.');
       await tx.paymentClaim.create({ data: { tenantId, debtId, debtorId, amount: amt.toFixed(2), note: note?.trim().slice(0, 280) || null } });
       await this.tracking.record(tx, { tenantId, actorType: 'DEBTOR', actorId: debtorId, type: 'PAYMENT_CLAIMED', targetType: 'debt', targetId: debtId, detail: { amount: amt.toFixed(2) } });
+      // Notifica o padrinho para confirmar o pagamento avisado.
+      const d = await tx.debtor.findUnique({ where: { id: debtorId }, select: { name: true } });
+      await notifyCreditor(tx, { tenantId, debtorId, debtId, type: 'PAYMENT_CLAIMED', title: 'Pagamento avisado', body: `${d?.name ?? 'Seu sobrinho'} avisou um pagamento de ${brl(amt.toFixed(2))}. Confirme quando puder.` });
     });
   }
 

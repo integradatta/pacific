@@ -19,7 +19,8 @@ function fakeDb(over: Record<string, unknown> = {}) {
     locationPing: { createMany: vi.fn(async () => ({ count: 0 })), findMany: vi.fn(async () => []), deleteMany: vi.fn(async () => ({ count: 0 })) },
     geofence: { findMany: vi.fn(async () => []), create: vi.fn(async () => ({})), deleteMany: vi.fn(async () => ({ count: 0 })) },
     geofenceEvent: { createMany: vi.fn(async () => ({ count: 0 })) },
-    debtor: { findMany: vi.fn(async () => []) },
+    debtor: { findMany: vi.fn(async () => []), findUnique: vi.fn(async () => ({ name: 'Sobrinho' })) },
+    notification: { create: vi.fn(async () => ({})), findFirst: vi.fn(async () => null) },
     ...over,
   };
 }
@@ -44,10 +45,11 @@ describe('LocationService — consentimento', () => {
     expect(db.debtorPosition.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 't1', debtorId: 'd1' } });
   });
 
-  it('setConsent DECLINED registra recusa (gatilho da notificação)', async () => {
+  it('setConsent DECLINED registra recusa + notifica o padrinho', async () => {
     const db = fakeDb();
     await svc(db).setConsent('t1', 'd1', 'DECLINED');
     expect(tracking.record).toHaveBeenCalledWith(db, expect.objectContaining({ type: 'LOCATION_CONSENT', detail: { state: 'DECLINED' } }));
+    expect(db.notification.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ type: 'LOCATION_DECLINED' }) }));
   });
 });
 

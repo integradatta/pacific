@@ -23,6 +23,8 @@ function fakeDb(debts: Array<{ id: string; settledAt?: Date | null }>, payEvents
     platformEvent: { findMany: vi.fn(async () => payEvents), create: vi.fn(async () => ({})) },
     paymentClaim: { findMany: vi.fn(async () => []), findFirst: vi.fn(async () => null), create: vi.fn(async () => ({})) },
     deviceToken: { upsert: vi.fn(async () => ({})), deleteMany: vi.fn(async () => ({ count: 0 })) },
+    debtor: { findUnique: vi.fn(async () => ({ name: 'Sobrinho' })) },
+    notification: { upsert: vi.fn(async () => ({})), create: vi.fn(async () => ({})) },
   };
 }
 const tracking = { record: vi.fn(async () => undefined) };

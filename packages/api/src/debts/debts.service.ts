@@ -6,6 +6,7 @@ import type { PayDebtInput } from './dto/pay-debt.dto.js';
 import type { PreviewDebtDto } from './dto/preview-debt.dto.js';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 import { TrackingService } from '../tracking/tracking.service.js';
+import { notifyCreditor } from '../notifications/notify.js';
 import { generateAccessToken, hashAccessToken } from '../auth/access-token.util.js';
 import type { Page } from '../common/pagination.js';
 import type { CreateDebtInput } from './dto/create-debt.dto.js';
@@ -185,6 +186,11 @@ export class DebtsService {
     // Cancela alertas pendentes (não lidos) desta dívida.
     await tx.notification.deleteMany({ where: { tenantId, debtId: debt.id, readAt: null } });
     await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'OPERATION_PAID', targetType: 'debt', targetId: debt.id, detail: { paidAmount: paid.toFixed(2), settled: settledAt != null } });
+    // Marco positivo: ajuda quitada.
+    if (settledAt) {
+      const d = await tx.debtor.findUnique({ where: { id: debt.debtorId }, select: { name: true } });
+      await notifyCreditor(tx, { tenantId, debtorId: debt.debtorId, debtId: debt.id, type: 'DEBT_SETTLED', title: 'Ajuda quitada 🎉', body: `${d?.name ?? 'Uma ajuda'} — combinado quitado. Tudo certo!` });
+    }
   }
 
   /** Pagamentos informados pelo sobrinho aguardando confirmação do padrinho (toda a carteira). */

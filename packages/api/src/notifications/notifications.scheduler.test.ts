@@ -4,7 +4,8 @@ import { NotificationsScheduler } from './notifications.scheduler.js';
 function make(tenants: { id: string }[], gen = vi.fn(async () => ({ created: 2 }))) {
   const scoped = { raw: () => ({ tenant: { findMany: vi.fn(async () => tenants) } }) };
   const notifications = { generateDueNotifications: gen };
-  return { sched: new NotificationsScheduler(scoped as never, notifications as never), gen };
+  const location = { notifySilent: vi.fn(async () => 0) };
+  return { sched: new NotificationsScheduler(scoped as never, notifications as never, location as never), gen };
 }
 
 describe('NotificationsScheduler', () => {
