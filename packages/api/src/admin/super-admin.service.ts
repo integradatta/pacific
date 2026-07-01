@@ -45,19 +45,21 @@ export class SuperAdminService {
     if (cached && Date.now() - cached.at < SuperAdminService.OVERVIEW_TTL_MS) return cached.value;
 
     const today = startOfTodayUTC(now);
+    const last24h = new Date(now.getTime() - 86_400_000);
     // Contagens via count() (indexável; não carrega todas as linhas) + stats materializadas.
-    const [creditorsTotal, creditorsActive, creditorsBlocked, creditorsPending, newCreditorsToday, stats] = await Promise.all([
+    const [creditorsTotal, creditorsActive, creditorsBlocked, creditorsPending, newCreditorsToday, loginFailures24h, stats] = await Promise.all([
       this.db.tenant.count(),
       this.db.tenant.count({ where: { approval: 'APPROVED', status: 'ACTIVE' } }),
       this.db.tenant.count({ where: { status: 'SUSPENDED' } }),
       this.db.tenant.count({ where: { approval: 'PENDING' } }),
       this.db.tenant.count({ where: { createdAt: { gte: today } } }),
+      this.db.platformEvent.count({ where: { type: 'LOGIN_FAILED', at: { gte: last24h } } }),
       this.db.tenantStats.findMany(),
     ]);
     const o: AdminOverview = {
       creditorsTotal, creditorsActive, creditorsBlocked, creditorsPending, newCreditorsToday,
       operationsTotal: 0, operationsActive: 0, operationsOverdue: 0,
-      volumeLent: '0', outstanding: '0', received: '0', loginsToday: 0,
+      volumeLent: '0', outstanding: '0', received: '0', loginsToday: 0, loginFailures24h,
     };
     let volume = new Decimal(0);
     let outstanding = new Decimal(0);

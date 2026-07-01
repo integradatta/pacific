@@ -88,6 +88,14 @@ export default function LocalizacaoPage() {
                 <p className="px-5 py-6 font-sans text-sm text-text-dim">Ninguém está compartilhando a localização no momento.</p>
               ) : (
                 <ul className="divide-y divide-line/70">
+                  {sharing.filter((p) => p.battery != null && p.battery <= 20).length > 0 && (
+                    <li className="px-5 py-2 flex items-center gap-2" style={{ background: 'rgba(245,166,35,0.08)' }}>
+                      <span aria-hidden>🔋</span>
+                      <span className="font-sans text-xs text-text-dim">
+                        {sharing.filter((p) => p.battery != null && p.battery <= 20).length} com bateria baixa — a localização pode parar.
+                      </span>
+                    </li>
+                  )}
                   {sharing.map((p) => (
                     <li key={p.debtorId} className="px-5 py-3">
                       <div className="flex items-center justify-between gap-2">
@@ -102,7 +110,12 @@ export default function LocalizacaoPage() {
                           {selected === p.debtorId ? 'Ocultar' : 'Trajeto'}
                         </button>
                       </div>
-                      <p className="font-mono text-[10px] text-muted mt-1 tabular-nums">{p.online ? 'agora' : 'sem atualização recente'} · {fmtRel(p.recordedAt)}</p>
+                      <p className="font-mono text-[10px] text-muted mt-1 tabular-nums">
+                        {p.online ? 'agora' : 'sem atualização recente'} · {fmtRel(p.recordedAt)}
+                        {p.battery != null && (
+                          <span style={p.battery <= 20 ? { color: '#F5A623' } : undefined}> · 🔋 {p.battery}%{p.battery <= 20 ? ' baixa' : ''}</span>
+                        )}
+                      </p>
                     </li>
                   ))}
                 </ul>

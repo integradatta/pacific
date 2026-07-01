@@ -44,6 +44,7 @@ export interface AdminOverview {
   outstanding: string; // total a receber (devido)
   received: string; // total recebido
   loginsToday: number; // acessos de devedores hoje (proxy de atividade)
+  loginFailures24h: number; // tentativas de login falhas nas últimas 24h (sinal de segurança)
 }
 
 /** Linha de credor com agregados da carteira. */

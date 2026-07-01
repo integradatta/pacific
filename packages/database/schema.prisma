@@ -81,6 +81,13 @@ enum NotificationType {
   DUE_1
   DUE_TODAY
   OVERDUE
+  // Eventos do sobrinho que o padrinho vê como notificação (nível-devedor: debtId pode ser null).
+  LOCATION_DECLINED // recusou compartilhar localização
+  LOCATION_STOPPED // parou de compartilhar (revogou)
+  LOCATION_SILENT // localização ativa mas sem sinal há X tempo (proxy de "sumiu/desinstalou")
+  PAYMENT_CLAIMED // avisou um pagamento ("Já resolvi") — aguardando confirmação
+  DEBT_SETTLED // ajuda quitada
+  DEBTOR_FIRST_ACCESS // abriu o link pela primeira vez
 }
 
 model Tenant {

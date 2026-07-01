@@ -1,0 +1,7 @@
+-- Novos tipos de notificação (eventos do sobrinho + quitação). Aditivo e idempotente.
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'LOCATION_DECLINED';
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'LOCATION_STOPPED';
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'LOCATION_SILENT';
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'PAYMENT_CLAIMED';
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'DEBT_SETTLED';
+ALTER TYPE "NotificationType" ADD VALUE IF NOT EXISTS 'DEBTOR_FIRST_ACCESS';

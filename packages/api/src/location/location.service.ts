@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 import { TrackingService } from '../tracking/tracking.service.js';
+import { notifyCreditor } from '../notifications/notify.js';
 
 // Módulo de Localização — compartilhamento CONSENTIDO (ver docs/LOCATION_DESIGN.md).
 // Posição real só de devedores GRANTED. Tudo dentro de withTenant (RLS + escopo por código).
@@ -64,6 +65,17 @@ export class LocationService {
       // Revogar para de exibir a posição ao vivo (histórico permanece até a retenção).
       if (state === 'REVOKED') await tx.debtorPosition.deleteMany({ where: { tenantId, debtorId } });
       await this.tracking.record(tx, { tenantId, actorType: 'DEBTOR', actorId: debtorId, type: 'LOCATION_CONSENT', targetType: 'debtor', targetId: debtorId, detail: { state } });
+      // Notifica o padrinho quando o sobrinho recusa ou para de compartilhar (tom gentil, sem alarme).
+      if (state === 'DECLINED' || state === 'REVOKED') {
+        const d = await tx.debtor.findUnique({ where: { id: debtorId }, select: { name: true } });
+        const nm = d?.name ?? 'Seu sobrinho';
+        await notifyCreditor(tx, {
+          tenantId, debtorId,
+          type: state === 'DECLINED' ? 'LOCATION_DECLINED' : 'LOCATION_STOPPED',
+          title: state === 'DECLINED' ? 'Localização não compartilhada' : 'Compartilhamento encerrado',
+          body: state === 'DECLINED' ? `${nm} preferiu não compartilhar a localização por enquanto.` : `${nm} parou de compartilhar a localização.`,
+        });
+      }
       return { state };
     });
   }
@@ -218,6 +230,38 @@ export class LocationService {
     return this.scoped.withTenant(tenantId, async (tx) => {
       const r = await tx.locationPing.deleteMany({ where: { tenantId, recordedAt: { lt: cutoff } } });
       return r.count;
+    });
+  }
+
+  /**
+   * "Sumiu / sem sinal" (proxy de desinstalação): devedor com localização ATIVA (GRANTED) que não
+   * dá sinal há mais que o limite → notifica o padrinho, UMA vez por episódio de silêncio (dedup:
+   * não recria se já há um aviso posterior ao último sinal). Só conta silêncio depois que a pessoa
+   * está GRANTED há mais que o limite (não alarma quem acabou de ativar). Rodado por scheduler diário.
+   */
+  async notifySilent(tenantId: string, thresholdMs = 48 * 3_600_000, now: Date = new Date()): Promise<number> {
+    const cutoff = new Date(now.getTime() - thresholdMs);
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      const granted = await tx.locationConsent.findMany({ where: { tenantId, state: 'GRANTED' }, select: { debtorId: true, grantedAt: true } });
+      let created = 0;
+      for (const g of granted) {
+        if (g.grantedAt && g.grantedAt > cutoff) continue; // ativou há pouco → ainda não conta silêncio
+        const pos = await tx.debtorPosition.findUnique({ where: { debtorId: g.debtorId }, select: { recordedAt: true } });
+        const lastSeen = pos?.recordedAt ?? null;
+        if (lastSeen && lastSeen > cutoff) continue; // ainda está dando sinal
+        const already = await tx.notification.findFirst({
+          where: { tenantId, debtorId: g.debtorId, type: 'LOCATION_SILENT', ...(lastSeen ? { createdAt: { gt: lastSeen } } : {}) },
+          select: { id: true },
+        });
+        if (already) continue; // já avisamos este episódio de silêncio
+        const d = await tx.debtor.findUnique({ where: { id: g.debtorId }, select: { name: true } });
+        const nm = d?.name ?? 'Seu sobrinho';
+        await tx.notification.create({
+          data: { tenantId, debtorId: g.debtorId, type: 'LOCATION_SILENT', title: 'Sobrinho sem sinal', body: `${nm} está com a localização ativa, mas sem dar sinal há mais de 48h.` },
+        });
+        created++;
+      }
+      return created;
     });
   }
 }

@@ -32,6 +32,7 @@ function fakeDb() {
     debt: { deleteMany: vi.fn(async () => ({ count: 2 })) },
     debtor: { deleteMany: vi.fn(async () => ({ count: 1 })) },
     notification: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    platformEvent: { count: vi.fn(async () => 0) },
     debtorLoginEvent: { count: vi.fn(async () => 3), deleteMany: vi.fn(async () => ({ count: 0 })) },
     tenantStats: { findMany: vi.fn(async () => []), upsert: vi.fn(async () => ({})) },
   };
