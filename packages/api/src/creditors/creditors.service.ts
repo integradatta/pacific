@@ -64,4 +64,17 @@ export class CreditorsService {
     const u = await db.user.findUnique({ where: { supabaseId }, select: { termsAcceptedAt: true } });
     return u?.termsAcceptedAt != null;
   }
+
+  /** Preferência por resumo semanal: null = ainda não decidiu (mostra o convite no 1º acesso). */
+  async getWeeklyDigestOptIn(supabaseId: string): Promise<boolean | null> {
+    const db = this.resolver.forTenant('__provisioning__');
+    const u = await db.user.findUnique({ where: { supabaseId }, select: { weeklyDigestOptIn: true } });
+    return u?.weeklyDigestOptIn ?? null;
+  }
+
+  /** Define (aceita/nega) o resumo semanal — no 1º acesso e depois em Configurações. */
+  async setWeeklyDigestOptIn(supabaseId: string, value: boolean): Promise<void> {
+    const db = this.resolver.forTenant('__provisioning__');
+    await db.user.update({ where: { supabaseId }, data: { weeklyDigestOptIn: value } });
+  }
 }

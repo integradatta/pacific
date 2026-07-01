@@ -1,13 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Shell } from '@/components/Shell';
 import { ThresholdSettings } from '@/components/Intelligence';
 import { useThresholds } from '@/lib/hooks';
-import { apiGet } from '@/lib/api';
+import { apiGet, apiPost } from '@/lib/api';
 
-interface Me { email: string; role: string; tenantId: string | null; approved: boolean }
+interface Me { email: string; role: string; tenantId: string | null; approved: boolean; weeklyDigestOptIn?: boolean | null }
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -19,7 +19,13 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 export default function ConfiguracoesPage() {
+  const qc = useQueryClient();
   const me = useQuery({ queryKey: ['auth-me'], queryFn: () => apiGet<Me>('/auth/me') });
+  const setDigest = useMutation({
+    mutationFn: (weeklyDigest: boolean) => apiPost('/auth/notification-prefs', { weeklyDigest }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['auth-me'] }),
+  });
+  const digestOn = me.data?.weeklyDigestOptIn === true;
   const [thresholds, setThresholds] = useThresholds();
 
   return (
@@ -54,6 +60,22 @@ export default function ConfiguracoesPage() {
             <p className="font-sans text-sm text-text-dim">Escolha as réguas (15/7/3/1 dia, no vencimento, após vencer).</p>
           </div>
           <Link href="/notificacoes" className="font-mono text-[11px] text-sonar uppercase tracking-widest border border-sonar/40 rounded-lg px-3 py-2 hover:bg-sonar/10 transition-colors shrink-0">Gerenciar →</Link>
+        </section>
+
+        {/* Resumo semanal (push) */}
+        <section className="panel p-6 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="font-display text-base font-semibold text-text tracking-tight">Resumo semanal</h2>
+            <p className="font-sans text-sm text-text-dim">Um panorama da carteira, uma vez por semana{me.data?.weeklyDigestOptIn === null ? ' — você ainda não decidiu.' : '.'}</p>
+          </div>
+          <button
+            type="button" role="switch" aria-checked={digestOn} aria-label="Resumo semanal"
+            onClick={() => setDigest.mutate(!digestOn)} disabled={setDigest.isPending}
+            className="relative w-12 h-7 rounded-full transition-colors shrink-0 disabled:opacity-50"
+            style={{ background: digestOn ? 'rgb(var(--sonar))' : 'rgb(var(--line-strong))' }}
+          >
+            <span className="absolute top-1 w-5 h-5 rounded-full bg-white transition-all" style={{ left: digestOn ? '26px' : '4px' }} />
+          </button>
         </section>
 
         {/* Lixeira */}

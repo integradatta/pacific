@@ -66,6 +66,21 @@ export function useSetDebtTags(id: string) {
   });
 }
 
+/** Ajusta as datas (inicial/vencimento) — inclusive no passado, p/ registrar dívidas antigas. */
+export function useUpdateDebtDates(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { startDate?: string; dueDate?: string }) => apiPatch<DebtRecord>(`/debts/${id}/dates`, input),
+    onSuccess: (rec) => {
+      qc.setQueryData(['debt', id], rec);
+      void qc.invalidateQueries({ queryKey: ['debt', id, 'summary'] });
+      void qc.invalidateQueries({ queryKey: ['debt', id, 'history'] });
+      void qc.invalidateQueries({ queryKey: ['portfolio'] });
+      void qc.invalidateQueries({ queryKey: ['kpis'] });
+    },
+  });
+}
+
 /** Registra pagamento (parcial: { amount } ou total: { full: true }) e atualiza tudo. */
 export function usePayDebt(id: string) {
   const qc = useQueryClient();

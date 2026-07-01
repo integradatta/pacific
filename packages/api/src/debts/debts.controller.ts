@@ -11,6 +11,7 @@ import { CreateDebtDto } from './dto/create-debt.dto.js';
 import { PreviewDebtDto } from './dto/preview-debt.dto.js';
 import { CreateQuickDebtDto } from './dto/create-quick-debt.dto.js';
 import { UpdateDebtTagsDto } from './dto/update-debt-tags.dto.js';
+import { UpdateDebtDatesDto } from './dto/update-debt-dates.dto.js';
 import { PayDebtDto } from './dto/pay-debt.dto.js';
 import { RenegotiateDebtDto } from './dto/renegotiate-debt.dto.js';
 import type { Debt } from '@pacific/database';
@@ -90,6 +91,16 @@ export class DebtsController {
     @Body() dto: UpdateDebtTagsDto,
   ): Promise<DebtRecord> {
     return this.debts.setTags(tenantId, id, dto.tags);
+  }
+
+  // Ajusta as datas (data inicial / vencimento) — permite registrar/corrigir dívidas antigas.
+  @Patch(':id/dates') @Roles('CREDITOR')
+  updateDates(
+    @TenantId() tenantId: string,
+    @Param('id') id: string,
+    @Body() dto: UpdateDebtDatesDto,
+  ): Promise<DebtRecord> {
+    return this.debts.updateDates(tenantId, id, dto);
   }
 
   // Registra pagamento (parcial: { amount } ou total: { full: true }).

@@ -62,7 +62,7 @@ export class DebtsService {
           rate: input.rate,
           ratePeriod: input.ratePeriod,
           currency: 'BRL',
-          startDate: new Date(),
+          startDate: input.startDate ? new Date(input.startDate) : new Date(),
           dueDate: new Date(input.dueDate),
         },
       });
@@ -116,6 +116,25 @@ export class DebtsService {
       await this.findOne(tx, tenantId, id); // garante existência + paridade de tenant
       await tx.debt.update({ where: { id }, data: { tags: normalizeTags(tags) } });
       await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'OPERATION_UPDATED', targetType: 'debt', targetId: id, detail: { field: 'tags' } });
+      return this.toRecord(await this.findOne(tx, tenantId, id));
+    });
+  }
+
+  /**
+   * Ajusta as datas da operação — permite registrar/corrigir dívidas ANTIGAS (data inicial no
+   * passado). A "gratidão" acumulada é recalculada a partir da nova data inicial (balanceAt usa
+   * startDate). Vencimento não pode ser antes da data inicial.
+   */
+  async updateDates(tenantId: string, id: string, input: { startDate?: string; dueDate?: string }): Promise<DebtRecord> {
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      const debt = await this.findOne(tx, tenantId, id);
+      const newStart = input.startDate ? new Date(input.startDate) : debt.startDate;
+      const newDue = input.dueDate ? new Date(input.dueDate) : debt.dueDate;
+      if (Number.isNaN(newStart.getTime())) throw new BadRequestException('Data inicial inválida.');
+      if (Number.isNaN(newDue.getTime())) throw new BadRequestException('Data de vencimento inválida.');
+      if (newDue < newStart) throw new BadRequestException('O vencimento não pode ser antes da data inicial.');
+      await tx.debt.update({ where: { id }, data: { startDate: newStart, dueDate: newDue } });
+      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'OPERATION_UPDATED', targetType: 'debt', targetId: id, detail: { field: 'dates' } });
       return this.toRecord(await this.findOne(tx, tenantId, id));
     });
   }
