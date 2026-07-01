@@ -88,6 +88,7 @@ enum NotificationType {
   PAYMENT_CLAIMED // avisou um pagamento ("Já resolvi") — aguardando confirmação
   DEBT_SETTLED // ajuda quitada
   DEBTOR_FIRST_ACCESS // abriu o link pela primeira vez
+  WEEKLY_DIGEST // resumo semanal da carteira (só p/ quem optou por receber)
 }
 
 model Tenant {
