@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { IsBoolean } from 'class-validator';
 import { CreditorsService } from './creditors.service.js';
 import { RegisterCreditorDto } from './dto/register-creditor.dto.js';
 import { JwtGuard } from '../auth/jwt.guard.js';
@@ -20,6 +21,11 @@ export interface MeResponse {
   tenantId: string | null; // null = autenticado mas ainda sem carteira (precisa concluir o cadastro)
   approved: boolean; // credor com tenant aprovado E ativo (super-admin/devedor: sempre true)
   termsAccepted: boolean; // padrinho já aceitou termos+aviso legal? (não-credor: sempre true)
+  weeklyDigestOptIn: boolean | null; // resumo semanal: null = decidir no 1º acesso (só credor)
+}
+
+export class NotificationPrefsDto {
+  @IsBoolean() weeklyDigest!: boolean;
 }
 
 @Controller('auth')
@@ -41,8 +47,10 @@ export class CreditorsController {
   @Get('me')
   @UseGuards(new JwtGuard(), PrincipalGuard)
   async me(@CurrentUser() user: AuthUser): Promise<MeResponse> {
-    // Aceite de termos só importa para o padrinho (credor). Demais papéis: sempre true (não veem a tela).
-    const termsAccepted = user.role === 'CREDITOR' ? await this.creditors.hasAcceptedTerms(user.supabaseId) : true;
+    // Aceite de termos + preferência de resumo semanal só importam para o padrinho (credor).
+    const [termsAccepted, weeklyDigestOptIn] = user.role === 'CREDITOR'
+      ? await Promise.all([this.creditors.hasAcceptedTerms(user.supabaseId), this.creditors.getWeeklyDigestOptIn(user.supabaseId)])
+      : [true, null as boolean | null];
     return {
       supabaseId: user.supabaseId,
       email: user.email,
@@ -50,6 +58,7 @@ export class CreditorsController {
       tenantId: user.tenantId,
       approved: user.tenantApproved ?? true,
       termsAccepted,
+      weeklyDigestOptIn,
     };
   }
 
@@ -59,6 +68,15 @@ export class CreditorsController {
   @Roles('CREDITOR')
   async acceptTerms(@CurrentUser() user: AuthUser): Promise<{ success: true }> {
     await this.creditors.acceptTerms(user.supabaseId, CURRENT_TERMS_VERSION);
+    return { success: true };
+  }
+
+  // Aceita/nega o resumo semanal (push) — no 1º acesso e depois em Configurações. Só o padrinho.
+  @Post('notification-prefs')
+  @UseGuards(new JwtGuard(), PrincipalGuard, RolesGuard)
+  @Roles('CREDITOR')
+  async setNotificationPrefs(@CurrentUser() user: AuthUser, @Body() dto: NotificationPrefsDto): Promise<{ success: true }> {
+    await this.creditors.setWeeklyDigestOptIn(user.supabaseId, dto.weeklyDigest);
     return { success: true };
   }
 }

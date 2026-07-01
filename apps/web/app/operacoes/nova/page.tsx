@@ -31,6 +31,7 @@ export default function NovaOperacaoPage() {
   const [principal, setPrincipal] = useState('');
   const [ratePct, setRatePct] = useState('');
   const [ratePeriod, setRatePeriod] = useState<'MONTHLY' | 'ANNUAL'>('MONTHLY');
+  const [startDate, setStartDate] = useState(todayISO()); // padrão hoje; permite passado (dívidas antigas)
   const [dueDate, setDueDate] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -46,8 +47,8 @@ export default function NovaOperacaoPage() {
   const previewInput = useMemo(() => {
     const p = Number(principal);
     if (!principal || !dueDate || !Number.isFinite(p) || p <= 0) return null;
-    return { principal: String(p), rate: rateFraction, ratePeriod, dueDate: new Date(dueDate).toISOString() };
-  }, [principal, dueDate, rateFraction, ratePeriod]);
+    return { principal: String(p), rate: rateFraction, ratePeriod, startDate: startDate ? new Date(startDate).toISOString() : undefined, dueDate: new Date(dueDate).toISOString() };
+  }, [principal, dueDate, startDate, rateFraction, ratePeriod]);
 
   // Debounce — não chama a API a cada tecla.
   const [debounced, setDebounced] = useState<typeof previewInput>(null);
@@ -75,6 +76,7 @@ export default function NovaOperacaoPage() {
         principal: String(Number(principal)),
         rate: rateFraction,
         ratePeriod,
+        startDate: startDate ? new Date(startDate).toISOString() : undefined,
         dueDate: new Date(dueDate).toISOString(),
         tags,
       });
@@ -120,9 +122,16 @@ export default function NovaOperacaoPage() {
             </div>
           </div>
 
-          <div className="space-y-1">
-            <label htmlFor="dueDate" className={labelClass}>Data de vencimento</label>
-            <input id="dueDate" type="date" required min={todayISO()} value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputClass} />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label htmlFor="startDate" className={labelClass}>Data inicial</label>
+              <input id="startDate" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className={inputClass} />
+              <p className="font-sans text-[11px] text-muted">Pode ser no passado (dívidas antigas).</p>
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="dueDate" className={labelClass}>Vencimento</label>
+              <input id="dueDate" type="date" required min={startDate || undefined} value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={inputClass} />
+            </div>
           </div>
 
           <div className="space-y-1">

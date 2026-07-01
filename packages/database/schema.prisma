@@ -152,6 +152,9 @@ model User {
   // Só se aplica a CREDITOR; OWNER/SUPER_ADMIN/DEBTOR não veem a tela.
   termsAcceptedAt DateTime?
   termsVersion    String?
+  // Preferência do padrinho por um resumo SEMANAL (push). Null = ainda não decidiu (mostra o
+  // convite no 1º acesso); true/false = decidiu (alterável em Configurações). Só p/ CREDITOR.
+  weeklyDigestOptIn Boolean?
   createdAt  DateTime @default(now())
 
   @@index([tenantId])

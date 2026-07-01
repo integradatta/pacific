@@ -5,6 +5,8 @@ export interface Me {
   tenantId: string | null;
   approved: boolean;
   termsAccepted: boolean; // padrinho que ainda não aceitou termos+aviso legal → /termos
+  email?: string;
+  weeklyDigestOptIn?: boolean | null; // resumo semanal: null = decidir no 1º acesso (só credor)
 }
 
 /**

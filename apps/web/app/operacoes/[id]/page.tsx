@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/States';
 import { TagInput } from '@/components/Tags';
 import { RiskBadge } from '@/components/RiskBadge';
-import { useDebt, useDebtSummary, useDebtHistory, useSetDebtTags, usePayDebt, useDeleteDebt, useRenegotiateDebt } from '@/lib/debts';
+import { useDebt, useDebtSummary, useDebtHistory, useSetDebtTags, usePayDebt, useDeleteDebt, useRenegotiateDebt, useUpdateDebtDates } from '@/lib/debts';
 import { formatBRL, venceEm } from '@/lib/format';
 import { STATUS_COLOR, STATUS_LABEL } from '@/lib/status';
 
@@ -80,6 +80,61 @@ function RenegotiateBox({ id }: { id: string }) {
             </button>
             <button type="button" onClick={() => setOpen(false)} className="font-mono text-[10px] uppercase tracking-widest text-muted hover:text-text px-3">Cancelar</button>
           </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// Editar datas — corrigir a data inicial (inclusive no passado) e/ou o vencimento.
+function EditDatesBox({ id, start, due }: { id: string; start: string; due: string }) {
+  const upd = useUpdateDebtDates(id);
+  const [open, setOpen] = useState(false);
+  const [startDate, setStartDate] = useState(start.slice(0, 10));
+  const [dueDate, setDueDate] = useState(due.slice(0, 10));
+
+  function submit(): void {
+    if (!startDate || !dueDate || new Date(dueDate) < new Date(startDate)) return;
+    upd.mutate(
+      { startDate: new Date(startDate).toISOString(), dueDate: new Date(dueDate).toISOString() },
+      { onSuccess: () => setOpen(false) },
+    );
+  }
+
+  return (
+    <section className="panel p-6">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="font-mono text-xs text-muted uppercase tracking-widest">Editar datas</h3>
+          <p className="font-sans text-sm text-text-dim mt-1">Ajuste a data inicial (inclusive no passado, p/ dívidas antigas) ou o vencimento.</p>
+        </div>
+        {!open && (
+          <button type="button" onClick={() => setOpen(true)} className="font-mono text-[10px] uppercase tracking-widest text-iris border border-iris/40 rounded px-3 py-1.5 hover:bg-iris/10 transition-colors shrink-0">Editar</button>
+        )}
+      </div>
+      {open && (
+        <div className="mt-4 space-y-3 border-t border-line pt-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="ed-start" className="block font-mono text-[10px] text-muted uppercase tracking-wider mb-1">Data inicial</label>
+              <input id="ed-start" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)}
+                className="w-full bg-surface2 border border-line rounded-lg px-3 py-2.5 text-text font-mono text-sm focus:outline-none focus:border-iris transition-all" />
+            </div>
+            <div>
+              <label htmlFor="ed-due" className="block font-mono text-[10px] text-muted uppercase tracking-wider mb-1">Vencimento</label>
+              <input id="ed-due" type="date" min={startDate || undefined} value={dueDate} onChange={(e) => setDueDate(e.target.value)}
+                className="w-full bg-surface2 border border-line rounded-lg px-3 py-2.5 text-text font-mono text-sm focus:outline-none focus:border-iris transition-all" />
+            </div>
+          </div>
+          {upd.isError && <p role="alert" className="font-mono text-xs text-status-red">Não foi possível salvar. Verifique as datas.</p>}
+          <div className="flex gap-2">
+            <button type="button" onClick={submit} disabled={!startDate || !dueDate || upd.isPending}
+              className="bg-iris text-ink font-mono text-xs font-semibold uppercase tracking-widest px-4 py-2.5 rounded-lg hover:brightness-110 active:translate-y-px disabled:opacity-40 transition-all">
+              {upd.isPending ? 'Salvando…' : 'Salvar datas'}
+            </button>
+            <button type="button" onClick={() => setOpen(false)} className="font-mono text-[10px] uppercase tracking-widest text-muted hover:text-text px-3">Cancelar</button>
+          </div>
+          <p className="font-sans text-[11px] text-muted">A gratidão acumulada é recalculada a partir da nova data inicial.</p>
         </div>
       )}
     </section>
@@ -367,6 +422,9 @@ export default function OperacaoDetalhePage({ params }: { params: { id: string }
                 </dl>
               </section>
             </div>
+
+            {/* Editar datas — corrigir/registrar dívidas antigas (vale mesmo se quitada) */}
+            <EditDatesBox id={params.id} start={debt.data.startDate} due={debt.data.dueDate} />
 
             {/* Renegociação — só faz sentido em operação aberta */}
             {summary.data && !summary.data.settled && <RenegotiateBox id={params.id} />}
