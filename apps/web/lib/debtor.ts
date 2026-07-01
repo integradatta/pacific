@@ -20,6 +20,10 @@ export function getDebtorJwt(): string | null {
   return typeof window === 'undefined' ? null : localStorage.getItem(KEY);
 }
 
+export function clearDebtorJwt(): void {
+  if (typeof window !== 'undefined') localStorage.removeItem(KEY);
+}
+
 export async function debtorApiGet<T>(path: string): Promise<T> {
   const jwt = getDebtorJwt();
   const res = await fetch(`${BASE}${path}`, {
