@@ -84,3 +84,24 @@ ALTER TABLE "MonthlyReport" FORCE ROW LEVEL SECURITY;
 CREATE POLICY tenant_isolation_monthlyreport ON "MonthlyReport"
   USING ("tenantId" = current_setting('app.current_tenant', true))
   WITH CHECK ("tenantId" = current_setting('app.current_tenant', true));
+
+-- ─────────────────────────────────────────────────────────────────────────────────────────────
+-- Tabelas GLOBAIS (não tenant-scoped) — a migration 14 ligou RLS deny-by-default (sem FORCE) nelas
+-- como defesa contra PostgREST/anon. Isso funcionava com a API conectando como DONA das tabelas
+-- (postgres ignora RLS sem FORCE). Com a role de runtime `pacific_app` (NÃO dona, C1), o deny-by-
+-- default passa a bloqueá-la → SELECT "User" volta 0 linhas e /auth/me quebra. Estas policies
+-- liberam SÓ a `pacific_app` (o controle de acesso dessas tabelas é feito na camada de aplicação);
+-- anon/authenticated continuam bloqueados (foram REVOKE na mig 14 e não têm policy). Idempotente.
+DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'User','Tenant','AdminAuditLog','PlatformEvent',
+    'TenantStats','PortfolioSnapshot','DeviceToken','DebtorAccess'
+  ] LOOP
+    EXECUTE format('DROP POLICY IF EXISTS app_full_access ON %I;', t);
+    EXECUTE format(
+      'CREATE POLICY app_full_access ON %I FOR ALL TO pacific_app '
+      'USING (true) WITH CHECK (true);', t);
+  END LOOP;
+END $$;

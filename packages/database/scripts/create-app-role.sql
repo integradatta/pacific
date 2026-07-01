@@ -5,15 +5,17 @@
 -- (as migrations precisam de DDL). Veja docs/RLS_RUNBOOK.md.
 -- ─────────────────────────────────────────────────────────────────────────────────────────────
 
--- 1) Cria a role de login, SEM superuser e SEM bypassrls. TROQUE a senha.
+-- 1) Cria a role de login. TROQUE a senha.
+-- NOTA (Supabase): NÃO declaramos NOSUPERUSER/NOBYPASSRLS/NOCREATE* explicitamente — no Supabase o
+-- `postgres` NÃO é superuser de verdade, e setar esses atributos dispara "permission denied to alter
+-- role" (só superuser altera o atributo SUPERUSER/BYPASSRLS). Esses valores JÁ são o DEFAULT de uma
+-- role nova, então a role nasce sem superuser e sem bypassrls sozinha. A verificação abaixo confirma.
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'pacific_app') THEN
-    CREATE ROLE pacific_app LOGIN PASSWORD 'TROQUE_ESTA_SENHA_FORTE' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+    CREATE ROLE pacific_app LOGIN PASSWORD 'TROQUE_ESTA_SENHA_FORTE';
   END IF;
 END $$;
--- Garante (idempotente) que a role nunca burla a RLS.
-ALTER ROLE pacific_app NOSUPERUSER NOBYPASSRLS;
 
 -- 2) Acesso DML (sem DDL) ao schema da aplicação.
 GRANT USAGE ON SCHEMA public TO pacific_app;
