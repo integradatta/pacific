@@ -7,9 +7,12 @@ import { supabase } from '@/lib/supabase';
 import { fetchMe, pathForMe } from '@/lib/auth-redirect';
 
 // Entrada única — também é o start_url do PWA. Roteia por QUEM está logado, não por uma rota fixa,
-// pra o atalho na tela inicial abrir a interface certa de cada pessoa:
-//  1) Sobrinho (devedor): JWT próprio no localStorage → /me (não usa sessão Supabase).
-//  2) Padrinho/admin: sessão Supabase → painel por papel (pathForMe: /admin ou /dashboard).
+// pra o atalho na tela inicial abrir a interface certa de cada pessoa. A ORDEM importa: a sessão
+// Supabase (login explícito de padrinho/admin) tem PRIORIDADE sobre o JWT de sobrinho no
+// localStorage — senão um device que já foi usado p/ testar o app do sobrinho jogaria o
+// padrinho/admin sempre no /me (o token do devedor "vence" indevidamente).
+//  1) Padrinho/admin: sessão Supabase → painel por papel (pathForMe: /admin ou /dashboard).
+//  2) Sobrinho (devedor): sem sessão Supabase, mas com JWT próprio → /me.
 //  3) Ninguém logado → /login.
 export default function Home(): ReactElement {
   const router = useRouter();
@@ -17,10 +20,6 @@ export default function Home(): ReactElement {
   useEffect(() => {
     let active = true;
     void (async () => {
-      if (getDebtorJwt()) {
-        router.replace('/me');
-        return;
-      }
       const { data } = await supabase().auth.getSession();
       if (!active) return;
       if (data.session) {
@@ -30,6 +29,10 @@ export default function Home(): ReactElement {
         } catch {
           if (active) router.replace('/login');
         }
+        return;
+      }
+      if (getDebtorJwt()) {
+        router.replace('/me');
         return;
       }
       router.replace('/login');
