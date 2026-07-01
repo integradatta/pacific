@@ -1,12 +1,14 @@
 import type { MetadataRoute } from 'next';
 
-// PWA do sobrinho (devedor): instalável na tela inicial. start_url no portal financeiro.
+// PWA instalável na tela inicial (sobrinho, padrinho ou admin). O start_url é a raiz "/",
+// que roteia por QUEM está logado (ver app/page.tsx) — não uma rota fixa. Assim o atalho abre
+// a interface certa de cada pessoa, em vez de mandar todo mundo pro app do sobrinho.
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Pacific',
     short_name: 'Pacific',
-    description: 'Acompanhe sua ajuda: valor, vencimento e situação.',
-    start_url: '/me',
+    description: 'Acompanhe sua conta no Pacific.',
+    start_url: '/',
     scope: '/',
     display: 'standalone',
     orientation: 'portrait',
