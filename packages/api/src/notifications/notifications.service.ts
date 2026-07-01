@@ -80,6 +80,36 @@ export class NotificationsService {
     });
   }
 
+  /**
+   * Resumo SEMANAL da carteira → uma notificação in-app, só para o padrinho que OPTOU por receber
+   * (User.weeklyDigestOptIn). Dedup: no máx. 1 por ~semana (a menos de force=true, p/ teste manual).
+   * Conteúdo: vencendo em 7d, vencidas e pagamentos aguardando confirmação.
+   */
+  async generateWeeklyDigest(tenantId: string, opts: { force?: boolean } = {}, now: Date = new Date()): Promise<{ created: number }> {
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      const optedIn = await tx.user.findFirst({ where: { tenantId, role: 'CREDITOR', weeklyDigestOptIn: true }, select: { id: true } });
+      if (!optedIn) return { created: 0 };
+      if (!opts.force) {
+        const sixDaysAgo = new Date(now.getTime() - 6 * 86_400_000);
+        const recent = await tx.notification.findFirst({ where: { tenantId, type: 'WEEKLY_DIGEST', createdAt: { gte: sixDaysAgo } }, select: { id: true } });
+        if (recent) return { created: 0 };
+      }
+      const in7d = new Date(now.getTime() + 7 * 86_400_000);
+      const [dueSoon, overdue, pendingClaims] = await Promise.all([
+        tx.debt.count({ where: { tenantId, deletedAt: null, settledAt: null, dueDate: { gte: now, lte: in7d } } }),
+        tx.debt.count({ where: { tenantId, deletedAt: null, settledAt: null, dueDate: { lt: now } } }),
+        tx.paymentClaim.count({ where: { tenantId, status: 'PENDING' } }),
+      ]);
+      const parts: string[] = [];
+      if (dueSoon > 0) parts.push(`${dueSoon} ajuda${dueSoon > 1 ? 's' : ''} vencendo nos próximos 7 dias`);
+      if (overdue > 0) parts.push(`${overdue} vencida${overdue > 1 ? 's' : ''}`);
+      if (pendingClaims > 0) parts.push(`${pendingClaims} pagamento${pendingClaims > 1 ? 's' : ''} aguardando sua confirmação`);
+      const body = parts.length > 0 ? `Esta semana: ${parts.join(', ')}.` : 'Tudo tranquilo por aqui esta semana — nada vencendo e nada pendente. 👍';
+      await tx.notification.create({ data: { tenantId, type: 'WEEKLY_DIGEST', title: 'Resumo semanal', body } });
+      return { created: 1 };
+    });
+  }
+
   async markRead(tenantId: string, id: string): Promise<Notification> {
     return this.scoped.withTenant(tenantId, async (tx) => {
       const existing = await tx.notification.findFirst({ where: { id, tenantId } });

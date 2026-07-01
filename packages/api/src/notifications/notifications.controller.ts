@@ -25,6 +25,13 @@ export class NotificationsController {
     return this.notifications.generateDueNotifications(tenantId, dto.types);
   }
 
+  // Gera o resumo semanal AGORA (força; ignora o dedup semanal) — útil para testar sob demanda.
+  // Só cria se o padrinho tiver optado por receber (weeklyDigestOptIn).
+  @Post('weekly-digest') @Roles('CREDITOR')
+  weeklyDigest(@TenantId() tenantId: string): Promise<{ created: number }> {
+    return this.notifications.generateWeeklyDigest(tenantId, { force: true });
+  }
+
   @Patch(':id/read') @Roles('CREDITOR')
   read(@TenantId() tenantId: string, @Param('id') id: string): Promise<Notification> {
     return this.notifications.markRead(tenantId, id);

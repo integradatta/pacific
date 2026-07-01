@@ -25,6 +25,10 @@ export default function ConfiguracoesPage() {
     mutationFn: (weeklyDigest: boolean) => apiPost('/auth/notification-prefs', { weeklyDigest }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['auth-me'] }),
   });
+  const sendNow = useMutation({
+    mutationFn: () => apiPost<{ created: number }>('/notifications/weekly-digest'),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['notifications'] }),
+  });
   const digestOn = me.data?.weeklyDigestOptIn === true;
   const [thresholds, setThresholds] = useThresholds();
 
@@ -62,20 +66,31 @@ export default function ConfiguracoesPage() {
           <Link href="/notificacoes" className="font-mono text-[11px] text-sonar uppercase tracking-widest border border-sonar/40 rounded-lg px-3 py-2 hover:bg-sonar/10 transition-colors shrink-0">Gerenciar →</Link>
         </section>
 
-        {/* Resumo semanal (push) */}
-        <section className="panel p-6 flex items-center justify-between gap-4">
-          <div>
-            <h2 className="font-display text-base font-semibold text-text tracking-tight">Resumo semanal</h2>
-            <p className="font-sans text-sm text-text-dim">Um panorama da carteira, uma vez por semana{me.data?.weeklyDigestOptIn === null ? ' — você ainda não decidiu.' : '.'}</p>
+        {/* Resumo semanal */}
+        <section className="panel p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="font-display text-base font-semibold text-text tracking-tight">Resumo semanal</h2>
+              <p className="font-sans text-sm text-text-dim">Um panorama da carteira nas suas notificações, uma vez por semana{me.data?.weeklyDigestOptIn === null ? ' — você ainda não decidiu.' : '.'}</p>
+            </div>
+            <button
+              type="button" role="switch" aria-checked={digestOn} aria-label="Resumo semanal"
+              onClick={() => setDigest.mutate(!digestOn)} disabled={setDigest.isPending}
+              className="relative w-12 h-7 rounded-full transition-colors shrink-0 disabled:opacity-50"
+              style={{ background: digestOn ? 'rgb(var(--sonar))' : 'rgb(var(--line-strong))' }}
+            >
+              <span className="absolute top-1 w-5 h-5 rounded-full bg-white transition-all" style={{ left: digestOn ? '26px' : '4px' }} />
+            </button>
           </div>
-          <button
-            type="button" role="switch" aria-checked={digestOn} aria-label="Resumo semanal"
-            onClick={() => setDigest.mutate(!digestOn)} disabled={setDigest.isPending}
-            className="relative w-12 h-7 rounded-full transition-colors shrink-0 disabled:opacity-50"
-            style={{ background: digestOn ? 'rgb(var(--sonar))' : 'rgb(var(--line-strong))' }}
-          >
-            <span className="absolute top-1 w-5 h-5 rounded-full bg-white transition-all" style={{ left: digestOn ? '26px' : '4px' }} />
-          </button>
+          {digestOn && (
+            <div className="mt-4 pt-4 border-t border-line/70 flex items-center gap-3">
+              <button type="button" onClick={() => sendNow.mutate()} disabled={sendNow.isPending}
+                className="font-mono text-[11px] text-sonar uppercase tracking-widest border border-sonar/40 rounded-lg px-3 py-2 hover:bg-sonar/10 transition-colors disabled:opacity-50">
+                {sendNow.isPending ? 'Gerando…' : 'Gerar agora (teste)'}
+              </button>
+              {sendNow.isSuccess && <span className="font-sans text-xs text-status-green">Resumo gerado — veja em Notificações.</span>}
+            </div>
+          )}
         </section>
 
         {/* Lixeira */}
