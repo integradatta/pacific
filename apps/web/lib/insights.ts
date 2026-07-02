@@ -1,8 +1,20 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { DebtorProfile } from '@pacific/shared';
+import type { DebtorProfile, CashForecast } from '@pacific/shared';
 import { apiGet, apiPost } from './api';
+
+export interface CoolingRow { debtId: string; debtorId: string; debtorName: string; amountDue: string; daysRemaining: number; score: number; reasons: string[] }
+
+/** #4 Previsão de caixa ponderada (faixas + por mês). */
+export function useCashForecast() {
+  return useQuery({ queryKey: ['insights', 'cash-forecast'], queryFn: () => apiGet<CashForecast>('/insights/cash-forecast'), staleTime: 5 * 60_000 });
+}
+
+/** #5 Radar de esfriamento (sobrinhos com sinais de risco). */
+export function useRadar() {
+  return useQuery({ queryKey: ['insights', 'radar'], queryFn: () => apiGet<CoolingRow[]>('/insights/radar'), staleTime: 5 * 60_000 });
+}
 
 /** Perfil comportamental de um sobrinho (#2 + #6). Derivado de dados já coletados. */
 export function useDebtorProfile(debtorId: string | undefined) {

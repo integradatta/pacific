@@ -5,8 +5,8 @@ import { TenantGuard } from '../tenancy/tenant.guard.js';
 import { RolesGuard } from '../auth/roles.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { TenantId } from '../tenancy/tenant-id.decorator.js';
-import { InsightsService, type DebtorSignalRow } from './insights.service.js';
-import type { DebtorProfile } from '@pacific/shared';
+import { InsightsService, type DebtorSignalRow, type CoolingRow } from './insights.service.js';
+import type { DebtorProfile, CashForecast } from '@pacific/shared';
 
 @Controller('insights')
 @UseGuards(new JwtGuard(), PrincipalGuard, TenantGuard, RolesGuard)
@@ -16,6 +16,16 @@ export class InsightsController {
   @Get('debtors/:id/profile') @Roles('CREDITOR')
   debtorProfile(@TenantId() tenantId: string, @Param('id') id: string): Promise<DebtorProfile> {
     return this.insights.debtorProfile(tenantId, id);
+  }
+
+  @Get('cash-forecast') @Roles('CREDITOR')
+  cashForecast(@TenantId() tenantId: string): Promise<CashForecast> {
+    return this.insights.cashForecast(tenantId);
+  }
+
+  @Get('radar') @Roles('CREDITOR')
+  radar(@TenantId() tenantId: string): Promise<CoolingRow[]> {
+    return this.insights.coolingRadar(tenantId);
   }
 
   @Get('debtors/:id/signals') @Roles('CREDITOR')

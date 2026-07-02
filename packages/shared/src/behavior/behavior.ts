@@ -96,6 +96,71 @@ export function debtorProfile(input: BehaviorInput): DebtorProfile {
   };
 }
 
+// ── #4 Previsão de caixa ponderada por probabilidade de pagamento ────────────────────────────
+export interface ForecastItem { amountDue: number; probability: number; dueDate: Date } // probability 0..1
+export interface ForecastBucket { key: string; label: string; nominal: number; expected: number }
+export interface CashForecast {
+  horizonDays: number;
+  count: number;
+  nominal: number; // soma nominal a vencer no horizonte
+  expected: number; // provável = Σ valor × probabilidade
+  optimistic: number; // todos pagam
+  pessimistic: number; // só os de alta probabilidade (≥70%) pagam
+  buckets: ForecastBucket[]; // por mês
+}
+
+const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+export function cashForecast(items: ForecastItem[], now: Date, horizonDays = 90): CashForecast {
+  const limit = now.getTime() + horizonDays * DAY;
+  const inWindow = items.filter((i) => i.dueDate.getTime() <= limit); // inclui atrasados (a receber já)
+  const bucketMap = new Map<string, ForecastBucket>();
+  let nominal = 0, expected = 0, optimistic = 0, pessimistic = 0;
+  for (const i of inWindow) {
+    const p = Math.max(0, Math.min(1, i.probability));
+    nominal += i.amountDue;
+    expected += i.amountDue * p;
+    optimistic += i.amountDue;
+    if (p >= 0.7) pessimistic += i.amountDue;
+    // vencidos entram no mês corrente; futuros no mês do vencimento.
+    const ref = i.dueDate.getTime() < now.getTime() ? now : i.dueDate;
+    const key = `${ref.getFullYear()}-${String(ref.getMonth() + 1).padStart(2, '0')}`;
+    const b = bucketMap.get(key) ?? { key, label: `${MONTHS[ref.getMonth()]}/${String(ref.getFullYear()).slice(2)}`, nominal: 0, expected: 0 };
+    b.nominal += i.amountDue;
+    b.expected += i.amountDue * p;
+    bucketMap.set(key, b);
+  }
+  const buckets = [...bucketMap.values()].sort((a, b) => a.key.localeCompare(b.key));
+  return { horizonDays, count: inWindow.length, nominal, expected, optimistic, pessimistic, buckets };
+}
+
+// ── #5 Radar de esfriamento (sinal composto por sobrinho) ────────────────────────────────────
+export interface CoolingInput {
+  daysToDue: number; // dias até o vencimento (negativo = vencido)
+  lastLoginDaysAgo: number | null; // null = nunca abriu
+  engagementTrend: Trend;
+  locationGranted: boolean;
+  locationSilentDays: number | null; // dias sem sinal (se GRANTED); null = n/a
+  paymentProbability: number; // 0..100
+}
+export interface CoolingResult { score: number; cooling: boolean; reasons: string[] }
+
+// Score 0..100 (quanto maior, mais "esfriando"). Combina desengajamento + proximidade do
+// vencimento + baixa probabilidade + silêncio de localização. Só dados já coletados.
+export function coolingScore(i: CoolingInput): CoolingResult {
+  const reasons: string[] = [];
+  let score = 0;
+  if (i.lastLoginDaysAgo != null && i.lastLoginDaysAgo >= 21) { score += 30; reasons.push(`sem abrir o app há ${i.lastLoginDaysAgo} dias`); }
+  else if (i.lastLoginDaysAgo != null && i.lastLoginDaysAgo >= 10) { score += 15; reasons.push(`pouco ativo (${i.lastLoginDaysAgo} dias sem abrir)`); }
+  if (i.engagementTrend === 'down') { score += 12; reasons.push('engajamento em queda'); }
+  if (i.daysToDue < 0) { score += 25; reasons.push(`vencido há ${Math.abs(i.daysToDue)} dias`); }
+  else if (i.daysToDue <= 7) { score += 15; reasons.push(`vence em ${i.daysToDue} dia${i.daysToDue === 1 ? '' : 's'}`); }
+  if (i.paymentProbability < 50) { score += 15; reasons.push('probabilidade de pagamento baixa'); }
+  if (i.locationGranted && i.locationSilentDays != null && i.locationSilentDays >= 2) { score += 10; reasons.push(`localização sem sinal há ${i.locationSilentDays} dias`); }
+  score = Math.min(100, score);
+  return { score, cooling: score >= 40, reasons };
+}
+
 function buildSummary(p: Pick<DebtorProfile, 'sampleSize' | 'avgDelayDays' | 'onTimeRate' | 'reliability' | 'lastLoginDaysAgo' | 'engagementTrend'>): string {
   if (p.reliability === 'unknown') {
     return p.lastLoginDaysAgo == null
