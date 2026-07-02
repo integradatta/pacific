@@ -89,12 +89,13 @@ policies RLS são aplicadas MANUALMENTE** no Supabase (o container pula `migrate
 Enums: `UserRole`(OWNER/SUPER_ADMIN/CREDITOR/DEBTOR) · `TenantStatus`(ACTIVE/SUSPENDED) ·
 `TenantApproval`(PENDING/APPROVED/REJECTED) · `DebtStatus`(GREEN/YELLOW/ORANGE/RED) ·
 `RatePeriod`(MONTHLY/ANNUAL) · `LocationConsentState`(NEVER/DECLINED/GRANTED/REVOKED) ·
-`PaymentClaimStatus`(PENDING/CONFIRMED/REJECTED) ·
+`PaymentClaimStatus`(PENDING/CONFIRMED/REJECTED) · `DebtorSignalKind`(INTENT_TO_PAY/NEED_SUPPORT) ·
 `PlatformEventType`(LOGIN, LOGOUT, LOGIN_FAILED, LINK_USED, LINK_CREATED, LINK_ROTATED,
 ACCESS_REVOKED, ACCESS_REACTIVATED, OPERATION_CREATED, OPERATION_UPDATED, OPERATION_PAID,
 PAYMENT_CLAIMED, LOCATION_CONSENT, CLIENT_CREATED, TENANT_APPROVED, TENANT_SUSPENDED, ERROR, IMPORTANT) ·
 `NotificationType`(DUE_SOON, DUE_15, DUE_7, DUE_3, DUE_1, DUE_TODAY, OVERDUE, LOCATION_DECLINED,
-LOCATION_STOPPED, LOCATION_SILENT, PAYMENT_CLAIMED, DEBT_SETTLED, DEBTOR_FIRST_ACCESS, WEEKLY_DIGEST).
+LOCATION_STOPPED, LOCATION_SILENT, PAYMENT_CLAIMED, DEBT_SETTLED, DEBTOR_FIRST_ACCESS, WEEKLY_DIGEST,
+DEBTOR_INTENT, DEBTOR_SUPPORT).
 
 Modelos (campos principais):
 - **Tenant**: id, name, orgCode(único), approval, status, createdAt. A "carteira" de um padrinho.
@@ -112,6 +113,8 @@ Modelos (campos principais):
 - **DebtorAccess**: tokenHash, debtorId, tenantId, active, lastSeenAt?. Link mágico (fora do RLS
   tenant — lookup por token antes do contexto de tenant).
 - **DebtorLoginEvent**: acesso do sobrinho (debtorId, tenantId, success, ip?, at). RLS FORCE.
+- **DebtorSignal**: sinal do sobrinho ao padrinho (kind INTENT_TO_PAY/NEED_SUPPORT, dueDate?, note?,
+  resolvedAt?). O último em aberto fica ao lado do nome. RLS FORCE. (migração 23)
 - **LocationConsent**: debtorId(único), tenantId, state(LocationConsentState), consentText?,
   grantedAt?/declinedAt?/revokedAt?, updatedAt. RLS FORCE.
 - **DebtorPosition**: debtorId(único), tenantId, lat, lng, accuracy?, battery?, recordedAt. Última
@@ -196,6 +199,29 @@ admin, revogar link. Home do admin: aprovações pendentes + **alerta de seguran
 1º acesso: aceite único de termos (`POST /auth/accept-terms`, gate /termos) + convite de resumo
 semanal (aceitar/negar; modal no Shell; alterável em `/configuracoes`; `POST /auth/notification-prefs`).
 
+### 8.9 Camada de inteligência do padrinho (`/insights`, módulo `packages/api/src/insights`)
+Deriva insights de dados JÁ coletados (quitações, avisos, logins, localização) — nada novo é
+coletado. Funções puras em `packages/shared/behavior` (testadas). Tudo tenant-scoped, mobile-harmônico
+(insights compactos, sem excesso).
+- **#2 Perfil comportamental do sobrinho** (`GET /insights/debtors/:id/profile`): como costuma pagar
+  (pontual/atrasa-mas-paga/irregular), % no prazo, atraso médio, taxa de confirmação de avisos,
+  engajamento (logins 30d + tendência + último acesso) e **#6 melhor horário para lembrar** (moda dos
+  logins). Card compacto na tela da operação. É a FUNDAÇÃO dos demais.
+- **#3 Sinais do sobrinho** (`POST /debtor/me/signals`; `GET /insights/debtors/:id/signals`,
+  `POST /insights/signals/:id/resolve`): no app o sobrinho envia "Pretendo resolver até <data>"
+  (INTENT_TO_PAY) ou "Preciso de suporte" (NEED_SUPPORT) → notifica o padrinho e fica ao lado do
+  nome (resolvível). Modelo `DebtorSignal` (RLS FORCE). Sem implicação jurídica (é recado).
+- **#4 Previsão de caixa ponderada** (`GET /insights/cash-forecast`): Σ valor×probabilidade por mês,
+  com faixas provável/otimista/pessimista. Card compacto na /recebiveis.
+- **#5 Radar de esfriamento** (`GET /insights/radar`): score composto por sobrinho (desengajamento +
+  proximidade do vencimento + baixa probabilidade + silêncio de localização) → lista "esfriando".
+- **#9 Simulador ciente da carteira** (`POST /insights/simulate`): impacto de uma nova ajuda
+  (concentração na carteira, exposição ao sobrinho, atraso provável do perfil). Linha compacta no
+  form "nova operação".
+- **#1 "Hoje" — sugestões** (`GET /insights/suggestions`): compõe suporte + pagamentos avisados +
+  radar + vencidos/a vencer + intenções numa fila ordenada. Seção compacta no topo do dashboard.
+  **Tom de sugestão, nunca ordem**; dispensável por dia (localStorage).
+
 ## 9. API (todos os endpoints)
 
 ```
@@ -205,7 +231,12 @@ POST /auth/register-creditor      GET  /auth/me      POST /auth/accept-terms
 POST /auth/notification-prefs     POST /auth/debtor/exchange
 # Devedor (sobrinho)
 GET  /debtor/me/debts             POST /debtor/me/debts/:debtId/claim   POST /debtor/me/push-token
+POST /debtor/me/signals           # "pretendo resolver até…" / "preciso de suporte"
 GET  /debtor/me/location/consent  POST /debtor/me/location/consent      POST /debtor/me/location/ping
+# Inteligência do padrinho (@Roles CREDITOR)
+GET  /insights/debtors/:id/profile   GET /insights/debtors/:id/signals   POST /insights/signals/:id/resolve
+GET  /insights/cash-forecast         GET /insights/radar                 GET /insights/suggestions
+POST /insights/simulate
 # Dívidas (credor)
 POST /debts/preview  POST /debts  POST /debts/quick  GET /debts  GET /debts/trash
 GET  /debts/claims/pending  POST /debts/claims/:id/confirm  POST /debts/claims/:id/reject
@@ -262,7 +293,7 @@ claro acolhedor (sobrinho).
   omitido de propósito** (pula migrate no boot).
 - **Vercel** (web): `NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
   `NEXT_PUBLIC_SENTRY_DSN?`, `NEXT_PUBLIC_MAP_TILE_URL?`, `NEXT_PUBLIC_MAP_TILE_ATTRIBUTION?`.
-- **Supabase** (DB): migrações 0–22 e `rls.sql` aplicados manualmente; role `pacific_app` sem
+- **Supabase** (DB): migrações 0–23 e `rls.sql` aplicados manualmente; role `pacific_app` sem
   BYPASSRLS. Plano FREE hoje (sem PITR → DR limitado; ver docs/DR_RUNBOOK.md, RLS_RUNBOOK.md).
 
 ## 13. Estado atual e pendências
@@ -270,7 +301,9 @@ claro acolhedor (sobrinho).
 Entregue e no ar (branch principal): carteira/operações, motor financeiro, dashboard/IA, notificações
 (vencimento + eventos do sobrinho + resumo semanal in-app), relatórios, localização consentida (painel
 + app + mapa com clustering), app do sobrinho reposicionado (rede de confiança), admin, RLS estrito
-(C1), data inicial editável, opt-in de resumo semanal. Migrações até a **22**.
+(C1), data inicial editável, opt-in de resumo semanal, **camada de inteligência do padrinho** (perfil
+comportamental, previsão ponderada, radar de esfriamento, simulador, sinais do sobrinho, sugestões
+"Hoje"). Migrações até a **23**.
 
 **Pendências / decisões abertas:**
 - **Envio por PUSH** (navegador) do resumo semanal: hoje é in-app; push real (VAPID + subscription +

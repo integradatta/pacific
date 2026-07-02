@@ -76,8 +76,10 @@ export class InsightsService {
       const debts = await tx.debt.findMany({ where: { tenantId, deletedAt: null, settledAt: null }, include: { debtor: { select: { id: true, name: true } } } });
       if (debts.length === 0) return [];
       const ids = [...new Set(debts.map((d) => d.debtorId))];
+      // Limita a 90 dias: cobre a janela de engajamento (30d + 30d anteriores) e evita scan ilimitado.
+      const since = new Date(now.getTime() - 90 * DAY);
       const [logins, consents, positions] = await Promise.all([
-        tx.debtorLoginEvent.findMany({ where: { tenantId, debtorId: { in: ids }, success: true }, select: { debtorId: true, at: true } }),
+        tx.debtorLoginEvent.findMany({ where: { tenantId, debtorId: { in: ids }, success: true, at: { gte: since } }, select: { debtorId: true, at: true } }),
         tx.locationConsent.findMany({ where: { tenantId, debtorId: { in: ids }, state: 'GRANTED' }, select: { debtorId: true } }),
         tx.debtorPosition.findMany({ where: { tenantId, debtorId: { in: ids } }, select: { debtorId: true, recordedAt: true } }),
       ]);
