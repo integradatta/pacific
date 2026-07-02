@@ -28,6 +28,8 @@ function debtRow(over: Record<string, unknown> = {}) {
 
 function fakeDb() {
   return {
+    // findOneForUpdate faz SELECT … FOR UPDATE (lock de linha) antes de reler via findFirst.
+    $queryRaw: vi.fn(async () => [{ id: 'debt1' }]),
     debtor: {
       findFirst: vi.fn(async () => ({ id: 'd1', tenantId: 't1' })),
       findUnique: vi.fn(async () => ({ name: 'Cliente A' })),
@@ -179,6 +181,8 @@ describe('DebtsService', () => {
       expect(db.debt.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'debt1' }, data: expect.objectContaining({ paidAmount: '1000.00', settledAt: NOW }) }),
       );
+      // Lock pessimista (SELECT … FOR UPDATE) antes do read-modify-write, contra perda de atualização.
+      expect(db.$queryRaw).toHaveBeenCalled();
     });
     it('parcial abate sem quitar (settledAt null)', async () => {
       const db = fakeDb(); zeroRate(db);

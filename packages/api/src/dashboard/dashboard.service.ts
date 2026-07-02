@@ -42,6 +42,8 @@ export class DashboardService {
   }
 
   async portfolio(tenantId: string, asOf: Date = new Date()): Promise<PortfolioRow[]> {
+    // #Escalabilidade — transação CURTA: busca as linhas dentro do withTenant e fecha; o cálculo de
+    // juros (Decimal, pesado) roda FORA da transação, para não monopolizar conexão do pool sob pgbouncer.
     const debts = await this.scoped.withTenant(tenantId, (tx) =>
       tx.debt.findMany({
         where: { tenantId, deletedAt: null },

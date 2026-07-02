@@ -102,6 +102,18 @@ describe('LocationService — pings', () => {
     await svc(db).recordPings('t1', 'd1', [{ lat: -23.5, lng: -46.6, recordedAt: '2026-06-30T12:00:00Z' }], NOW); // dentro
     expect(db.geofenceEvent.createMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ geofenceId: 'g1', type: 'ARRIVAL' })] }));
   });
+
+  it('cache: dois pings que avançam consultam as geofences UMA vez (não a cada ping)', async () => {
+    const db = fakeDb();
+    db.locationConsent.findUnique = vi.fn(async () => ({ state: 'GRANTED' })) as never;
+    db.debtorPosition.findUnique = vi.fn(async () => ({ lat: 0, lng: 0, recordedAt: new Date('2026-06-30T11:00:00Z') })) as never;
+    db.debtorPosition.updateMany = vi.fn(async () => ({ count: 1 })) as never; // sempre avança
+    db.geofence.findMany = vi.fn(async () => [{ id: 'g1', lat: -23.5, lng: -46.6, radiusM: 200 }]) as never;
+    const s = svc(db); // mesma instância → mesmo cache
+    await s.recordPings('t1', 'd1', [{ lat: -23.5, lng: -46.6, recordedAt: '2026-06-30T12:00:00Z' }], NOW);
+    await s.recordPings('t1', 'd1', [{ lat: -23.51, lng: -46.61, recordedAt: '2026-06-30T12:05:00Z' }], NOW);
+    expect(db.geofence.findMany).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('LocationService — padrinho', () => {

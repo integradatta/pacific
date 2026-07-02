@@ -27,13 +27,28 @@ export interface GeofenceRow { id: string; label: string; lat: number; lng: numb
 
 const ONLINE_WINDOW_MS = Number(process.env.LOCATION_ONLINE_WINDOW_MS ?? 10 * 60_000);
 
+interface CachedFence { id: string; lat: number; lng: number; radiusM: number }
+
 @Injectable()
 export class LocationService {
   private readonly log = new Logger('LocationService');
+  // Cache das cercas por tenant (config de baixa cardinalidade que muda raramente). Evita reconsultar
+  // TODAS as cercas a cada ping que avança. TTL curto (auto-cura); invalidado no create/delete.
+  private readonly fenceCache = new Map<string, { at: number; fences: CachedFence[] }>();
+  private readonly FENCE_TTL_MS = Number(process.env.GEOFENCE_CACHE_TTL_MS ?? 60_000);
   constructor(
     private readonly scoped: TenantScopedService,
     private readonly tracking: TrackingService,
   ) {}
+
+  private async fencesFor(tx: Parameters<Parameters<TenantScopedService['withTenant']>[1]>[0], tenantId: string): Promise<CachedFence[]> {
+    const cached = this.fenceCache.get(tenantId);
+    if (cached && Date.now() - cached.at < this.FENCE_TTL_MS) return cached.fences;
+    const rows = await tx.geofence.findMany({ where: { tenantId }, select: { id: true, lat: true, lng: true, radiusM: true } });
+    const fences = rows.map((f) => ({ id: f.id, lat: Number(f.lat), lng: Number(f.lng), radiusM: f.radiusM }));
+    this.fenceCache.set(tenantId, { at: Date.now(), fences });
+    return fences;
+  }
 
   // ── SOBRINHO ──────────────────────────────────────────────────────────────
   async getConsent(tenantId: string, debtorId: string): Promise<{ state: ConsentState; updatedAt: string | null }> {
@@ -132,10 +147,10 @@ export class LocationService {
     prev: { lat: number; lng: number } | null,
     next: { lat: number; lng: number },
   ): Promise<void> {
-    const fences = await tx.geofence.findMany({ where: { tenantId } });
+    const fences = await this.fencesFor(tx, tenantId);
     if (fences.length === 0) return;
-    const inside = (pt: { lat: number; lng: number } | null, f: { lat: unknown; lng: unknown; radiusM: number }) =>
-      pt != null && distanceM(pt, { lat: Number(f.lat), lng: Number(f.lng) }) <= f.radiusM;
+    const inside = (pt: { lat: number; lng: number } | null, f: CachedFence) =>
+      pt != null && distanceM(pt, { lat: f.lat, lng: f.lng }) <= f.radiusM;
     const events = fences.flatMap((f) => {
       const was = inside(prev, f);
       const now = inside(next, f);
@@ -209,11 +224,13 @@ export class LocationService {
   async createGeofence(tenantId: string, input: { label: string; lat: number; lng: number; radiusM: number }): Promise<GeofenceRow> {
     return this.scoped.withTenant(tenantId, async (tx) => {
       const g = await tx.geofence.create({ data: { tenantId, label: input.label, lat: input.lat, lng: input.lng, radiusM: input.radiusM } });
+      this.fenceCache.delete(tenantId); // invalida o cache: a próxima avaliação recarrega
       return { id: g.id, label: g.label, lat: Number(g.lat), lng: Number(g.lng), radiusM: g.radiusM };
     });
   }
   async deleteGeofence(tenantId: string, id: string): Promise<void> {
     await this.scoped.withTenant(tenantId, (tx) => tx.geofence.deleteMany({ where: { id, tenantId } }));
+    this.fenceCache.delete(tenantId); // invalida o cache
   }
 
   /** Depuração de pings antigos (job de retenção), por tenant (RLS). */
