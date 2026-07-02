@@ -1,18 +1,23 @@
 'use client';
 
-import { enqueue, peek, commit, size, clear, type OutboxPoint } from './location-outbox';
+import { enqueue, peek, commit, clear, type OutboxPoint } from './location-outbox';
 
 /*
  * Gerenciador de localização do app (família) — SINGLETON de módulo.
  * Por que singleton: persiste entre trocas de aba/remontagens de página (não reinicia ao navegar).
  *
- * Estratégia de PRODUÇÃO (estabilidade > tempo real): AMOSTRAGEM PERIÓDICA a cada ~5 min com baixa
- * precisão (economia de bateria), em vez de watchPosition contínuo de alta precisão. Uma posição a
- * cada 5 min é suficiente e escala para milhares de usuários (≈288 pontos/dia por pessoa).
+ * Estratégia de PRODUÇÃO (estabilidade > tempo real):
+ *  - NATIVO (Capacitor + @capacitor-community/background-geolocation): watcher com foreground service
+ *    e NOTIFICAÇÃO PERSISTENTE VISÍVEL — funciona com o app em segundo plano / tela bloqueada.
+ *    Nada oculto: o usuário sempre vê "Pacific está compartilhando sua localização".
+ *  - WEB/PWA (foreground): amostragem periódica a cada ~5 min, baixa precisão (bateria).
+ * Em ambos, throttle para ~1 ponto a cada 5 min: leve para bateria e escalável (≈288 pontos/dia/pessoa).
  *
- * Resiliência: outbox persistente (sem perda em queda de rede), reenvio em `online`/`visibilitychange`.
- * Nativo (Capacitor): usa @capacitor/geolocation se presente (mais confiável); background contínuo
- * com app fechado exige um plugin de background-geolocation nativo — ver docs/LOCATION_DESIGN.md.
+ * Resiliência: outbox persistente (sem perda em queda de rede), reenvio em `online`/`visibilitychange`,
+ * revogação de permissão do SO encerra o compartilhamento.
+ *
+ * Sem import estático dos plugins nativos: usamos o bridge do Capacitor em runtime, para o bundle web
+ * não depender deles (feature-detect + try/catch → nunca quebra no navegador).
  */
 
 type Send = (points: OutboxPoint[]) => Promise<unknown>;
@@ -22,28 +27,51 @@ const BATCH = 50;
 const SAMPLE_MS = 5 * 60_000; // 5 min — cadência estável e leve para a bateria
 const FLUSH_MS = 60_000; // tenta esvaziar a outbox a cada 1 min
 const GEO_TIMEOUT_MS = 30_000;
-const GEO_MAX_AGE_MS = 120_000; // aceita uma posição em cache de até 2 min (menos GPS ligado)
+const GEO_MAX_AGE_MS = 120_000; // aceita posição em cache de até 2 min (menos GPS ligado)
+const BG_DISTANCE_FILTER_M = 25; // no nativo, só reporta quando move ≥ isto (economia)
 
 let sampleTimer: ReturnType<typeof setInterval> | null = null;
 let flushTimer: ReturnType<typeof setInterval> | null = null;
+let watcherId: string | null = null;
+let lastEnqueuedAt = 0;
 let active = false;
 let flushing = false;
 let sampling = false;
 let send: Send | null = null;
 let onDenied: (() => void) | null = null;
 
-// ── Fonte de posição: Capacitor Geolocation (nativo) quando disponível; senão a Web Geolocation ──
+// ── Bridges do Capacitor (runtime; ausentes no navegador) ────────────────────
 interface CapGeo { getCurrentPosition(opts?: { enableHighAccuracy?: boolean; timeout?: number; maximumAge?: number }): Promise<{ coords: { latitude: number; longitude: number; accuracy?: number } }> }
-function capacitorGeo(): CapGeo | null {
-  const cap = (globalThis as { Capacitor?: { isNativePlatform?: () => boolean; Plugins?: { Geolocation?: CapGeo } } }).Capacitor;
-  if (cap?.isNativePlatform?.() && cap.Plugins?.Geolocation) return cap.Plugins.Geolocation;
-  return null;
+interface BgLoc { latitude: number; longitude: number; accuracy?: number }
+interface BgErr { code?: string; message?: string }
+interface BgPlugin {
+  addWatcher(opts: { backgroundTitle?: string; backgroundMessage?: string; requestPermissions?: boolean; stale?: boolean; distanceFilter?: number }, cb: (loc?: BgLoc, err?: BgErr) => void): Promise<string>;
+  removeWatcher(opts: { id: string }): Promise<void>;
+}
+type Cap = { isNativePlatform?: () => boolean; Plugins?: { Geolocation?: CapGeo; BackgroundGeolocation?: BgPlugin } };
+function cap(): Cap | undefined { return (globalThis as { Capacitor?: Cap }).Capacitor; }
+function isNative(): boolean { return cap()?.isNativePlatform?.() === true; }
+
+function enqueueCoords(c: Coords, now = Date.now()): void {
+  if (!Number.isFinite(c.lat) || !Number.isFinite(c.lng)) return;
+  // Throttle: no máx. 1 ponto a cada SAMPLE_MS (mantém o "online" fresco sem inundar). Tráfego mínimo.
+  if (lastEnqueuedAt && now - lastEnqueuedAt < SAMPLE_MS) return;
+  lastEnqueuedAt = now;
+  enqueue([{ lat: c.lat, lng: c.lng, accuracy: c.accuracy, recordedAt: new Date(now).toISOString() }]);
+  void flush();
 }
 
-async function getPosition(): Promise<Coords> {
-  const cap = capacitorGeo();
-  if (cap) {
-    const p = await cap.getCurrentPosition({ enableHighAccuracy: false, timeout: GEO_TIMEOUT_MS, maximumAge: GEO_MAX_AGE_MS });
+function isPermissionDenied(err: unknown): boolean {
+  const e = err as { code?: number | string; message?: string } | undefined;
+  // Web: GeolocationPositionError.PERMISSION_DENIED === 1. Nativo: code/mensagem com "denied"/"NOT_AUTHORIZED".
+  return e?.code === 1 || (typeof e?.code === 'string' && /denied|not_authorized/i.test(e.code)) || (typeof e?.message === 'string' && /denied|permission/i.test(e.message));
+}
+
+// ── Fonte WEB: getCurrentPosition periódico (foreground) ─────────────────────
+async function getWebPosition(): Promise<Coords> {
+  const g = cap()?.Plugins?.Geolocation;
+  if (g) {
+    const p = await g.getCurrentPosition({ enableHighAccuracy: false, timeout: GEO_TIMEOUT_MS, maximumAge: GEO_MAX_AGE_MS });
     return { lat: p.coords.latitude, lng: p.coords.longitude, accuracy: Number.isFinite(p.coords.accuracy) ? Math.round(p.coords.accuracy!) : null };
   }
   return new Promise<Coords>((resolve, reject) => {
@@ -56,27 +84,46 @@ async function getPosition(): Promise<Coords> {
   });
 }
 
-function isPermissionDenied(err: unknown): boolean {
-  const e = err as { code?: number; message?: string } | undefined;
-  // Web: GeolocationPositionError.PERMISSION_DENIED === 1. Capacitor: mensagem contém "denied".
-  return e?.code === 1 || (typeof e?.message === 'string' && /denied|permission/i.test(e.message));
-}
-
-async function sample(): Promise<void> {
+async function sampleWeb(): Promise<void> {
   if (sampling || !active) return;
   sampling = true;
   try {
-    const c = await getPosition();
-    if (!Number.isFinite(c.lat) || !Number.isFinite(c.lng)) return;
-    // Uma amostra por ciclo: mantém o "online" fresco no painel e alimenta as cercas. Tráfego mínimo.
-    enqueue([{ lat: c.lat, lng: c.lng, accuracy: c.accuracy, recordedAt: new Date().toISOString() }]);
-    void flush();
+    enqueueCoords(await getWebPosition());
   } catch (err) {
     if (isPermissionDenied(err) && onDenied) onDenied(); // revogado no SO → encerra (vira REVOKED)
     // POSITION_UNAVAILABLE / TIMEOUT são transitórios: o próximo ciclo tenta de novo.
   } finally {
     sampling = false;
   }
+}
+
+// ── Fonte NATIVA: watcher em segundo plano com notificação persistente ───────
+async function startNative(bg: BgPlugin): Promise<void> {
+  try {
+    watcherId = await bg.addWatcher(
+      {
+        backgroundTitle: 'Pacific',
+        backgroundMessage: 'Compartilhando sua localização com a família',
+        requestPermissions: true,
+        stale: false,
+        distanceFilter: BG_DISTANCE_FILTER_M,
+      },
+      (loc, err) => {
+        if (err) { if (isPermissionDenied(err) && onDenied) onDenied(); return; }
+        if (!loc) return;
+        enqueueCoords({ lat: loc.latitude, lng: loc.longitude, accuracy: Number.isFinite(loc.accuracy) ? Math.round(loc.accuracy!) : null });
+      },
+    );
+  } catch {
+    // Plugin indisponível/erro → cai para o sampler web (foreground).
+    startWebSampler();
+  }
+}
+
+function startWebSampler(): void {
+  if (sampleTimer) return;
+  void sampleWeb(); // amostra imediata
+  sampleTimer = setInterval(() => void sampleWeb(), SAMPLE_MS);
 }
 
 async function flush(): Promise<void> {
@@ -98,17 +145,19 @@ async function flush(): Promise<void> {
 
 const onOnline = (): void => void flush();
 const onVisible = (): void => {
-  if (typeof document !== 'undefined' && document.visibilityState === 'visible') { void flush(); void sample(); }
+  if (typeof document !== 'undefined' && document.visibilityState === 'visible') { void flush(); if (!isNative()) void sampleWeb(); }
 };
 
 function start(): void {
   if (active || typeof window === 'undefined') return;
   active = true;
-  void sample(); // amostra imediata ao ativar
-  sampleTimer = setInterval(() => void sample(), SAMPLE_MS);
+  lastEnqueuedAt = 0;
   flushTimer = setInterval(() => void flush(), FLUSH_MS);
   window.addEventListener('online', onOnline);
   document.addEventListener('visibilitychange', onVisible);
+  const bg = isNative() ? cap()?.Plugins?.BackgroundGeolocation : undefined;
+  if (bg) void startNative(bg); // nativo: background + notificação persistente
+  else startWebSampler(); // web/PWA: foreground periódico
   void flush(); // recupera pings de sessões anteriores (resiliência a reinício do app)
 }
 
@@ -119,6 +168,7 @@ function stop(): void {
   sampleTimer = null;
   if (flushTimer) clearInterval(flushTimer);
   flushTimer = null;
+  if (watcherId) { const bg = cap()?.Plugins?.BackgroundGeolocation; void bg?.removeWatcher({ id: watcherId }).catch(() => undefined); watcherId = null; }
   window.removeEventListener('online', onOnline);
   document.removeEventListener('visibilitychange', onVisible);
   // Parou de compartilhar (revogado): pings pendentes não serão aceitos pelo servidor → descarta.

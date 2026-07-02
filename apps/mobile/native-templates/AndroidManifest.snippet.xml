@@ -1,0 +1,16 @@
+<!--
+  Aplicar em: android/app/src/main/AndroidManifest.xml  (dentro de <manifest>, antes de <application>)
+
+  O plugin @capacitor-community/background-geolocation já injeta seu foreground service de localização
+  e a notificação persistente via merge de manifesto. Aqui declaramos apenas as PERMISSÕES.
+
+  ACCESS_BACKGROUND_LOCATION (Android 10+) permite localização com o app em segundo plano; no Android
+  11+ o usuário concede "Permitir o tempo todo" numa tela separada do sistema — peça isso na UI só
+  DEPOIS de explicar o porquê (o app já faz esse enquadramento).
+-->
+<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+<uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+<uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />

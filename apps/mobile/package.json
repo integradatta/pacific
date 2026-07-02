@@ -2,20 +2,27 @@
   "name": "@pacific/mobile",
   "version": "0.1.0",
   "private": true,
-  "description": "App nativo do sobrinho (devedor) — Capacitor envolvendo o portal web Pacific.",
+  "description": "App nativo (família / metas) — Capacitor envolvendo o portal web Pacific.",
   "scripts": {
-    "sync": "cap sync",
     "add:ios": "cap add ios",
     "add:android": "cap add android",
+    "sync": "cap sync",
+    "sync:dev": "MOBILE_ENV=dev cap sync",
+    "sync:staging": "MOBILE_ENV=staging cap sync",
+    "sync:prod": "MOBILE_ENV=prod cap sync",
     "open:ios": "cap open ios",
-    "open:android": "cap open android"
+    "open:android": "cap open android",
+    "build:android": "MOBILE_ENV=prod cap sync android && cd android && ./gradlew assembleRelease",
+    "assets": "capacitor-assets generate --iconBackgroundColor '#FAF7F3'"
   },
   "dependencies": {
+    "@capacitor-community/background-geolocation": "^1.2.20",
     "@capacitor/core": "^6.1.2",
     "@capacitor/geolocation": "^6.0.1",
     "@capacitor/push-notifications": "^6.0.2"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^6.1.2",
     "@capacitor/android": "^6.1.2",
     "@capacitor/ios": "^6.1.2"

@@ -1,0 +1,17 @@
+<!--
+  Aplicar em: ios/App/App/Info.plist  (dentro do <dict> raiz)
+  Purpose strings EXIGIDAS pela Apple para localização (sem elas → rejeição no Beta App Review).
+  Texto white-label (família), coerente com o app. Fluxo: pedir "When in Use" primeiro; só depois,
+  com contexto na UI, pedir "Always".
+-->
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>Compartilhe sua localização com a família enquanto o app está aberto. É voluntário e você pode desligar quando quiser.</string>
+
+<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+<string>Para manter a família por perto mesmo com o app em segundo plano, sua localização é atualizada a cada poucos minutos. Você vê quando está ativo e pode parar a qualquer momento.</string>
+
+<!-- Necessário para atualizar a localização com o app em segundo plano. -->
+<key>UIBackgroundModes</key>
+<array>
+  <string>location</string>
+</array>
