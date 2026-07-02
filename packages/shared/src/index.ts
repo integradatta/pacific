@@ -8,3 +8,4 @@ export * from './location/contracts.js';
 export * from './types/financial.types.js';
 export * from './finance/finance.js';
 export * from './intelligence/intelligence.js';
+export * from './behavior/behavior.js';

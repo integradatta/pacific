@@ -10,6 +10,7 @@ import { ErrorState } from '@/components/States';
 import { TagInput } from '@/components/Tags';
 import { RiskBadge } from '@/components/RiskBadge';
 import { useDebt, useDebtSummary, useDebtHistory, useSetDebtTags, usePayDebt, useDeleteDebt, useRenegotiateDebt, useUpdateDebtDates } from '@/lib/debts';
+import { DebtorProfileCard } from '@/components/DebtorProfileCard';
 import { formatBRL, venceEm } from '@/lib/format';
 import { STATUS_COLOR, STATUS_LABEL } from '@/lib/status';
 
@@ -422,6 +423,9 @@ export default function OperacaoDetalhePage({ params }: { params: { id: string }
                 </dl>
               </section>
             </div>
+
+            {/* Perfil comportamental do sobrinho (#2 + #6) — compacto */}
+            <DebtorProfileCard debtorId={debt.data.debtorId} name={debt.data.debtorName} />
 
             {/* Editar datas — corrigir/registrar dívidas antigas (vale mesmo se quitada) */}
             <EditDatesBox id={params.id} start={debt.data.startDate} due={debt.data.dueDate} />
