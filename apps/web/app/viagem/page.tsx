@@ -207,6 +207,66 @@ function Timeline({ payments }: { payments: PaymentPoint[] }) {
   );
 }
 
+// #3 — Sinais ao padrinho: "pretendo resolver até…" / "preciso de suporte". Compacto, gentil.
+function SignalsBox({ debt }: { debt: MyDebt }) {
+  const [mode, setMode] = useState<null | 'intent' | 'support'>(null);
+  const [dueDate, setDueDate] = useState('');
+  const [note, setNote] = useState('');
+  const [done, setDone] = useState<null | 'intent' | 'support'>(null);
+  const send = useMutation({
+    mutationFn: (body: { kind: 'INTENT_TO_PAY' | 'NEED_SUPPORT'; dueDate?: string; note?: string }) => debtorApiPost('/debtor/me/signals', body),
+    onSuccess: (_r, body) => { setDone(body.kind === 'INTENT_TO_PAY' ? 'intent' : 'support'); setMode(null); setDueDate(''); setNote(''); },
+  });
+
+  if (done) {
+    return (
+      <Card className="flex items-start gap-3">
+        <GentleCheck size={40} />
+        <p className="text-[15px]" style={{ color: C.ink }}>{done === 'intent' ? 'Combinado! Avisamos seu padrinho da sua intenção. 💛' : 'Pronto — seu padrinho foi avisado de que você precisa conversar. 💛'}</p>
+      </Card>
+    );
+  }
+
+  const softBtn = 'rounded-[14px] py-3 text-[14px] font-semibold transition-all active:translate-y-px';
+  return (
+    <Card>
+      <SectionTitle>Fale com seu padrinho</SectionTitle>
+      {mode === null ? (
+        <div className="grid grid-cols-2 gap-2.5">
+          <button type="button" onClick={() => setMode('intent')} className={softBtn} style={{ ...sans, background: C.skySoft, color: C.sky }}>📅 Pretendo resolver até…</button>
+          <button type="button" onClick={() => setMode('support')} className={softBtn} style={{ ...sans, background: C.coralSoft, color: C.coral }}>💬 Preciso de suporte</button>
+        </div>
+      ) : mode === 'intent' ? (
+        <div className="space-y-3">
+          <label htmlFor="sig-date" className="block text-[13px]" style={{ color: C.soft }}>Até quando você pretende resolver?</label>
+          <input id="sig-date" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)}
+            className="w-full rounded-[14px] bg-white px-3.5 py-3 text-[15px] focus:outline-none" style={{ ...sans, color: C.ink, border: `1.5px solid ${C.line}` }} />
+          <div className="flex items-center gap-2">
+            <button type="button" disabled={!dueDate || send.isPending} onClick={() => send.mutate({ kind: 'INTENT_TO_PAY', dueDate: new Date(dueDate).toISOString() })}
+              className="flex-1 text-white text-[14px] font-semibold rounded-[14px] py-3 disabled:opacity-50" style={{ ...round, background: `linear-gradient(135deg, ${C.sky}, ${C.mint})` }}>
+              {send.isPending ? 'Enviando…' : 'Avisar meu padrinho'}
+            </button>
+            <button type="button" onClick={() => setMode(null)} className="text-[13px] px-3 py-3" style={{ color: C.soft }}>Voltar</button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <label htmlFor="sig-note" className="block text-[13px]" style={{ color: C.soft }}>Quer contar rapidinho o que houve? (opcional)</label>
+          <input id="sig-note" type="text" maxLength={280} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex.: tive um imprevisto este mês"
+            className="w-full rounded-[14px] bg-white px-3.5 py-3 text-[15px] focus:outline-none" style={{ ...sans, color: C.ink, border: `1.5px solid ${C.line}` }} />
+          <div className="flex items-center gap-2">
+            <button type="button" disabled={send.isPending} onClick={() => send.mutate({ kind: 'NEED_SUPPORT', note: note.trim() || undefined })}
+              className="flex-1 text-white text-[14px] font-semibold rounded-[14px] py-3 disabled:opacity-50" style={{ ...round, background: `linear-gradient(135deg, ${C.coral}, ${C.sun})` }}>
+              {send.isPending ? 'Enviando…' : 'Pedir suporte'}
+            </button>
+            <button type="button" onClick={() => setMode(null)} className="text-[13px] px-3 py-3" style={{ color: C.soft }}>Voltar</button>
+          </div>
+        </div>
+      )}
+    </Card>
+  );
+}
+
 function Loading() {
   return (
     <div className="space-y-4">
@@ -245,6 +305,7 @@ export default function ViagemPage() {
           <HeroTrip debt={primary} />
           <WithWhom />
           {!primary.summary.settled && <ResolveBox debt={primary} />}
+          {!primary.summary.settled && <SignalsBox debt={primary} />}
           <HowItFormed debt={primary} />
           <Timeline payments={primary.payments} />
         </>

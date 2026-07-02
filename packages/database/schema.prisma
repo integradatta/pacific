@@ -73,6 +73,11 @@ enum PaymentClaimStatus {
   REJECTED // padrinho recusou (não bate)
 }
 
+enum DebtorSignalKind {
+  INTENT_TO_PAY // "pretendo resolver até <dueDate>" (informativo, sem implicação jurídica)
+  NEED_SUPPORT // "preciso de suporte" (pede ajuda/conversa ao padrinho)
+}
+
 enum NotificationType {
   DUE_SOON // legado (mantido p/ registros antigos); a geração agora usa as réguas abaixo
   DUE_15
@@ -89,6 +94,8 @@ enum NotificationType {
   DEBT_SETTLED // ajuda quitada
   DEBTOR_FIRST_ACCESS // abriu o link pela primeira vez
   WEEKLY_DIGEST // resumo semanal da carteira (só p/ quem optou por receber)
+  DEBTOR_INTENT // sobrinho declarou intenção de resolver até uma data
+  DEBTOR_SUPPORT // sobrinho pediu suporte/ajuda
 }
 
 model Tenant {
@@ -236,6 +243,23 @@ model PaymentClaim {
 
   @@index([tenantId, status])
   @@index([debtId])
+}
+
+// Sinais que o SOBRINHO envia ao padrinho pelo app: intenção de resolver até uma data, ou pedido de
+// suporte. Informativo (sem implicação jurídica). O último em aberto fica visível ao lado do nome do
+// sobrinho no painel; também gera notificação. Tenant-scoped (RLS FORCE em src/rls.sql).
+model DebtorSignal {
+  id         String           @id @default(uuid())
+  tenantId   String
+  debtorId   String
+  debtId     String?
+  kind       DebtorSignalKind
+  dueDate    DateTime? // preenchido no INTENT_TO_PAY
+  note       String?
+  createdAt  DateTime         @default(now())
+  resolvedAt DateTime? // padrinho marcou como resolvido/ciente
+
+  @@index([tenantId, debtorId, resolvedAt])
 }
 
 model Notification {
