@@ -29,7 +29,7 @@ export default function LocalPage() {
 
   return (
     <Screen>
-      <Header eyebrow="Rede de confiança" title="Localização" />
+      <Header eyebrow="Localização em família" title="Localização" />
 
       {consent.isLoading ? (
         <div className="rounded-[22px] animate-pulse" style={{ height: 160, background: '#EFE9E1' }} />
@@ -37,7 +37,7 @@ export default function LocalPage() {
         <Card pad="p-6" className="text-center">
           <span className="inline-flex items-center justify-center w-16 h-16 rounded-full" style={{ background: C.line, color: C.faint }}><LocationGlyph active={false} /></span>
           <h2 className="text-[20px] font-bold mt-4" style={{ ...round, color: C.ink }}>Ative a localização no aparelho</h2>
-          <p className="text-[14.5px] mt-1.5" style={{ color: C.soft }}>Para compartilhar com seu padrinho, permita o acesso à localização nas configurações do celular e tente de novo.</p>
+          <p className="text-[14.5px] mt-1.5" style={{ color: C.soft }}>Para compartilhar com sua família, permita o acesso à localização nas configurações do celular e tente de novo.</p>
           <button type="button" onClick={enable} className="mt-5 w-full text-white text-[16px] font-semibold rounded-[16px] py-3.5" style={{ ...round, background: `linear-gradient(135deg, ${C.sky}, ${C.mint})` }}>Tentar de novo</button>
         </Card>
       ) : state === 'GRANTED' ? (
@@ -48,9 +48,9 @@ export default function LocalPage() {
                 <span className="absolute inline-flex w-full h-full rounded-full animate-ping2" style={{ background: 'rgba(47,185,138,0.5)' }} />
                 <span className="relative inline-flex w-3 h-3 rounded-full" style={{ background: C.mint }} />
               </span>
-              <p className="text-[17px] font-semibold" style={{ ...round, color: '#1E8B63' }}>Vocês estão conectados 💚</p>
+              <p className="text-[17px] font-semibold" style={{ ...round, color: '#1E8B63' }}>Você está conectado 💚</p>
             </div>
-            <p className="text-[14.5px] mt-2 leading-relaxed" style={{ color: '#2A7D57' }}>Seu padrinho pode ver sua localização — só ele. Você pode parar quando quiser, aqui embaixo.</p>
+            <p className="text-[14.5px] mt-2 leading-relaxed" style={{ color: '#2A7D57' }}>Sua família pode ver sua localização — só quem você confia. Você atualiza a cada poucos minutos e pode parar quando quiser, aqui embaixo.</p>
           </section>
 
           <Card>
@@ -70,9 +70,9 @@ export default function LocalPage() {
         <>
           <Card pad="p-6">
             <span className="inline-flex items-center justify-center w-16 h-16 rounded-full animate-floaty" style={{ background: C.coralSoft, color: C.coral }}><LocationGlyph active /></span>
-            <h2 className="text-[21px] font-bold mt-4" style={{ ...round, color: C.ink }}>Compartilhar com seu padrinho</h2>
+            <h2 className="text-[21px] font-bold mt-4" style={{ ...round, color: C.ink }}>Compartilhar com a família</h2>
             <p className="text-[14.5px] mt-2 leading-relaxed" style={{ color: C.soft }}>
-              É como estar de mãos dadas à distância. <b style={{ color: C.ink }}>Só o seu padrinho</b> vê, é <b style={{ color: C.ink }}>totalmente voluntário</b>, e você pode <b style={{ color: C.ink }}>desligar quando quiser</b>.
+              É como estar de mãos dadas à distância. <b style={{ color: C.ink }}>Só quem você confia</b> vê, é <b style={{ color: C.ink }}>totalmente voluntário</b>, e você pode <b style={{ color: C.ink }}>desligar quando quiser</b>.
             </p>
             <button type="button" onClick={enable} disabled={setConsent.isPending} className="mt-5 w-full text-white text-[16px] font-semibold rounded-[16px] py-3.5 disabled:opacity-50" style={{ ...round, background: `linear-gradient(135deg, ${C.sky}, ${C.mint})`, boxShadow: '0 6px 16px -6px rgba(91,156,246,0.5)' }}>
               Começar a compartilhar
@@ -84,7 +84,7 @@ export default function LocalPage() {
 
           <Card className="flex items-start gap-3">
             <span className="text-[22px]" aria-hidden>🤝</span>
-            <p className="text-[13.5px] leading-relaxed" style={{ color: C.soft }}>Isso existe pra aproximar quem cuida de você — nunca pra vigiar. A escolha é sempre sua.</p>
+            <p className="text-[13.5px] leading-relaxed" style={{ color: C.soft }}>Isso existe pra aproximar quem se importa com você — nunca pra vigiar. A escolha é sempre sua.</p>
           </Card>
         </>
       )}

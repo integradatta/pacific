@@ -7,7 +7,7 @@ import { locationManager } from '@/lib/location-manager';
 
 /*
  * Liga o gerenciador de localização (singleton) ao estado de consentimento. Renderiza null.
- * Incluído em TODAS as telas do sobrinho (/me e /local) → o compartilhamento roda enquanto o app
+ * Incluído em TODAS as telas do app (/me, /local, /viagem) → o compartilhamento roda enquanto o app
  * estiver aberto, independente da aba; como o manager é singleton, trocar de aba não reinicia o GPS.
  */
 export function LocationSync() {

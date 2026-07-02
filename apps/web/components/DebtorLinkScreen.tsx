@@ -10,7 +10,7 @@ export function DebtorLinkScreen({ error }: { error: boolean }) {
         {error ? (
           <div className="space-y-1.5">
             <p className="text-[17px] font-semibold text-[#111827]" role="alert">Link expirado</p>
-            <p className="text-[15px] text-[#6B7280]">Peça um novo link ao seu padrinho para acessar.</p>
+            <p className="text-[15px] text-[#6B7280]">Peça um novo convite à sua rede para acessar.</p>
           </div>
         ) : (
           <div className="flex items-center gap-2.5 justify-center">

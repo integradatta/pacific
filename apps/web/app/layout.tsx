@@ -18,8 +18,9 @@ const dmMono = DM_Mono({ subsets: ['latin'], weight: ['400', '500'], variable: '
 const round = Baloo_2({ subsets: ['latin'], weight: ['500', '600', '700'], variable: '--font-round' });
 
 export const metadata: Metadata = {
-  title: 'Pacific — Torre de Controle',
-  description: 'Monitoramento de carteira de ajudas privadas.',
+  title: 'Pacific',
+  // White-label (o app do sobrinho vai à App Store): descrição neutra de metas + família.
+  description: 'Acompanhe suas metas e sua família, com respeito e transparência.',
   applicationName: 'Pacific',
   appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Pacific' },
   icons: { icon: '/icon.svg', apple: '/icon.svg' },

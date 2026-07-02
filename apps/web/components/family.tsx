@@ -90,39 +90,28 @@ const AVATAR = {
   sun: { bg: C.sunSoft, fg: C.sun },
 } as const;
 
-// ── Trilha da viagem (elemento-assinatura) ───────────────────────────────────
-// Começo (você) → marcador no progresso → destino (bandeira). Gradiente sky→mint.
-export function TripTrail({ pct, settled }: { pct: number; settled: boolean }) {
+// ── Barra do cofre (elemento-assinatura) ─────────────────────────────────────
+// Início (🐷) → marcador do quanto já foi guardado → meta (🎯). Gradiente sky→mint.
+export function CofreBar({ pct, settled }: { pct: number; settled: boolean }) {
   const p = Math.max(0, Math.min(100, pct));
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-2 text-[12px]" style={{ color: C.soft }}>
-        <span className="inline-flex items-center gap-1"><Dot color={C.sky} /> Início</span>
-        <span className="inline-flex items-center gap-1">Destino <Flag /></span>
+        <span className="inline-flex items-center gap-1"><span aria-hidden>🐷</span> Início</span>
+        <span className="inline-flex items-center gap-1">Meta <span aria-hidden>🎯</span></span>
       </div>
       <div className="relative h-3 rounded-full" style={{ background: C.line }}>
         <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${p}%`, background: `linear-gradient(90deg, ${C.sky}, ${C.mint})`, transition: 'width 700ms ease' }} />
-        {/* marcador (você) andando na trilha */}
+        {/* marcador do quanto já foi guardado */}
         <div
           className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-6 h-6 rounded-full flex items-center justify-center"
           style={{ left: `${p}%`, background: C.card, boxShadow: '0 2px 8px rgba(0,0,0,0.15)', border: `2px solid ${settled ? C.mint : C.sky}`, transition: 'left 700ms ease' }}
           aria-hidden
         >
-          <span className="text-[12px]">{settled ? '🎉' : '🧭'}</span>
+          <span className="text-[12px]">{settled ? '🎉' : '🐷'}</span>
         </div>
       </div>
     </div>
-  );
-}
-function Dot({ color }: { color: string }) {
-  return <span className="inline-block w-2 h-2 rounded-full" style={{ background: color }} />;
-}
-function Flag() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.sun} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M5 21V4c4-2 8 2 12 0v9c-4 2-8-2-12 0" fill={C.sunSoft} />
-      <line x1="5" y1="21" x2="5" y2="3" />
-    </svg>
   );
 }
 
@@ -150,11 +139,11 @@ const BADGE = {
   warm: { bg: C.warmSoft, fg: '#C47B3C' },
 } as const;
 
-// Status gentil — sem "vencido/atenção/risco". Tom de convívio, nunca punitivo.
+// Status gentil — sem "vencido/atenção/risco". Tom de metas, nunca punitivo.
 export function gentleStatus(status: DebtStatus, settled: boolean, daysRemaining: number): { label: string; tone: keyof typeof BADGE } {
-  if (settled) return { label: 'Tudo certo ✨', tone: 'mint' };
-  if (daysRemaining < 0) return { label: 'Passou da data combinada', tone: 'warm' };
-  if (daysRemaining === 0) return { label: 'É hoje o combinado', tone: 'sun' };
+  if (settled) return { label: 'Meta alcançada ✨', tone: 'mint' };
+  if (daysRemaining < 0) return { label: 'Passou da data da meta', tone: 'warm' };
+  if (daysRemaining === 0) return { label: 'A meta é hoje', tone: 'sun' };
   if (daysRemaining <= 7) return { label: 'Chegando perto', tone: 'sun' };
   return { label: 'No caminho', tone: 'sky' };
 }
@@ -188,13 +177,15 @@ export function LocationGlyph({ active }: { active: boolean }) {
     </svg>
   );
 }
-export function TripGlyph({ active }: { active: boolean }) {
-  // Trilha sinuosa com bandeira — a "viagem".
+export function CofreGlyph({ active }: { active: boolean }) {
+  // Cofrinho (porquinho) — a meta de economia. Corpo + focinho + orelha + moeda entrando.
   return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <path d="M6 20c0-3 3-3 3-6s-3-3-3-6 4-3 6-3" strokeDasharray="0.1 3.4" />
-      <circle cx="6" cy="20" r="1.4" fill={active ? 'currentColor' : 'none'} />
-      <path d="M16 4v7c1.6.8 3.2-.8 4.5 0V4c-1.3-.8-2.9.8-4.5 0Z" fill={active ? C.sunSoft : 'none'} />
+    <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? C.mintSoft : 'none'} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M4 12a6 5 0 0 1 6-5h3a6 5 0 0 1 6 5 6 5 0 0 1-2 3.7V18h-2.2v-1.2a8 8 0 0 1-3.6 0V18H9v-1.4A6 5 0 0 1 4 12Z" />
+      <path d="M3.5 11.5c-.9-.2-1-1.6 0-2" />
+      <path d="M13 7l1.2-2" />
+      <circle cx="8" cy="11.5" r="0.6" fill="currentColor" stroke="none" />
+      <line x1="12" y1="6.6" x2="14.2" y2="6.6" />
     </svg>
   );
 }
