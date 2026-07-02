@@ -40,6 +40,26 @@ describe('debtorProfile', () => {
     expect(p.reliability).toBe('unpredictable');
   });
 
+  it('DebtorScore: pontual pontua alto + explicação legível; irregular pontua baixo', () => {
+    const bom = debtorProfile({ settled: [
+      { dueDate: d('2026-06-01'), settledAt: d('2026-06-01') },
+      { dueDate: d('2026-05-01'), settledAt: d('2026-05-01') },
+      { dueDate: d('2026-04-01'), settledAt: d('2026-04-02') },
+    ], claims: [{ status: 'CONFIRMED' }], logins: [now, now, now], locationConsent: 'GRANTED', now });
+    expect(bom.score).not.toBeNull();
+    expect(bom.score!).toBeGreaterThanOrEqual(70);
+    expect(bom.scoreExplanation).toMatch(/\/100/);
+    expect(bom.scoreExplanation).toMatch(/no prazo/);
+
+    const ruim = debtorProfile({ settled: [{ dueDate: d('2026-05-01'), settledAt: d('2026-06-10') }], claims: [], logins: [], renegotiations: 2, locationConsent: 'REVOKED', now });
+    expect(ruim.score!).toBeLessThan(bom.score!);
+  });
+
+  it('sem histórico → score null', () => {
+    const p = debtorProfile({ settled: [], claims: [], logins: [], now });
+    expect(p.score).toBeNull();
+  });
+
   it('melhor horário = moda dos logins (≥3)', () => {
     const logins = [d('2026-06-28T20:00:00'), d('2026-06-21T21:00:00'), d('2026-06-14T20:30:00')]; // domingos à noite
     const p = debtorProfile({ settled: [], claims: [], logins, now });

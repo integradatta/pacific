@@ -115,15 +115,22 @@ export class InsightsService {
   /** Perfil comportamental de um sobrinho (como costuma pagar, engajamento, melhor horário). */
   async debtorProfile(tenantId: string, debtorId: string, now: Date = new Date()): Promise<DebtorProfile> {
     return this.scoped.withTenant(tenantId, async (tx) => {
-      const [settled, claims, logins] = await Promise.all([
+      const [settled, claims, logins, debtIds, consent] = await Promise.all([
         tx.debt.findMany({ where: { tenantId, debtorId, deletedAt: null, settledAt: { not: null } }, select: { dueDate: true, settledAt: true } }),
         tx.paymentClaim.findMany({ where: { tenantId, debtorId }, select: { status: true } }),
         tx.debtorLoginEvent.findMany({ where: { tenantId, debtorId, success: true }, select: { at: true }, orderBy: { at: 'desc' }, take: 300 }),
+        tx.debt.findMany({ where: { tenantId, debtorId }, select: { id: true } }),
+        tx.locationConsent.findUnique({ where: { debtorId }, select: { state: true } }),
       ]);
+      const renegotiations = debtIds.length
+        ? await tx.platformEvent.count({ where: { tenantId, type: 'OPERATION_UPDATED', targetType: 'debt', targetId: { in: debtIds.map((d) => d.id) }, detail: { path: ['renegotiated'], equals: true } } })
+        : 0;
       return debtorProfile({
         settled: settled.filter((s): s is { dueDate: Date; settledAt: Date } => s.settledAt != null).map((s) => ({ dueDate: s.dueDate, settledAt: s.settledAt! })),
         claims: claims.map((c) => ({ status: c.status })),
         logins: logins.map((l) => l.at),
+        renegotiations,
+        locationConsent: consent?.state ?? 'NEVER',
         now,
       });
     });

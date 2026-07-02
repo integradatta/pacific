@@ -12,6 +12,10 @@ export interface BehaviorInput {
   claims: { status: 'PENDING' | 'CONFIRMED' | 'REJECTED' }[];
   /** Timestamps de acesso do sobrinho ao app (engajamento + melhor horário). */
   logins: Date[];
+  /** Nº de renegociações pedidas (sinal leve de dificuldade). */
+  renegotiations?: number;
+  /** Estado atual do consentimento de localização (confiança/transparência). */
+  locationConsent?: 'GRANTED' | 'REVOKED' | 'DECLINED' | 'NEVER' | null;
   now: Date;
 }
 
@@ -28,6 +32,9 @@ export interface DebtorProfile {
   engagementTrend: Trend;
   bestTime: BestTime | null; // #6 — melhor janela para lembrar
   summary: string; // frase curta e amigável (mobile)
+  score: number | null; // DebtorScore 0..100 ("empresto de novo?"); null = sem histórico
+  scoreExplanation: string; // fatores concretos e legíveis
+  scoreTrend: Trend; // melhorando / piorando (pelos atrasos recentes)
 }
 
 const DAY = 86_400_000;
@@ -93,10 +100,44 @@ export function debtorProfile(input: BehaviorInput): DebtorProfile {
 
   const bestTime = bestTimeFromLogins(logins); // #6
 
+  // DebtorScore — atrasos em ordem cronológica (p/ "última" e tendência).
+  const sortedDelays = [...settled].sort((a, b) => a.settledAt.getTime() - b.settledAt.getTime()).map((s) => Math.round((s.settledAt.getTime() - s.dueDate.getTime()) / DAY));
+  const lastDelay = sortedDelays.length ? sortedDelays[sortedDelays.length - 1]! : null;
+  let scoreTrend: Trend = 'unknown';
+  if (sortedDelays.length >= 2) {
+    const earlier = sortedDelays.slice(0, -1);
+    const earlierMean = earlier.reduce((a, b) => a + b, 0) / earlier.length;
+    scoreTrend = lastDelay! < earlierMean - 2 ? 'up' : lastDelay! > earlierMean + 2 ? 'down' : 'stable';
+  }
+  const reneg = input.renegotiations ?? 0;
+  const loc = input.locationConsent ?? null;
+
+  let score: number | null = null;
+  let scoreExplanation = 'Sem histórico de quitações ainda — perfil em formação.';
+  if (sampleSize > 0 && onTimeRate != null) {
+    let s = 40 + onTimeRate * 45;
+    if (avgDelayDays && avgDelayDays > 0) s -= Math.min(avgDelayDays, 30) * 0.5;
+    if (claimConfirmRate != null) s += (claimConfirmRate - 0.5) * 10;
+    if (logins30d >= 4) s += 5;
+    else if (engagementTrend === 'down' && (lastLoginDaysAgo ?? 0) > 21) s -= 8;
+    s -= Math.min(reneg, 3) * 5;
+    if (loc === 'GRANTED') s += 3;
+    else if (loc === 'REVOKED') s -= 5;
+    score = Math.max(0, Math.min(100, Math.round(s)));
+    const onCount = Math.round(onTimeRate * sampleSize);
+    const parts = [`pagou ${onCount} de ${sampleSize} no prazo`];
+    if (lastDelay != null && lastDelay > 2) parts.push(`atrasou a última em ${lastDelay} dias`);
+    if (logins30d >= 4) parts.push('acessa o portal com frequência');
+    else if (lastLoginDaysAgo != null && lastLoginDaysAgo > 21) parts.push(`sem acessar há ${lastLoginDaysAgo} dias`);
+    if (reneg > 0) parts.push(`pediu ${reneg} renegociaç${reneg === 1 ? 'ão' : 'ões'}`);
+    scoreExplanation = `${score}/100: ${parts.join('; ')}.`;
+  }
+
   return {
     sampleSize, avgDelayDays, onTimeRate, reliability, claimConfirmRate,
     logins30d, lastLoginDaysAgo, engagementTrend, bestTime,
     summary: buildSummary({ sampleSize, avgDelayDays, onTimeRate, reliability, lastLoginDaysAgo, engagementTrend }),
+    score, scoreExplanation, scoreTrend,
   };
 }
 
