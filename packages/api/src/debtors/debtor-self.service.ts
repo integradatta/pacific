@@ -97,9 +97,12 @@ export class DebtorSelfService {
       const d = await tx.debtor.findUnique({ where: { id: debtorId }, select: { name: true } });
       const nm = d?.name ?? 'Seu sobrinho';
       const cleanNote = note?.trim().slice(0, 280) || null;
-      await tx.debtorSignal.create({
-        data: { tenantId, debtorId, kind, dueDate: kind === 'INTENT_TO_PAY' && dueDate ? new Date(dueDate) : null, note: cleanNote },
-      });
+      const data = { dueDate: kind === 'INTENT_TO_PAY' && dueDate ? new Date(dueDate) : null, note: cleanNote };
+      // Dedup: 1 sinal aberto por tipo/sobrinho — reenviar atualiza o existente (evita spam de
+      // notificações e de itens "ao lado do nome").
+      const existing = await tx.debtorSignal.findFirst({ where: { tenantId, debtorId, kind, resolvedAt: null }, select: { id: true } });
+      if (existing) await tx.debtorSignal.update({ where: { id: existing.id }, data: { ...data, createdAt: new Date() } });
+      else await tx.debtorSignal.create({ data: { tenantId, debtorId, kind, ...data } });
       if (kind === 'INTENT_TO_PAY') {
         const quando = dueDate ? new Date(dueDate).toLocaleDateString('pt-BR') : 'em breve';
         await notifyCreditor(tx, { tenantId, debtorId, type: 'DEBTOR_INTENT', title: 'Intenção de pagamento', body: `${nm} pretende resolver até ${quando}.` });
