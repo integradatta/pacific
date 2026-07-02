@@ -1,6 +1,8 @@
 'use client';
 
-import { useDebtorProfile } from '@/lib/insights';
+import { useDebtorProfile, useDebtorSignals, useResolveSignal } from '@/lib/insights';
+
+const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
 
 // Perfil comportamental — COMPACTO (uma frase + poucos chips). Sem excesso; mobile-harmônico.
 const RELIABILITY: Record<string, { label: string; cls: string }> = {
@@ -16,10 +18,29 @@ function Chip({ children, cls = 'text-muted border-line bg-surface2' }: { childr
 
 export function DebtorProfileCard({ debtorId, name }: { debtorId: string; name: string }) {
   const q = useDebtorProfile(debtorId);
+  const signals = useDebtorSignals(debtorId);
+  const resolve = useResolveSignal(debtorId);
   const p = q.data;
+  const open = signals.data ?? [];
 
   return (
     <section className="panel p-5">
+      {/* Sinais em aberto do sobrinho — ao lado do nome, acionáveis (#3) */}
+      {open.length > 0 && (
+        <div className="mb-4 space-y-2">
+          {open.map((s) => (
+            <div key={s.id} className="flex items-start justify-between gap-2 rounded-lg px-3 py-2.5" style={{ background: s.kind === 'NEED_SUPPORT' ? 'rgb(var(--status-red) / 0.08)' : 'rgb(var(--sonar) / 0.08)' }}>
+              <p className="font-sans text-sm text-text">
+                {s.kind === 'INTENT_TO_PAY'
+                  ? <>📅 Pretende resolver {s.dueDate ? `até ${fmtDate(s.dueDate)}` : 'em breve'}</>
+                  : <>💬 Pediu suporte{s.note ? ` — “${s.note}”` : ''}</>}
+              </p>
+              <button type="button" onClick={() => resolve.mutate(s.id)} disabled={resolve.isPending}
+                className="font-mono text-[10px] uppercase tracking-widest text-muted hover:text-text shrink-0 mt-0.5 disabled:opacity-50">ciente</button>
+            </div>
+          ))}
+        </div>
+      )}
       <h3 className="font-mono text-xs text-muted uppercase tracking-widest mb-2">Como {name.split(' ')[0]} costuma agir</h3>
       {q.isLoading ? (
         <div className="skeleton h-5 w-3/4 rounded" />

@@ -5,6 +5,7 @@ import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 const FORCED_TABLES = [
   'Debtor', 'Debt', 'Notification', 'DebtorLoginEvent', 'PaymentClaim',
   'LocationConsent', 'DebtorPosition', 'LocationPing', 'Geofence', 'GeofenceEvent', 'MonthlyReport',
+  'DebtorSignal',
 ];
 
 /**

@@ -2,6 +2,14 @@ import { Injectable } from '@nestjs/common';
 import { debtorProfile, type DebtorProfile } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 
+export interface DebtorSignalRow {
+  id: string;
+  kind: 'INTENT_TO_PAY' | 'NEED_SUPPORT';
+  dueDate: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
 /**
  * Camada de inteligência do padrinho. Deriva insights de dados JÁ coletados (quitações, avisos,
  * logins) — sem coletar nada novo. Tudo tenant-scoped (withTenant/RLS). Começa com o perfil
@@ -26,5 +34,18 @@ export class InsightsService {
         now,
       });
     });
+  }
+
+  /** Sinais em aberto do sobrinho (intenção de pagar / pedido de suporte) — ficam ao lado do nome. */
+  async openSignals(tenantId: string, debtorId: string): Promise<DebtorSignalRow[]> {
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      const rows = await tx.debtorSignal.findMany({ where: { tenantId, debtorId, resolvedAt: null }, orderBy: { createdAt: 'desc' } });
+      return rows.map((r) => ({ id: r.id, kind: r.kind, dueDate: r.dueDate?.toISOString() ?? null, note: r.note, createdAt: r.createdAt.toISOString() }));
+    });
+  }
+
+  /** Padrinho marca o sinal como resolvido/ciente (some de "ao lado do nome"). */
+  async resolveSignal(tenantId: string, id: string): Promise<void> {
+    await this.scoped.withTenant(tenantId, (tx) => tx.debtorSignal.updateMany({ where: { id, tenantId }, data: { resolvedAt: new Date() } }));
   }
 }

@@ -87,6 +87,28 @@ export class DebtorSelfService {
     });
   }
 
+  /**
+   * Sinal do sobrinho ao padrinho (#3): intenção de resolver até uma data, ou pedido de suporte.
+   * Informativo (sem implicação jurídica). Cria o registro (fica ao lado do nome no painel) e
+   * notifica o padrinho.
+   */
+  async sendSignal(tenantId: string, debtorId: string, kind: 'INTENT_TO_PAY' | 'NEED_SUPPORT', dueDate?: string, note?: string): Promise<void> {
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      const d = await tx.debtor.findUnique({ where: { id: debtorId }, select: { name: true } });
+      const nm = d?.name ?? 'Seu sobrinho';
+      const cleanNote = note?.trim().slice(0, 280) || null;
+      await tx.debtorSignal.create({
+        data: { tenantId, debtorId, kind, dueDate: kind === 'INTENT_TO_PAY' && dueDate ? new Date(dueDate) : null, note: cleanNote },
+      });
+      if (kind === 'INTENT_TO_PAY') {
+        const quando = dueDate ? new Date(dueDate).toLocaleDateString('pt-BR') : 'em breve';
+        await notifyCreditor(tx, { tenantId, debtorId, type: 'DEBTOR_INTENT', title: 'Intenção de pagamento', body: `${nm} pretende resolver até ${quando}.` });
+      } else {
+        await notifyCreditor(tx, { tenantId, debtorId, type: 'DEBTOR_SUPPORT', title: 'Pedido de suporte', body: `${nm} pediu suporte${cleanNote ? `: "${cleanNote.slice(0, 120)}"` : '.'}` });
+      }
+    });
+  }
+
   /** Registra o token de push do dispositivo do sobrinho (app nativo). Envio (FCM) é externo.
    *  Dedup: mantém só o token atual por (devedor, plataforma) — evita acúmulo de tokens stale. */
   async registerPushToken(tenantId: string, debtorId: string, token: string, platform: string): Promise<void> {
