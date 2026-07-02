@@ -27,6 +27,30 @@ Use `@capacitor/assets` com um PNG 1024×1024 (derive de `apps/web/public/icon.s
 npx @capacitor/assets generate --iconBackgroundColor '#070A11'
 ```
 
+## Permissões de localização (OBRIGATÓRIO p/ App Store)
+
+A Apple exige textos de propósito (purpose strings) claros para localização, senão **rejeita**. Use
+linguagem white-label (família). Gerado o projeto iOS (`cap add ios`), edite
+`apps/mobile/ios/App/App/Info.plist`:
+
+```xml
+<key>NSLocationWhenInUseUsageDescription</key>
+<string>Compartilhe sua localização com a família enquanto o app está aberto. É voluntário e você pode desligar quando quiser.</string>
+<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+<string>Para manter a família por perto mesmo com o app em segundo plano, a localização é atualizada a cada poucos minutos. Você controla e pode parar a qualquer momento.</string>
+<!-- Só inclua o modo background se realmente usar um plugin de background-geolocation: -->
+<key>UIBackgroundModes</key>
+<array><string>location</string></array>
+```
+
+Android (`android/app/src/main/AndroidManifest.xml`): `ACCESS_COARSE_LOCATION` + `ACCESS_FINE_LOCATION`
+(+ `ACCESS_BACKGROUND_LOCATION` só se usar foreground service).
+
+O gerenciador (`apps/web/lib/location-manager.ts`) amostra a cada **5 min** com baixa precisão
+(bateria) e usa `@capacitor/geolocation` no nativo. **Background com o app FECHADO** exige um plugin
+dedicado (ex.: `@capacitor-community/background-geolocation`) + os modos acima; sem ele, o
+compartilhamento roda em foreground (app aberto).
+
 ## Push (FCM) e GPS-background (resumo)
 - Push: criar app no Firebase, baixar `google-services.json` (Android) / `GoogleService-Info.plist` (iOS),
   registrar o device token e enviar ao backend. APNs (Apple) habilitado no Apple Developer.
