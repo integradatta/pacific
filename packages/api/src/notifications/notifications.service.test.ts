@@ -3,12 +3,14 @@ import { NotificationsService } from './notifications.service.js';
 import { NotFoundException } from '@nestjs/common';
 
 const start = new Date('2026-01-01T00:00:00Z');
-function debt(id: string, dueDate: Date) {
-  return { id, debtorId: `dbt-${id}`, principal: { toString: () => '1000.00' }, rate: { toString: () => '0' }, ratePeriod: 'MONTHLY', startDate: start, dueDate };
+function debt(id: string, dueDate: Date, settledAt: Date | null = null) {
+  return { id, debtorId: `dbt-${id}`, principal: { toString: () => '1000.00' }, rate: { toString: () => '0' }, ratePeriod: 'MONTHLY', startDate: start, dueDate, settledAt };
 }
 function fakeDb(debts: ReturnType<typeof debt>[]) {
   return {
-    debt: { findMany: vi.fn(async () => debts) },
+    // Honra o filtro settledAt:null (só dívidas abertas geram alerta).
+    debt: { findMany: vi.fn(async (args?: { where?: { settledAt?: unknown } }) =>
+      args?.where && 'settledAt' in args.where ? debts.filter((d) => d.settledAt == null) : debts) },
     notification: {
       upsert: vi.fn(async () => ({})),
       findMany: vi.fn(async () => [{ id: 'n1' }]),
@@ -40,6 +42,16 @@ describe('NotificationsService', () => {
     const out = await svc(db).generateDueNotifications('t1', undefined, asOf);
     expect(out.created).toBe(6);
     expect(typesOf(db).sort()).toEqual(['DUE_1', 'DUE_15', 'DUE_3', 'DUE_7', 'DUE_TODAY', 'OVERDUE']);
+  });
+
+  it('NÃO gera alerta para dívida quitada (mesmo vencida)', async () => {
+    const db = fakeDb([
+      debt('a', new Date('2026-01-20T00:00:00Z')), // aberta, vencida -> OVERDUE
+      debt('paga', new Date('2026-01-20T00:00:00Z'), new Date('2026-01-25T00:00:00Z')), // quitada -> ignora
+    ]);
+    const out = await svc(db).generateDueNotifications('t1', undefined, asOf);
+    expect(out.created).toBe(1);
+    expect(typesOf(db)).toEqual(['OVERDUE']);
   });
 
   it('respeita as réguas ativas (enabled filtra)', async () => {

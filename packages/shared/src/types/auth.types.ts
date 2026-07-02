@@ -7,4 +7,5 @@ export interface AuthUser {
   debtorId?: string; // presente quando o sujeito é um devedor (login por link)
   tenantApproved?: boolean; // credor: tenant aprovado pelo super-admin E ativo
   tokenIssuedAt?: number; // claim iat (segundos) — usado p/ revogação instantânea de sessão
+  accessVersion?: number; // devedor: versão do link (DebtorAccess.rotatedAt) — mata JWT ao rotacionar
 }

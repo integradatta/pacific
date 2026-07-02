@@ -59,7 +59,9 @@ export class NotificationsService {
   ): Promise<{ created: number }> {
     const active = new Set<AlertType>(enabled);
     return this.scoped.withTenant(tenantId, async (tx) => {
-      const debts = await tx.debt.findMany({ where: { tenantId, deletedAt: null } });
+      // Só dívidas ABERTAS: quitada não gera "vencida". Sem o settledAt:null, uma dívida paga e
+      // vencida ressurgia todo dia (pay() apaga a notificação e o cron recriava).
+      const debts = await tx.debt.findMany({ where: { tenantId, deletedAt: null, settledAt: null } });
       let created = 0;
       for (const d of debts) {
         const days = daysRemaining(

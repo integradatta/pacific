@@ -123,6 +123,12 @@ export default function NovaOperacaoPage() {
                 ))}
               </div>
             </div>
+            {/* Aviso (não bloqueia): 1% a.m. é o teto legal entre pessoas físicas no Brasil. Proteção do negócio. */}
+            {ratePct.trim() !== '' && (ratePeriod === 'MONTHLY' ? Number(ratePct) : Number(ratePct) / 12) > 1 && (
+              <p className="font-sans text-[11px] text-status-yellow">
+                Acima de 1% ao mês — teto usual entre pessoas físicas no Brasil. Confirme o valor.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">

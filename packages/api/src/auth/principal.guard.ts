@@ -15,7 +15,10 @@ export class PrincipalGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const user = context.switchToHttp().getRequest<RequestWithUser>().user;
-    if (user && user.role !== 'DEBTOR' && !user.tenantId) {
+    // SEMPRE resolve pelo nosso banco para não-devedores — o papel/tenant do JWT nunca são a verdade.
+    // (Antes só resolvia quando o JWT NÃO tinha tenantId; se algum dia o Supabase popular app_metadata,
+    // o force-logout e o gate de aprovação seriam pulados silenciosamente.)
+    if (user && user.role !== 'DEBTOR') {
       const row = await this.scoped.raw().user.findUnique({
         where: { supabaseId: user.supabaseId },
         include: { tenant: { select: { approval: true, status: true } } },

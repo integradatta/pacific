@@ -33,7 +33,7 @@ describe('DebtorsAdminService', () => {
     expect(db.debtor.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ tenantId: 't1', name: 'Ana' }) }));
     expect(db.debtorAccess.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ debtorId: 'd1', tenantId: 't1', tokenHash: expect.stringMatching(/^[a-f0-9]{64}$/) }) }));
     expect(out.debtorId).toBe('d1');
-    expect(out.accessLink).toMatch(/\/d\/[A-Za-z0-9_-]{43}$/);
+    expect(out.accessLink).toMatch(/\/d#[A-Za-z0-9_-]{43}$/);
   });
   it('revoke: desativa o acesso (updateMany com tenantId) ', async () => {
     const db = fakeDb();
@@ -47,7 +47,7 @@ describe('DebtorsAdminService', () => {
   it('rotateLink: gera novo link e atualiza tokenHash+rotatedAt', async () => {
     const db = fakeDb();
     const out = await svc(db).rotateLink('t1', 'd1');
-    expect(out.accessLink).toMatch(/\/d\/[A-Za-z0-9_-]{43}$/);
+    expect(out.accessLink).toMatch(/\/d#[A-Za-z0-9_-]{43}$/);
     const call = ((db.debtorAccess.updateMany.mock.calls as unknown[][])[0]![0]) as { where: unknown; data: { tokenHash: string; rotatedAt: Date } };
     expect(call.where).toEqual({ debtorId: 'd1', tenantId: 't1' });
     expect(call.data.tokenHash).toMatch(/^[a-f0-9]{64}$/);

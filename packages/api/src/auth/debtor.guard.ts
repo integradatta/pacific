@@ -21,6 +21,19 @@ export class DebtorGuard implements CanActivate {
     const debtorId = user?.debtorId;
     if (!user || user.role !== 'DEBTOR' || !debtorId || !req.tenantId) return true;
     try {
+      // Revogação/rotação do link: desativar mata a sessão; rotacionar muda rotatedAt → o `av` do
+      // token antigo não bate mais. (DebtorAccess é global: consulta por debtorId @unique.)
+      const access = await this.scoped.raw().debtorAccess.findUnique({
+        where: { debtorId },
+        select: { active: true, rotatedAt: true },
+      });
+      if (access) {
+        if (!access.active) throw new UnauthorizedException('Acesso revogado. Peça um novo link ao seu padrinho.');
+        const currentVersion = access.rotatedAt?.getTime() ?? 0;
+        if ((user.accessVersion ?? 0) !== currentVersion) {
+          throw new UnauthorizedException('Link atualizado. Peça o novo ao seu padrinho.');
+        }
+      }
       const exists = await this.scoped.withTenant(req.tenantId, (tx) =>
         tx.debtor.findUnique({ where: { id: debtorId }, select: { id: true } }),
       );
