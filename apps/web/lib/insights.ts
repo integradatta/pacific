@@ -16,6 +16,27 @@ export function useRadar() {
   return useQuery({ queryKey: ['insights', 'radar'], queryFn: () => apiGet<CoolingRow[]>('/insights/radar'), staleTime: 5 * 60_000 });
 }
 
+export interface Simulation {
+  portfolioOutstanding: number;
+  newShareOfPortfolio: number;
+  concentrationHigh: boolean;
+  debtorExposureBefore: number | null;
+  debtorExposureAfter: number | null;
+  debtorShareAfter: number | null;
+  expectedDelayDays: number | null;
+  reliability: string | null;
+}
+
+/** #9 Simulação de impacto na carteira (para o valor informado). null desabilita. */
+export function useSimulate(amount: number | null) {
+  return useQuery({
+    queryKey: ['insights', 'simulate', amount],
+    queryFn: () => apiPost<Simulation>('/insights/simulate', { amount }),
+    enabled: amount != null && amount > 0,
+    staleTime: 60_000,
+  });
+}
+
 /** Perfil comportamental de um sobrinho (#2 + #6). Derivado de dados já coletados. */
 export function useDebtorProfile(debtorId: string | undefined) {
   return useQuery({

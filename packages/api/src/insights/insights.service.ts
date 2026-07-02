@@ -24,7 +24,19 @@ export interface CoolingRow {
   reasons: string[];
 }
 
+export interface SimulationResult {
+  portfolioOutstanding: number; // total a receber hoje (aberto)
+  newShareOfPortfolio: number; // 0..1 — quanto ESTA ajuda representa do total (após)
+  concentrationHigh: boolean; // ESTA ajuda concentra demais a carteira
+  debtorExposureBefore: number | null; // exposição atual a este sobrinho (se informado)
+  debtorExposureAfter: number | null;
+  debtorShareAfter: number | null; // 0..1 — concentração no sobrinho após
+  expectedDelayDays: number | null; // atraso provável (do perfil), se houver histórico
+  reliability: string | null;
+}
+
 const DAY = 86_400_000;
+const CONCENTRATION_LIMIT = 0.3; // 30% da carteira numa única ajuda/sobrinho = alerta
 
 /**
  * Camada de inteligência do padrinho. Deriva insights de dados JÁ coletados (quitações, avisos,
@@ -101,6 +113,43 @@ export class InsightsService {
         now,
       });
     });
+  }
+
+  /**
+   * #9 Simulador de decisão ciente da carteira — o momento "devo emprestar?". Dado um valor (e,
+   * opcionalmente, um sobrinho existente), estima o impacto: concentração desta ajuda na carteira,
+   * exposição ao sobrinho e atraso provável (do perfil). Só leitura; nada é criado.
+   */
+  async simulate(tenantId: string, input: { amount: number; debtorId?: string }, now: Date = new Date()): Promise<SimulationResult> {
+    const rows = await this.dashboard.portfolio(tenantId, now);
+    const open = rows.filter((r) => !r.settled);
+    const portfolioOutstanding = open.reduce((s, r) => s + Number(r.amountDue), 0);
+    const amount = Math.max(0, input.amount);
+    const denom = portfolioOutstanding + amount;
+    const newShareOfPortfolio = denom > 0 ? amount / denom : 0;
+
+    let debtorExposureBefore: number | null = null;
+    let debtorExposureAfter: number | null = null;
+    let debtorShareAfter: number | null = null;
+    let expectedDelayDays: number | null = null;
+    let reliability: string | null = null;
+
+    if (input.debtorId) {
+      const [their, profile] = await Promise.all([
+        this.scoped.withTenant(tenantId, (tx) =>
+          tx.debt.findMany({ where: { tenantId, debtorId: input.debtorId, deletedAt: null, settledAt: null }, select: { principal: true, rate: true, ratePeriod: true, startDate: true, dueDate: true, paidAmount: true } }),
+        ),
+        this.debtorProfile(tenantId, input.debtorId, now),
+      ]);
+      debtorExposureBefore = their.reduce((s, d) => s + Number(outstanding(balanceAt({ principal: d.principal.toString(), rate: d.rate.toString(), ratePeriod: d.ratePeriod, startDate: d.startDate, dueDate: d.dueDate }, now), d.paidAmount.toString(), false)), 0);
+      debtorExposureAfter = debtorExposureBefore + amount;
+      debtorShareAfter = denom > 0 ? debtorExposureAfter / denom : 0;
+      expectedDelayDays = profile.avgDelayDays;
+      reliability = profile.reliability;
+    }
+
+    const concentrationHigh = Math.max(newShareOfPortfolio, debtorShareAfter ?? 0) >= CONCENTRATION_LIMIT;
+    return { portfolioOutstanding, newShareOfPortfolio, concentrationHigh, debtorExposureBefore, debtorExposureAfter, debtorShareAfter, expectedDelayDays, reliability };
   }
 
   /** Sinais em aberto do sobrinho (intenção de pagar / pedido de suporte) — ficam ao lado do nome. */

@@ -8,6 +8,7 @@ import { apiPost } from '@/lib/api';
 import { formatBRL, venceEm } from '@/lib/format';
 import { RiskBadge } from '@/components/RiskBadge';
 import { TagInput } from '@/components/Tags';
+import { useSimulate } from '@/lib/insights';
 
 // Resultado da prévia — calculado no SERVIDOR (o motor proprietário não vai no bundle do client).
 interface PreviewResult {
@@ -65,6 +66,8 @@ export default function NovaOperacaoPage() {
   });
   const preview = previewQuery.data ?? null;
   const recoverability = preview?.recoverability ?? null;
+  // #9 Impacto na carteira (simulação ciente do portfólio) — usa o valor debounced.
+  const sim = useSimulate(debounced ? Number(debounced.principal) : null);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
@@ -169,6 +172,18 @@ export default function NovaOperacaoPage() {
               <PreviewRow label="Retorno esperado" value={formatBRL(preview.expectedReturn)} />
               <PreviewRow label="Dias restantes" value={venceEm(preview.daysRemaining)} />
             </dl>
+          )}
+          {/* #9 Impacto na carteira — compacto */}
+          {preview && sim.data && (
+            <div className="mt-4 pt-4 border-t border-line">
+              <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-1.5">Impacto na carteira</p>
+              <p className="font-sans text-sm text-text-dim">
+                Esta ajuda seria <span className={`font-medium tabular-nums ${sim.data.concentrationHigh ? 'text-status-red' : 'text-text'}`}>{Math.round(sim.data.newShareOfPortfolio * 100)}%</span> da sua carteira.
+              </p>
+              {sim.data.concentrationHigh && (
+                <p className="font-sans text-xs text-status-red/90 mt-1">Concentra bastante numa só ajuda — considere diluir.</p>
+              )}
+            </div>
           )}
         </div>
       </div>
