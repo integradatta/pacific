@@ -41,6 +41,24 @@ function periodo(hour: number): string {
   return 'à noite';
 }
 
+// #6 Melhor horário para lembrar: moda de (dia da semana, faixa de 6h) dos logins. Reusável
+// (perfil e radar). Precisa de ≥3 logins e uma janela com ≥2 ocorrências, senão null.
+export function bestTimeFromLogins(logins: Date[]): BestTime | null {
+  if (logins.length < 3) return null;
+  const buckets = new Map<string, { count: number; weekday: number; hour: number }>();
+  for (const d of logins) {
+    const weekday = d.getDay();
+    const hour = d.getHours();
+    const key = `${weekday}-${Math.floor(hour / 6)}`;
+    const cur = buckets.get(key);
+    if (cur) cur.count++;
+    else buckets.set(key, { count: 1, weekday, hour });
+  }
+  const top = [...buckets.values()].sort((a, b) => b.count - a.count)[0];
+  if (!top || top.count < 2) return null;
+  return { weekday: top.weekday, hour: top.hour, label: `${WEEKDAYS[top.weekday]} ${periodo(top.hour)}` };
+}
+
 export function debtorProfile(input: BehaviorInput): DebtorProfile {
   const { settled, claims, logins, now } = input;
 
@@ -73,21 +91,7 @@ export function debtorProfile(input: BehaviorInput): DebtorProfile {
     else engagementTrend = 'stable';
   }
 
-  // #6 Melhor horário: moda de (dia da semana, faixa de hora) dos logins.
-  let bestTime: BestTime | null = null;
-  if (logins.length >= 3) {
-    const buckets = new Map<string, { count: number; weekday: number; hour: number }>();
-    for (const d of logins) {
-      const weekday = d.getDay();
-      const hour = d.getHours();
-      const key = `${weekday}-${Math.floor(hour / 6)}`; // faixas de 6h
-      const cur = buckets.get(key);
-      if (cur) cur.count++;
-      else buckets.set(key, { count: 1, weekday, hour });
-    }
-    const top = [...buckets.values()].sort((a, b) => b.count - a.count)[0];
-    if (top && top.count >= 2) bestTime = { weekday: top.weekday, hour: top.hour, label: `${WEEKDAYS[top.weekday]} ${periodo(top.hour)}` };
-  }
+  const bestTime = bestTimeFromLogins(logins); // #6
 
   return {
     sampleSize, avgDelayDays, onTimeRate, reliability, claimConfirmRate,

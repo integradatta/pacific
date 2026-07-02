@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
-  debtorProfile, cashForecast, coolingScore, balanceAt, outstanding, daysRemaining, paymentProbability,
+  debtorProfile, cashForecast, coolingScore, bestTimeFromLogins, balanceAt, outstanding, daysRemaining, paymentProbability,
   type DebtorProfile, type CashForecast, type Trend,
 } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
@@ -22,6 +22,7 @@ export interface CoolingRow {
   daysRemaining: number;
   score: number;
   reasons: string[];
+  bestTimeLabel: string | null; // #6 — melhor janela para lembrar (se houver dados)
 }
 
 export interface SimulationResult {
@@ -104,7 +105,8 @@ export class InsightsService {
         const locationSilentDays = granted.has(d.debtorId) && pos != null ? Math.floor((t - pos) / DAY) : null;
         const c = coolingScore({ daysToDue: days, lastLoginDaysAgo, engagementTrend, locationGranted: granted.has(d.debtorId), locationSilentDays, paymentProbability: prob });
         if (!c.cooling) continue;
-        out.push({ debtId: d.id, debtorId: d.debtorId, debtorName: d.debtor.name, amountDue, daysRemaining: days, score: c.score, reasons: c.reasons });
+        const bt = bestTimeFromLogins(ts.map((x) => new Date(x)));
+        out.push({ debtId: d.id, debtorId: d.debtorId, debtorName: d.debtor.name, amountDue, daysRemaining: days, score: c.score, reasons: c.reasons, bestTimeLabel: bt?.label ?? null });
       }
       return out.sort((a, b) => b.score - a.score);
     });
@@ -201,7 +203,8 @@ export class InsightsService {
 
       // Radar de esfriamento.
       for (const r of cooling) {
-        out.push({ id: `cool-${r.debtId}`, kind: 'cooling', title: `🌡️ Talvez valha um oi para ${first(r.debtorName)}`, body: `${r.reasons.slice(0, 2).join(' · ')}. Um contato leve costuma ajudar.`, href: `/operacoes/${r.debtId}`, priority: 70 });
+        const hint = r.bestTimeLabel ? ` Costuma abrir o app ${r.bestTimeLabel}.` : '';
+        out.push({ id: `cool-${r.debtId}`, kind: 'cooling', title: `🌡️ Talvez valha um oi para ${first(r.debtorName)}`, body: `${r.reasons.slice(0, 2).join(' · ')}. Um contato leve costuma ajudar.${hint}`, href: `/operacoes/${r.debtId}`, priority: 70 });
       }
 
       // Vencidos / a vencer (pula quem já está no radar, pra não repetir).

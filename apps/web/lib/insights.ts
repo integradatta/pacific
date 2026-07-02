@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { DebtorProfile, CashForecast } from '@pacific/shared';
 import { apiGet, apiPost } from './api';
 
-export interface CoolingRow { debtId: string; debtorId: string; debtorName: string; amountDue: string; daysRemaining: number; score: number; reasons: string[] }
+export interface CoolingRow { debtId: string; debtorId: string; debtorName: string; amountDue: string; daysRemaining: number; score: number; reasons: string[]; bestTimeLabel: string | null }
 
 /** #4 Previsão de caixa ponderada (faixas + por mês). */
 export function useCashForecast() {
