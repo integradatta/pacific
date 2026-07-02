@@ -6,6 +6,8 @@ import { Shell } from '@/components/Shell';
 import { ThresholdSettings } from '@/components/Intelligence';
 import { useThresholds } from '@/lib/hooks';
 import { apiGet, apiPost } from '@/lib/api';
+import { useState } from 'react';
+import { enablePush, pushConfigured, type PushResult } from '@/lib/push';
 
 interface Me { email: string; role: string; tenantId: string | null; approved: boolean; weeklyDigestOptIn?: boolean | null }
 
@@ -31,6 +33,8 @@ export default function ConfiguracoesPage() {
   });
   const digestOn = me.data?.weeklyDigestOptIn === true;
   const [thresholds, setThresholds] = useThresholds();
+  const [pushState, setPushState] = useState<PushResult | 'loading' | null>(null);
+  async function doEnablePush() { setPushState('loading'); setPushState(await enablePush()); }
 
   return (
     <Shell title="Configurações">
@@ -92,6 +96,23 @@ export default function ConfiguracoesPage() {
             </div>
           )}
         </section>
+
+        {/* Notificações no navegador (Web Push) — só aparece se o push estiver configurado no ambiente */}
+        {pushConfigured() && (
+          <section className="panel p-6 flex items-center justify-between gap-4">
+            <div>
+              <h2 className="font-display text-base font-semibold text-text tracking-tight">Notificações no navegador</h2>
+              <p className="font-sans text-sm text-text-dim">Um resumo por dia + avisos de pagamento — mesmo com o app fechado.</p>
+              {pushState === 'enabled' && <p className="font-sans text-xs text-status-green mt-1">Ativado neste dispositivo. ✓</p>}
+              {pushState === 'denied' && <p className="font-sans text-xs text-status-yellow mt-1">Permissão negada — libere nas configurações do navegador.</p>}
+              {pushState === 'error' && <p className="font-sans text-xs text-status-red mt-1">Não foi possível ativar agora.</p>}
+            </div>
+            <button type="button" onClick={doEnablePush} disabled={pushState === 'loading' || pushState === 'enabled'}
+              className="font-mono text-[11px] text-sonar uppercase tracking-widest border border-sonar/40 rounded-lg px-3 py-2 hover:bg-sonar/10 transition-colors disabled:opacity-50 shrink-0">
+              {pushState === 'loading' ? 'Ativando…' : pushState === 'enabled' ? 'Ativado' : 'Ativar'}
+            </button>
+          </section>
+        )}
 
         {/* Lixeira */}
         <section className="panel p-6 flex items-center justify-between gap-4">

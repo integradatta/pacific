@@ -104,7 +104,7 @@ DECLARE t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
     'User','Tenant','AdminAuditLog','PlatformEvent',
-    'TenantStats','PortfolioSnapshot','DeviceToken','DebtorAccess'
+    'TenantStats','PortfolioSnapshot','DeviceToken','DebtorAccess','PushSubscription'
   ] LOOP
     EXECUTE format('DROP POLICY IF EXISTS app_full_access ON %I;', t);
     EXECUTE format(

@@ -293,6 +293,20 @@ model DeviceToken {
   @@index([tenantId, debtorId])
 }
 
+// Assinatura Web Push (VAPID) do PADRINHO (navegador/PWA). Global (filtrado por tenantId em código +
+// app_full_access). O envio real só ocorre com VAPID_* configurado; sem chaves, tudo é no-op.
+model PushSubscription {
+  id        String   @id @default(uuid())
+  tenantId  String
+  supabaseId String // dono da assinatura (o credor)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+}
+
 model DebtorAccess {
   id         String    @id @default(uuid())
   debtorId   String    @unique

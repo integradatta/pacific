@@ -4,6 +4,7 @@ import { summarize, type DebtSummary } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 import { TrackingService } from '../tracking/tracking.service.js';
 import { notifyCreditor, brl } from '../notifications/notify.js';
+import { PushService } from '../notifications/push.service.js';
 
 /** Um pagamento registrado: data + total pago acumulado naquele momento (o app calcula o incremento). */
 export interface PaymentPoint { at: string; total: string; }
@@ -18,6 +19,7 @@ export class DebtorSelfService {
   constructor(
     private readonly scoped: TenantScopedService,
     private readonly tracking: TrackingService,
+    private readonly push: PushService,
   ) {}
 
   async myDebts(tenantId: string, debtorId: string): Promise<MyDebt[]> {
@@ -81,7 +83,7 @@ export class DebtorSelfService {
    * confirma ou recusa. Valida que a dívida é dele e não está quitada; impede duplicar um pendente.
    */
   async claimPayment(tenantId: string, debtorId: string, debtId: string, amount: string, note?: string): Promise<void> {
-    return this.scoped.withTenant(tenantId, async (tx) => {
+    const nm = await this.scoped.withTenant(tenantId, async (tx) => {
       const debt = await tx.debt.findFirst({ where: { id: debtId, tenantId, debtorId, deletedAt: null } });
       if (!debt) throw new NotFoundException('Ajuda não encontrada');
       if (debt.settledAt) throw new BadRequestException('Esta ajuda já está quitada.');
@@ -94,7 +96,10 @@ export class DebtorSelfService {
       // Notifica o padrinho para confirmar o pagamento avisado.
       const d = await tx.debtor.findUnique({ where: { id: debtorId }, select: { name: true } });
       await notifyCreditor(tx, { tenantId, debtorId, debtId, type: 'PAYMENT_CLAIMED', title: 'Pagamento avisado', body: `${d?.name ?? 'Seu sobrinho'} avisou um pagamento de ${brl(amt.toFixed(2))}. Confirme quando puder.` });
+      return d?.name ?? 'Seu sobrinho';
     });
+    // Evento de mão dupla → push imediato ao padrinho (fora da transação; no-op sem VAPID).
+    void this.push.sendToTenant(tenantId, { title: 'Pagamento avisado', body: `${nm} avisou um pagamento — confirme quando puder.`, url: '/dashboard' }).catch(() => undefined);
   }
 
   /**
