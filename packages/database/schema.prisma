@@ -78,6 +78,12 @@ enum DebtorSignalKind {
   NEED_SUPPORT // "preciso de suporte" (pede ajuda/conversa ao padrinho)
 }
 
+enum PromiseStatus {
+  OPEN // combinou pagar até a data; ainda no prazo
+  KEPT // cumpriu (houve quitação/aviso confirmado até a data + tolerância)
+  BROKEN // a data passou sem pagamento (resolvido automaticamente)
+}
+
 enum NotificationType {
   DUE_SOON // legado (mantido p/ registros antigos); a geração agora usa as réguas abaixo
   DUE_15
@@ -260,6 +266,26 @@ model DebtorSignal {
   resolvedAt DateTime? // padrinho marcou como resolvido/ciente
 
   @@index([tenantId, debtorId, resolvedAt])
+}
+
+// Promessa de pagamento que o padrinho registra ("combinou pagar R$X até <data>"). Ao contrário do
+// DebtorSignal (que o sobrinho envia), esta é o COMPROMISSO acordado, com desfecho rastreado:
+// cumprida (houve confirmação até a data + tolerância) ou quebrada (a data passou). O histórico de
+// cumprimento alimenta o DebtorScore. Informativo, sem implicação jurídica. Tenant-scoped (RLS FORCE).
+model PaymentPromise {
+  id         String        @id @default(uuid())
+  tenantId   String
+  debtorId   String
+  debtId     String
+  amount     Decimal?      @db.Decimal(14, 2) // opcional: valor combinado
+  promisedAt DateTime // data até quando prometeu resolver
+  note       String?
+  status     PromiseStatus @default(OPEN)
+  createdAt  DateTime      @default(now())
+  resolvedAt DateTime? // quando virou KEPT/BROKEN
+
+  @@index([tenantId, debtorId, status])
+  @@index([tenantId, debtId, status])
 }
 
 model Notification {

@@ -2,7 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { DebtorProfile, CashForecast } from '@pacific/shared';
-import { apiGet, apiPost } from './api';
+import { apiGet, apiPost, apiDelete } from './api';
 
 export interface CoolingRow { debtId: string; debtorId: string; debtorName: string; amountDue: string; daysRemaining: number; score: number; reasons: string[]; bestTimeLabel: string | null }
 
@@ -70,5 +70,40 @@ export function useResolveSignal(debtorId: string | undefined) {
   return useMutation({
     mutationFn: (id: string) => apiPost<void>(`/insights/signals/${id}/resolve`),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['insights', 'signals', debtorId] }),
+  });
+}
+
+// #4 Promessas rastreadas
+export interface PromiseRow { id: string; debtId: string; amount: string | null; promisedAt: string; note: string | null; status: 'OPEN' | 'KEPT' | 'BROKEN'; createdAt: string; resolvedAt: string | null }
+
+/** Promessas de um sobrinho (combinou pagar até uma data; desfecho rastreado). */
+export function useDebtorPromises(debtorId: string | undefined) {
+  return useQuery({
+    queryKey: ['insights', 'promises', debtorId],
+    queryFn: () => apiGet<PromiseRow[]>(`/insights/debtors/${debtorId}/promises`),
+    enabled: !!debtorId,
+    staleTime: 60_000,
+  });
+}
+
+export function useCreatePromise(debtorId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { debtId: string; promisedAt: string; amount?: string; note?: string }) => apiPost<PromiseRow>('/insights/promises', body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['insights', 'promises', debtorId] });
+      void qc.invalidateQueries({ queryKey: ['insights', 'profile', debtorId] });
+    },
+  });
+}
+
+export function useDeletePromise(debtorId: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiDelete<void>(`/insights/promises/${id}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['insights', 'promises', debtorId] });
+      void qc.invalidateQueries({ queryKey: ['insights', 'profile', debtorId] });
+    },
   });
 }

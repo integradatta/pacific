@@ -25,6 +25,7 @@ const svc = (tx: ReturnType<typeof fakeTx>) =>
   new InsightsService(
     { withTenant: async (_t: string, fn: (t: typeof tx) => unknown) => fn(tx) } as never,
     {} as never, // dashboard não é usado por suggestions()
+    { resolveDue: vi.fn(async () => 0), countsForScore: vi.fn(async () => ({ kept: 0, broken: 0 })) } as never, // promises
   );
 
 describe('InsightsService.suggestions', () => {

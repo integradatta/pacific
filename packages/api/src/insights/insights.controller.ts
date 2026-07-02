@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
-import { IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { IsNumber, IsNumberString, IsOptional, IsString, Min } from 'class-validator';
 import { JwtGuard } from '../auth/jwt.guard.js';
 import { PrincipalGuard } from '../auth/principal.guard.js';
 import { TenantGuard } from '../tenancy/tenant.guard.js';
@@ -7,6 +7,7 @@ import { RolesGuard } from '../auth/roles.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { TenantId } from '../tenancy/tenant-id.decorator.js';
 import { InsightsService, type DebtorSignalRow, type CoolingRow, type SimulationResult, type Suggestion } from './insights.service.js';
+import { PromisesService, type PromiseRow } from './promises.service.js';
 import type { DebtorProfile, CashForecast } from '@pacific/shared';
 
 export class SimulateDto {
@@ -14,10 +15,20 @@ export class SimulateDto {
   @IsOptional() @IsString() debtorId?: string;
 }
 
+export class CreatePromiseDto {
+  @IsString() debtId!: string;
+  @IsString() promisedAt!: string; // ISO
+  @IsOptional() @IsNumberString() amount?: string;
+  @IsOptional() @IsString() note?: string;
+}
+
 @Controller('insights')
 @UseGuards(new JwtGuard(), PrincipalGuard, TenantGuard, RolesGuard)
 export class InsightsController {
-  constructor(private readonly insights: InsightsService) {}
+  constructor(
+    private readonly insights: InsightsService,
+    private readonly promises: PromisesService,
+  ) {}
 
   @Get('debtors/:id/profile') @Roles('CREDITOR')
   debtorProfile(@TenantId() tenantId: string, @Param('id') id: string): Promise<DebtorProfile> {
@@ -52,5 +63,21 @@ export class InsightsController {
   @Post('signals/:id/resolve') @Roles('CREDITOR')
   resolveSignal(@TenantId() tenantId: string, @Param('id') id: string): Promise<void> {
     return this.insights.resolveSignal(tenantId, id);
+  }
+
+  // #4 Promessas rastreadas
+  @Get('debtors/:id/promises') @Roles('CREDITOR')
+  promisesForDebtor(@TenantId() tenantId: string, @Param('id') id: string): Promise<PromiseRow[]> {
+    return this.promises.listForDebtor(tenantId, id);
+  }
+
+  @Post('promises') @Roles('CREDITOR')
+  createPromise(@TenantId() tenantId: string, @Body() dto: CreatePromiseDto): Promise<PromiseRow> {
+    return this.promises.create(tenantId, { debtId: dto.debtId, promisedAt: dto.promisedAt, amount: dto.amount, note: dto.note });
+  }
+
+  @Delete('promises/:id') @Roles('CREDITOR')
+  removePromise(@TenantId() tenantId: string, @Param('id') id: string): Promise<void> {
+    return this.promises.remove(tenantId, id);
   }
 }

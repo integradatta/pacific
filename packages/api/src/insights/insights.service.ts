@@ -5,6 +5,7 @@ import {
 } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 import { DashboardService } from '../dashboard/dashboard.service.js';
+import { PromisesService } from './promises.service.js';
 
 export interface DebtorSignalRow {
   id: string;
@@ -59,6 +60,7 @@ export class InsightsService {
   constructor(
     private readonly scoped: TenantScopedService,
     private readonly dashboard: DashboardService,
+    private readonly promises: PromisesService,
   ) {}
 
   /** #4 Previsão de caixa ponderada pela probabilidade de pagamento (faixas + por mês). */
@@ -125,11 +127,16 @@ export class InsightsService {
       const renegotiations = debtIds.length
         ? await tx.platformEvent.count({ where: { tenantId, type: 'OPERATION_UPDATED', targetType: 'debt', targetId: { in: debtIds.map((d) => d.id) }, detail: { path: ['renegotiated'], equals: true } } })
         : 0;
+      // Promessas: resolve as vencidas e conta cumpridas/quebradas (entram no DebtorScore).
+      await this.promises.resolveDue(tx, tenantId, debtorId, now);
+      const { kept, broken } = await this.promises.countsForScore(tx, tenantId, debtorId);
       return debtorProfile({
         settled: settled.filter((s): s is { dueDate: Date; settledAt: Date } => s.settledAt != null).map((s) => ({ dueDate: s.dueDate, settledAt: s.settledAt! })),
         claims: claims.map((c) => ({ status: c.status })),
         logins: logins.map((l) => l.at),
         renegotiations,
+        promisesKept: kept,
+        promisesBroken: broken,
         locationConsent: consent?.state ?? 'NEVER',
         now,
       });

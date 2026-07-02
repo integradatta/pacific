@@ -14,6 +14,9 @@ export interface BehaviorInput {
   logins: Date[];
   /** Nº de renegociações pedidas (sinal leve de dificuldade). */
   renegotiations?: number;
+  /** Promessas cumpridas / quebradas (combinou pagar até uma data e cumpriu, ou não). */
+  promisesKept?: number;
+  promisesBroken?: number;
   /** Estado atual do consentimento de localização (confiança/transparência). */
   locationConsent?: 'GRANTED' | 'REVOKED' | 'DECLINED' | 'NEVER' | null;
   now: Date;
@@ -111,6 +114,8 @@ export function debtorProfile(input: BehaviorInput): DebtorProfile {
   }
   const reneg = input.renegotiations ?? 0;
   const loc = input.locationConsent ?? null;
+  const pKept = input.promisesKept ?? 0;
+  const pBroken = input.promisesBroken ?? 0;
 
   let score: number | null = null;
   let scoreExplanation = 'Sem histórico de quitações ainda — perfil em formação.';
@@ -121,6 +126,9 @@ export function debtorProfile(input: BehaviorInput): DebtorProfile {
     if (logins30d >= 4) s += 5;
     else if (engagementTrend === 'down' && (lastLoginDaysAgo ?? 0) > 21) s -= 8;
     s -= Math.min(reneg, 3) * 5;
+    // Promessas: cumprir o que combinou pesa a favor; quebrar pesa contra (limitado p/ não dominar).
+    s += Math.min(pKept, 4) * 3;
+    s -= Math.min(pBroken, 4) * 6;
     if (loc === 'GRANTED') s += 3;
     else if (loc === 'REVOKED') s -= 5;
     score = Math.max(0, Math.min(100, Math.round(s)));
@@ -129,6 +137,8 @@ export function debtorProfile(input: BehaviorInput): DebtorProfile {
     if (lastDelay != null && lastDelay > 2) parts.push(`atrasou a última em ${lastDelay} dias`);
     if (logins30d >= 4) parts.push('acessa o portal com frequência');
     else if (lastLoginDaysAgo != null && lastLoginDaysAgo > 21) parts.push(`sem acessar há ${lastLoginDaysAgo} dias`);
+    if (pKept > 0) parts.push(`cumpriu ${pKept} promessa${pKept === 1 ? '' : 's'}`);
+    if (pBroken > 0) parts.push(`não cumpriu ${pBroken} promessa${pBroken === 1 ? '' : 's'}`);
     if (reneg > 0) parts.push(`pediu ${reneg} renegociaç${reneg === 1 ? 'ão' : 'ões'}`);
     scoreExplanation = `${score}/100: ${parts.join('; ')}.`;
   }
