@@ -16,6 +16,13 @@ export function useRadar() {
   return useQuery({ queryKey: ['insights', 'radar'], queryFn: () => apiGet<CoolingRow[]>('/insights/radar'), staleTime: 5 * 60_000 });
 }
 
+export interface Suggestion { id: string; kind: 'support' | 'claim' | 'cooling' | 'overdue' | 'due_soon' | 'intent'; title: string; body: string; href?: string; priority: number }
+
+/** #1 "Hoje" — sugestões acionáveis (compostas dos sinais). Tom de sugestão, nunca ordem. */
+export function useSuggestions() {
+  return useQuery({ queryKey: ['insights', 'suggestions'], queryFn: () => apiGet<Suggestion[]>('/insights/suggestions'), staleTime: 2 * 60_000 });
+}
+
 export interface Simulation {
   portfolioOutstanding: number;
   newShareOfPortfolio: number;

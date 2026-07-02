@@ -35,6 +35,16 @@ export interface SimulationResult {
   reliability: string | null;
 }
 
+export type SuggestionKind = 'support' | 'claim' | 'cooling' | 'overdue' | 'due_soon' | 'intent';
+export interface Suggestion {
+  id: string;
+  kind: SuggestionKind;
+  title: string;
+  body: string;
+  href?: string;
+  priority: number;
+}
+
 const DAY = 86_400_000;
 const CONCENTRATION_LIMIT = 0.3; // 30% da carteira numa única ajuda/sobrinho = alerta
 
@@ -150,6 +160,59 @@ export class InsightsService {
 
     const concentrationHigh = Math.max(newShareOfPortfolio, debtorShareAfter ?? 0) >= CONCENTRATION_LIMIT;
     return { portfolioOutstanding, newShareOfPortfolio, concentrationHigh, debtorExposureBefore, debtorExposureAfter, debtorShareAfter, expectedDelayDays, reliability };
+  }
+
+  /**
+   * #1 "Hoje" — fila de SUGESTÕES (nunca ordens). Compõe os sinais em algo acionável e gentil:
+   * pedidos de suporte, pagamentos avisados a confirmar, sobrinhos esfriando, vencidos/a vencer e
+   * intenções declaradas. Ordenado por relevância. Copy suave (público de temperamento forte).
+   */
+  async suggestions(tenantId: string, now: Date = new Date()): Promise<Suggestion[]> {
+    const cooling = await this.coolingRadar(tenantId, now);
+    const coveredDebtors = new Set(cooling.map((c) => c.debtorId));
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      const [claims, signals, openDebts, debtors] = await Promise.all([
+        tx.paymentClaim.findMany({ where: { tenantId, status: 'PENDING' }, select: { debtId: true, debtorId: true, amount: true } }),
+        tx.debtorSignal.findMany({ where: { tenantId, resolvedAt: null }, orderBy: { createdAt: 'desc' } }),
+        tx.debt.findMany({ where: { tenantId, deletedAt: null, settledAt: null }, include: { debtor: { select: { id: true, name: true } } } }),
+        tx.debtor.findMany({ where: { tenantId }, select: { id: true, name: true } }),
+      ]);
+      const nameBy = new Map(debtors.map((d) => [d.id, d.name]));
+      const firstDebtBy = new Map<string, string>();
+      for (const d of openDebts) if (!firstDebtBy.has(d.debtorId)) firstDebtBy.set(d.debtorId, d.id);
+      const first = (name: string) => name.split(' ')[0];
+      const out: Suggestion[] = [];
+
+      // Sinais do sobrinho (suporte tem prioridade máxima; intenção é informativa).
+      for (const s of signals) {
+        const nm = first(nameBy.get(s.debtorId) ?? 'seu sobrinho');
+        const href = s.debtId ? `/operacoes/${s.debtId}` : firstDebtBy.get(s.debtorId) ? `/operacoes/${firstDebtBy.get(s.debtorId)}` : undefined;
+        if (s.kind === 'NEED_SUPPORT') out.push({ id: `sig-${s.id}`, kind: 'support', title: `💬 ${nm} pediu ajuda`, body: `Que tal dar um alô?${s.note ? ` Ele comentou: “${s.note}”.` : ' Às vezes uma conversa já resolve.'}`, href, priority: 100 });
+        else out.push({ id: `sig-${s.id}`, kind: 'intent', title: `🤝 ${nm} pretende resolver`, body: s.dueDate ? `Ele avisou que pretende resolver até ${new Date(s.dueDate).toLocaleDateString('pt-BR')}. Nada a fazer agora.` : 'Ele avisou que pretende resolver em breve.', href, priority: 20 });
+      }
+
+      // Pagamentos avisados a confirmar.
+      for (const c of claims) {
+        const nm = first(nameBy.get(c.debtorId) ?? 'seu sobrinho');
+        out.push({ id: `claim-${c.debtId}`, kind: 'claim', title: `💸 ${nm} avisou um pagamento`, body: `Quando puder, vale conferir e confirmar (${Number(c.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}).`, href: `/operacoes/${c.debtId}`, priority: 90 });
+      }
+
+      // Radar de esfriamento.
+      for (const r of cooling) {
+        out.push({ id: `cool-${r.debtId}`, kind: 'cooling', title: `🌡️ Talvez valha um oi para ${first(r.debtorName)}`, body: `${r.reasons.slice(0, 2).join(' · ')}. Um contato leve costuma ajudar.`, href: `/operacoes/${r.debtId}`, priority: 70 });
+      }
+
+      // Vencidos / a vencer (pula quem já está no radar, pra não repetir).
+      for (const d of openDebts) {
+        if (coveredDebtors.has(d.debtorId)) continue;
+        const days = daysRemaining({ principal: d.principal.toString(), rate: d.rate.toString(), ratePeriod: d.ratePeriod, startDate: d.startDate, dueDate: d.dueDate }, now);
+        const nm = first(d.debtor.name);
+        if (days < 0) out.push({ id: `due-${d.id}`, kind: 'overdue', title: `📌 A ajuda de ${nm} passou da data`, body: 'Sem pressa — um lembrete gentil pode ajudar a resolver.', href: `/operacoes/${d.id}`, priority: 55 });
+        else if (days <= 7) out.push({ id: `due-${d.id}`, kind: 'due_soon', title: `📅 ${nm} vence em ${days} dia${days === 1 ? '' : 's'}`, body: 'Talvez valha um lembrete amigável nos próximos dias.', href: `/operacoes/${d.id}`, priority: 40 });
+      }
+
+      return out.sort((a, b) => b.priority - a.priority).slice(0, 8);
+    });
   }
 
   /** Sinais em aberto do sobrinho (intenção de pagar / pedido de suporte) — ficam ao lado do nome. */

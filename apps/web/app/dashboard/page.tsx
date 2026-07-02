@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Shell } from '@/components/Shell';
+import { TodaySuggestions } from '@/components/TodaySuggestions';
 import { useKpis, usePortfolio, useIntelligence, useThresholds } from '@/lib/hooks';
 import { HorizonteVencimentos } from '@/components/HorizonteVencimentos';
 import { KpiReadouts } from '@/components/KpiReadouts';
@@ -33,6 +34,9 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="space-y-6">
+          {/* #1 Sugestões de hoje — o assistente propõe (não ordena); some quando não há nada */}
+          <TodaySuggestions />
+
           {/* Pagamentos informados pelos sobrinhos aguardando confirmação (some quando vazio) */}
           <PendingClaims />
           {/* Sobrinhos que recusaram compartilhar localização (some quando vazio) */}

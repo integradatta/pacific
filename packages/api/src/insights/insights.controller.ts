@@ -6,7 +6,7 @@ import { TenantGuard } from '../tenancy/tenant.guard.js';
 import { RolesGuard } from '../auth/roles.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { TenantId } from '../tenancy/tenant-id.decorator.js';
-import { InsightsService, type DebtorSignalRow, type CoolingRow, type SimulationResult } from './insights.service.js';
+import { InsightsService, type DebtorSignalRow, type CoolingRow, type SimulationResult, type Suggestion } from './insights.service.js';
 import type { DebtorProfile, CashForecast } from '@pacific/shared';
 
 export class SimulateDto {
@@ -32,6 +32,11 @@ export class InsightsController {
   @Get('radar') @Roles('CREDITOR')
   radar(@TenantId() tenantId: string): Promise<CoolingRow[]> {
     return this.insights.coolingRadar(tenantId);
+  }
+
+  @Get('suggestions') @Roles('CREDITOR')
+  suggestions(@TenantId() tenantId: string): Promise<Suggestion[]> {
+    return this.insights.suggestions(tenantId);
   }
 
   @Post('simulate') @Roles('CREDITOR')
