@@ -233,14 +233,19 @@ export class DebtsService {
     });
   }
 
-  /** Confirma um pagamento informado: vira pagamento de fato (reusa applyPayment) e marca o claim. */
-  async confirmClaim(tenantId: string, claimId: string, now: Date = new Date()): Promise<void> {
+  /**
+   * Confirma um pagamento informado: vira pagamento de fato (reusa applyPayment) e marca o claim.
+   * `amountOverride` permite confirmar COM AJUSTE (ex.: avisou 500, caiu 480) — o valor efetivo é o
+   * ajustado; o claim guarda o que foi de fato confirmado.
+   */
+  async confirmClaim(tenantId: string, claimId: string, amountOverride?: string, now: Date = new Date()): Promise<void> {
     return this.scoped.withTenant(tenantId, async (tx) => {
       const claim = await tx.paymentClaim.findFirst({ where: { id: claimId, tenantId } });
       if (!claim || claim.status !== 'PENDING') throw new NotFoundException('Pagamento informado não encontrado');
+      const amount = amountOverride && Number(amountOverride) > 0 ? new Decimal(amountOverride).toFixed(2) : claim.amount.toString();
       const debt = await this.findOne(tx, tenantId, claim.debtId);
-      await this.applyPayment(tx, tenantId, debt, { amount: claim.amount.toString() }, now);
-      await tx.paymentClaim.update({ where: { id: claimId }, data: { status: 'CONFIRMED', resolvedAt: now } });
+      await this.applyPayment(tx, tenantId, debt, { amount }, now);
+      await tx.paymentClaim.update({ where: { id: claimId }, data: { status: 'CONFIRMED', resolvedAt: now, amount } });
     });
   }
 

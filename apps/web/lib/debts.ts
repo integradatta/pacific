@@ -27,7 +27,8 @@ export function usePendingClaims() {
 export function useConfirmClaim() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => apiPost<void>(`/debts/claims/${id}/confirm`),
+    // Confirma; com `amount` confirma COM AJUSTE (ex.: avisou 500, caiu 480).
+    mutationFn: ({ id, amount }: { id: string; amount?: string }) => apiPost<void>(`/debts/claims/${id}/confirm`, amount ? { amount } : undefined),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['claims'] });
       void qc.invalidateQueries({ queryKey: ['portfolio'] });

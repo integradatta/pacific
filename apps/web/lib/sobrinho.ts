@@ -8,12 +8,14 @@ import { debtorApiGet } from '@/lib/debtor';
 // de UI para o combinado com o padrinho — os dados por baixo são os mesmos.
 export interface PaymentPoint { at: string; total: string }
 export interface PendingClaim { amount: string; claimedAt: string }
+export interface RejectedClaim { amount: string; resolvedAt: string }
 export interface MyDebt {
   id: string;
   principal: string;
   dueDate: string;
   payments: PaymentPoint[];
   pendingClaim: PendingClaim | null;
+  rejectedClaim: RejectedClaim | null;
   summary: {
     balance: string; // total combinado (valor + gratidão)
     accruedInterest: string; // gratidão acumulada

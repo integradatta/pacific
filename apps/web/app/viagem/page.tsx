@@ -30,6 +30,7 @@ function HeroTrip({ debt }: { debt: MyDebt }) {
       </div>
 
       <TripTrail pct={pct} settled={s.settled} />
+      {!s.settled && <p className="text-center text-[13px] mt-2.5 font-semibold" style={{ ...round, color: C.mint }}>{pct}% resolvido</p>}
 
       <div className="grid grid-cols-3 gap-2 mt-6 text-center">
         <div>
@@ -45,6 +46,13 @@ function HeroTrip({ debt }: { debt: MyDebt }) {
           <p className="text-[15px] font-bold mt-0.5" style={{ ...round, color: s.settled ? C.mint : C.ink }}>{s.settled ? '—' : formatBRLSoft(falta)}</p>
         </div>
       </div>
+      {debt.rejectedClaim && !debt.pendingClaim && (
+        <div className="mt-5 rounded-[14px] px-4 py-3" style={{ background: C.warmSoft }}>
+          <p className="text-[13.5px] leading-relaxed" style={{ color: '#9A5B2E' }}>
+            Seu aviso de {formatBRLSoft(debt.rejectedClaim.amount)} não foi confirmado. Sem problema — vale trocar uma ideia com seu padrinho e reenviar. 💛
+          </p>
+        </div>
+      )}
     </Card>
   );
 }

@@ -12,6 +12,7 @@ import { PreviewDebtDto } from './dto/preview-debt.dto.js';
 import { CreateQuickDebtDto } from './dto/create-quick-debt.dto.js';
 import { UpdateDebtTagsDto } from './dto/update-debt-tags.dto.js';
 import { UpdateDebtDatesDto } from './dto/update-debt-dates.dto.js';
+import { ConfirmClaimDto } from './dto/confirm-claim.dto.js';
 import { PayDebtDto } from './dto/pay-debt.dto.js';
 import { RenegotiateDebtDto } from './dto/renegotiate-debt.dto.js';
 import type { Debt } from '@pacific/database';
@@ -60,8 +61,8 @@ export class DebtsController {
   }
 
   @Post('claims/:id/confirm') @Roles('CREDITOR')
-  confirmClaim(@TenantId() tenantId: string, @Param('id') id: string): Promise<void> {
-    return this.debts.confirmClaim(tenantId, id);
+  confirmClaim(@TenantId() tenantId: string, @Param('id') id: string, @Body() dto: ConfirmClaimDto): Promise<void> {
+    return this.debts.confirmClaim(tenantId, id, dto.amount);
   }
 
   @Post('claims/:id/reject') @Roles('CREDITOR')

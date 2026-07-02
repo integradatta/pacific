@@ -288,10 +288,16 @@ describe('DebtsService', () => {
     it('confirmClaim aplica o pagamento (valor do claim) e marca CONFIRMED', async () => {
       const db = fakeDb();
       db.debt.findFirst = vi.fn(async () => debtRow({ rate: dec('0') })) as never; // bruto = 1000
-      await svc(db).confirmClaim('t1', 'claim1', new Date('2026-06-01T00:00:00Z'));
+      await svc(db).confirmClaim('t1', 'claim1', undefined, new Date('2026-06-01T00:00:00Z'));
       // aplica 300 (valor do claim)
       expect(db.debt.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ paidAmount: '300.00' }) }));
       expect(db.paymentClaim.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'claim1' }, data: expect.objectContaining({ status: 'CONFIRMED' }) }));
+    });
+    it('confirmClaim COM AJUSTE usa o valor ajustado', async () => {
+      const db = fakeDb();
+      db.debt.findFirst = vi.fn(async () => debtRow({ rate: dec('0') })) as never;
+      await svc(db).confirmClaim('t1', 'claim1', '480.00');
+      expect(db.debt.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ paidAmount: '480.00' }) }));
     });
     it('confirmClaim de claim inexistente/não-PENDENTE → NotFound', async () => {
       const db = fakeDb();

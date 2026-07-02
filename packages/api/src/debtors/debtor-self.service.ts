@@ -9,7 +9,9 @@ import { notifyCreditor, brl } from '../notifications/notify.js';
 export interface PaymentPoint { at: string; total: string; }
 /** Pagamento informado pelo sobrinho, ainda aguardando o padrinho confirmar. */
 export interface PendingClaim { amount: string; claimedAt: string; }
-export interface MyDebt { id: string; principal: string; dueDate: string; summary: DebtSummary; payments: PaymentPoint[]; pendingClaim: PendingClaim | null; }
+/** Aviso recente que NÃO foi confirmado pelo padrinho — para fechar o loop com o sobrinho. */
+export interface RejectedClaim { amount: string; resolvedAt: string; }
+export interface MyDebt { id: string; principal: string; dueDate: string; summary: DebtSummary; payments: PaymentPoint[]; pendingClaim: PendingClaim | null; rejectedClaim: RejectedClaim | null; }
 
 @Injectable()
 export class DebtorSelfService {
@@ -42,8 +44,15 @@ export class DebtorSelfService {
         ? await tx.paymentClaim.findMany({ where: { tenantId, debtorId, status: 'PENDING', debtId: { in: ids } } })
         : [];
       const claimByDebt = new Map(claims.map((c) => [c.debtId, c]));
+      // Avisos recusados recentemente (últimos 14 dias) — para o sobrinho saber que não bateu.
+      const rejected = ids.length
+        ? await tx.paymentClaim.findMany({ where: { tenantId, debtorId, status: 'REJECTED', debtId: { in: ids }, resolvedAt: { gte: new Date(Date.now() - 14 * 86_400_000) } }, orderBy: { resolvedAt: 'desc' } })
+        : [];
+      const rejectedByDebt = new Map<string, typeof rejected[number]>();
+      for (const r of rejected) if (!rejectedByDebt.has(r.debtId)) rejectedByDebt.set(r.debtId, r);
       return debts.map((d) => {
         const claim = claimByDebt.get(d.id);
+        const rej = !claim ? rejectedByDebt.get(d.id) : undefined; // um novo aviso pendente supera a recusa
         return {
           id: d.id,
           principal: d.principal.toFixed(2),
@@ -61,6 +70,7 @@ export class DebtorSelfService {
           ),
           payments: paymentsByDebt.get(d.id) ?? [],
           pendingClaim: claim ? { amount: claim.amount.toFixed(2), claimedAt: claim.claimedAt.toISOString() } : null,
+          rejectedClaim: rej && rej.resolvedAt ? { amount: rej.amount.toFixed(2), resolvedAt: rej.resolvedAt.toISOString() } : null,
         };
       });
     });
