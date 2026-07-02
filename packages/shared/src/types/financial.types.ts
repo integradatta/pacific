@@ -81,7 +81,7 @@ export interface DebtRecord {
   currency: string;
   startDate: string; // ISO
   dueDate: string;   // ISO
-  status: DebtStatus;
+  // Sem `status`: o status é DERIVADO (deriveStatus/DebtSummary), não uma coluna persistida.
   tags: string[];
   paidAmount: string;        // total já pago
   settledAt: string | null;  // ISO quando quitada; null se em aberto

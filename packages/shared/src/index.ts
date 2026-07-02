@@ -5,6 +5,7 @@ export * from './utils/date.utils.js';
 export * from './utils/org-code.js';
 export * from './utils/tags.js';
 export * from './location/contracts.js';
+export * from './location/geo.js';
 export * from './types/financial.types.js';
 export * from './finance/finance.js';
 export * from './intelligence/intelligence.js';

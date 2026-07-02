@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { usePendingClaims, useConfirmClaim, useRejectClaim } from '@/lib/debts';
+import { useConfirmClaim, useRejectClaim, type PaymentClaimRow } from '@/lib/debts';
 import { formatBRL } from '@/lib/format';
 import { toast } from '@/components/Toast';
 
@@ -9,11 +9,10 @@ const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('pt-BR');
 
 // Banner de pagamentos informados pelos sobrinhos aguardando confirmação do padrinho.
 // Confirmar (valor informado), Ajustar (ex.: avisou 500, caiu 480) ou Recusar. Some quando vazio.
-export function PendingClaims() {
-  const claims = usePendingClaims();
+// As linhas vêm do payload agregado do dashboard (/dashboard/home) — sem chamada própria.
+export function PendingClaims({ rows }: { rows: PaymentClaimRow[] }) {
   const confirm = useConfirmClaim();
   const reject = useRejectClaim();
-  const rows = claims.data ?? [];
   const [editing, setEditing] = useState<string | null>(null);
   const [amount, setAmount] = useState('');
   if (rows.length === 0) return null;

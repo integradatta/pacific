@@ -1,6 +1,6 @@
 import { Decimal } from 'decimal.js';
 import { daysBetween, daysUntil } from '../utils/date.utils.js';
-import type { DebtStatus, DebtTerms, DebtSummary, OperationPreview, Projection, RiskLevel } from '../types/financial.types.js';
+import type { DashboardKpis, DebtStatus, DebtTerms, DebtSummary, OperationPreview, PortfolioRow, Projection, RiskLevel } from '../types/financial.types.js';
 
 const HORIZONS = [0, 30, 90, 180, 365];
 
@@ -61,6 +61,48 @@ export function riskLevel(recoverability: number): RiskLevel {
   if (recoverability >= 70) return 'LOW';
   if (recoverability >= 40) return 'MEDIUM';
   return 'HIGH';
+}
+
+/**
+ * KPIs da carteira DERIVADOS das linhas de portfolio (fonte única) — evita recomputar/reconsultar
+ * as dívidas só para os totais. Quitadas saem de "a receber"/contagens em aberto; "a receber" e
+ * "vencido" usam o DEVIDO. Somatórios em Decimal (dinheiro), toFixed(2) no fim.
+ */
+export function portfolioKpis(rows: PortfolioRow[]): DashboardKpis {
+  let totalLent = new Decimal(0);
+  let totalReceivable = new Decimal(0);
+  let totalOverdue = new Decimal(0);
+  let totalExpectedReturn = new Decimal(0);
+  let totalReceived = new Decimal(0);
+  let countActive = 0;
+  let countSettled = 0;
+  const countByStatus: Record<DebtStatus, number> = { GREEN: 0, YELLOW: 0, ORANGE: 0, RED: 0 };
+  const riskDistribution: Record<RiskLevel, number> = { LOW: 0, MEDIUM: 0, HIGH: 0 };
+  for (const r of rows) {
+    totalLent = totalLent.plus(r.principal);
+    totalReceived = totalReceived.plus(r.paidAmount);
+    if (r.settled) {
+      countSettled += 1;
+      continue;
+    }
+    totalReceivable = totalReceivable.plus(r.amountDue);
+    totalExpectedReturn = totalExpectedReturn.plus(r.expectedReturn);
+    if (r.status === 'RED') totalOverdue = totalOverdue.plus(r.amountDue);
+    else countActive += 1;
+    countByStatus[r.status] += 1;
+    riskDistribution[riskLevel(r.recoverability)] += 1;
+  }
+  return {
+    totalLent: totalLent.toFixed(2),
+    totalReceivable: totalReceivable.toFixed(2),
+    totalOverdue: totalOverdue.toFixed(2),
+    totalExpectedReturn: totalExpectedReturn.toFixed(2),
+    totalReceived: totalReceived.toFixed(2),
+    countActive,
+    countSettled,
+    countByStatus,
+    riskDistribution,
+  };
 }
 
 function clampPct(n: number): number {

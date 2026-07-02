@@ -1,4 +1,5 @@
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import { distanceM } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 import { TrackingService } from '../tracking/tracking.service.js';
 import { notifyCreditor } from '../notifications/notify.js';
@@ -25,15 +26,6 @@ export interface PanelPosition {
 export interface GeofenceRow { id: string; label: string; lat: number; lng: number; radiusM: number }
 
 const ONLINE_WINDOW_MS = Number(process.env.LOCATION_ONLINE_WINDOW_MS ?? 10 * 60_000);
-
-function distanceM(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
-  const R = 6_371_000;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(s));
-}
 
 @Injectable()
 export class LocationService {

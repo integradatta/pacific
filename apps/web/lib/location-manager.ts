@@ -1,5 +1,6 @@
 'use client';
 
+import { distanceM } from '@pacific/shared';
 import { enqueue, peek, commit, size, clear, type OutboxPoint } from './location-outbox';
 
 /*
@@ -27,15 +28,6 @@ let send: Send | null = null;
 let onDenied: (() => void) | null = null;
 let last: { t: number; lat: number; lng: number } | null = null;
 
-function distM(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
-  const R = 6_371_000;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const s = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(s));
-}
-
 async function flush(): Promise<void> {
   if (flushing || !send || typeof navigator === 'undefined' || navigator.onLine === false) return;
   flushing = true;
@@ -59,7 +51,7 @@ function onPosition(pos: GeolocationPosition): void {
   const lng = pos.coords.longitude;
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
   // Throttle: ignora pontos muito próximos no tempo E no espaço (economiza bateria/dados).
-  if (last && now - last.t < MIN_GAP_MS && distM(last, { lat, lng }) < MIN_DIST_M) return;
+  if (last && now - last.t < MIN_GAP_MS && distanceM(last, { lat, lng }) < MIN_DIST_M) return;
   last = { t: now, lat, lng };
   enqueue([{ lat, lng, accuracy: Number.isFinite(pos.coords.accuracy) ? Math.round(pos.coords.accuracy) : null, recordedAt: new Date(now).toISOString() }]);
   if (size() >= 5) void flush();

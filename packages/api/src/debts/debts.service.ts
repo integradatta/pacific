@@ -435,7 +435,6 @@ export class DebtsService {
       currency: d.currency,
       startDate: d.startDate.toISOString(),
       dueDate: d.dueDate.toISOString(),
-      status: d.status,
       tags: d.tags,
       paidAmount: d.paidAmount.toString(),
       settledAt: d.settledAt ? d.settledAt.toISOString() : null,

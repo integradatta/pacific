@@ -457,10 +457,13 @@ export default function OperacaoDetalhePage({ params }: { params: { id: string }
                   {debt.data.description ? <p className="font-sans text-sm text-text-dim mt-1">{debt.data.description}</p> : null}
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="inline-flex items-center gap-2 font-mono text-xs text-muted">
-                    <span className={`w-2 h-2 rounded-full ${STATUS_COLOR[debt.data.status]}`} />
-                    {STATUS_LABEL[debt.data.status]}
-                  </span>
+                  {/* Status DERIVADO (do resumo), não a coluna Debt.status (removida — era sempre GREEN). */}
+                  {summary.data ? (
+                    <span className="inline-flex items-center gap-2 font-mono text-xs text-muted">
+                      <span className={`w-2 h-2 rounded-full ${summary.data.settled ? STATUS_COLOR.GREEN : STATUS_COLOR[summary.data.status]}`} />
+                      {summary.data.settled ? 'Quitada' : STATUS_LABEL[summary.data.status]}
+                    </span>
+                  ) : null}
                   <button
                     type="button"
                     onClick={handleDelete}
