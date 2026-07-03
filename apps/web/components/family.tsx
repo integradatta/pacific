@@ -115,15 +115,6 @@ export function CofreBar({ pct, settled }: { pct: number; settled: boolean }) {
   );
 }
 
-// ── Barra simples e helpers ──────────────────────────────────────────────────
-export function SoftBar({ pct, from, to }: { pct: number; from: string; to: string }) {
-  return (
-    <span className="block h-2 rounded-full overflow-hidden" style={{ background: C.line }}>
-      <span className="block h-full rounded-full" style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: `linear-gradient(90deg, ${from}, ${to})`, transition: 'width 600ms ease' }} />
-    </span>
-  );
-}
-
 export function GentleBadge({ tone, children }: { tone: keyof typeof BADGE; children: ReactNode }) {
   const t = BADGE[tone];
   return (
@@ -155,16 +146,6 @@ export function HomeGlyph({ active }: { active: boolean }) {
       <path d="M4 11.5 12 5l8 6.5" />
       <path d="M6 10v9a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-9" />
       <path d="M10.5 20v-4a1.5 1.5 0 0 1 3 0v4" />
-    </svg>
-  );
-}
-export function PeopleGlyph({ active }: { active: boolean }) {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? C.coralSoft : 'none'} stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <circle cx="9" cy="9" r="3" />
-      <path d="M3.5 19a5.5 5.5 0 0 1 11 0" />
-      <circle cx="17" cy="8" r="2.2" />
-      <path d="M15.5 13.6A4.5 4.5 0 0 1 20.5 18" />
     </svg>
   );
 }

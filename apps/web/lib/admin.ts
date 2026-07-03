@@ -74,10 +74,6 @@ export function usePromoteAdmin() {
   return useMutation({ mutationFn: (id: string) => apiPost<void>(`/admin/admins/${id}/promote`), onSuccess: () => invalidateAdmins(qc) });
 }
 
-export function useAdminAudit() {
-  return useQuery({ queryKey: ['admin', 'audit'], queryFn: () => apiGet<AdminAuditEntry[]>('/admin/audit') });
-}
-
 export type TenantAction = 'approve' | 'reject' | 'suspend' | 'reactivate' | 'block' | 'unblock';
 
 function invalidateAdmin(qc: ReturnType<typeof useQueryClient>) {

@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
 import type { AdminAccessLinkRow, AdminAuditEntry, AdminCreditorRow, AdminOverview, AdminTenantRow, AdminUserRow, TenantApproval } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
@@ -24,6 +24,7 @@ const clampSkip = (n: number | undefined): number => Math.max(n ?? 0, 0);
 // Toda mutação é auditada.
 @Injectable()
 export class SuperAdminService {
+  private readonly log = new Logger('SuperAdmin');
   constructor(
     private readonly scoped: TenantScopedService,
     private readonly dashboard: DashboardService,
@@ -273,7 +274,11 @@ export class SuperAdminService {
     await this.db.debtorAccess.deleteMany({ where: { tenantId } });
     await this.db.user.deleteMany({ where: { tenantId } });
     await this.db.tenant.delete({ where: { id: tenantId } });
-    for (const u of users) await this.authAdmin.deleteUser(u.supabaseId).catch(() => undefined);
+    // Falha aqui deixaria usuário órfão no Supabase Auth (PII/LGPD) — precisa aparecer no log.
+    for (const u of users) {
+      await this.authAdmin.deleteUser(u.supabaseId)
+        .catch((e: unknown) => this.log.warn(`deleteTenant: falha ao remover usuário ${u.supabaseId} do Supabase Auth: ${String(e)}`));
+    }
     await this.audit(actor, 'tenant.delete', 'tenant', tenantId, { orgCode: tenant.orgCode, users: users.length });
   }
 

@@ -19,7 +19,10 @@ export class ReportsScheduler {
       const tenants = await this.scoped.raw().tenant.findMany({ select: { id: true } });
       let n = 0;
       for (const t of tenants) {
-        await this.reports.generate(t.id, prevMonth, now).then(() => (n += 1)).catch(() => undefined);
+        await this.reports.generate(t.id, prevMonth, now)
+          .then(() => (n += 1))
+          // Falha por tenant não interrompe os demais, mas TEM que aparecer no log (era engolida).
+          .catch((e: unknown) => this.log.warn(`Falha no relatório mensal da carteira ${t.id}: ${String(e)}`));
       }
       this.log.log(`Relatórios mensais (${prevMonth}) gerados: ${n}/${tenants.length}.`);
     } catch (e) {

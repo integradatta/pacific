@@ -60,6 +60,49 @@ describe('debtorProfile', () => {
     expect(p.score).toBeNull();
   });
 
+  it('score é sempre clampado em [0, 100] — mesmo em extremos patológicos', () => {
+    // Péssimo em tudo: atraso enorme, renegociações, promessas quebradas, localização revogada.
+    const pessimo = debtorProfile({
+      settled: [{ dueDate: d('2026-01-01'), settledAt: d('2026-06-01') }],
+      claims: [{ status: 'REJECTED' }, { status: 'REJECTED' }],
+      logins: [],
+      renegotiations: 10,
+      promisesBroken: 10,
+      locationConsent: 'REVOKED',
+      now,
+    });
+    expect(pessimo.score!).toBeGreaterThanOrEqual(0);
+    // Perfeito em tudo: sempre no prazo, confirmado, engajado, promessas cumpridas, GRANTED.
+    const perfeito = debtorProfile({
+      settled: [
+        { dueDate: d('2026-06-01'), settledAt: d('2026-05-30') },
+        { dueDate: d('2026-05-01'), settledAt: d('2026-04-28') },
+      ],
+      claims: [{ status: 'CONFIRMED' }, { status: 'CONFIRMED' }],
+      logins: [d('2026-07-01'), d('2026-06-30'), d('2026-06-28'), d('2026-06-25')],
+      promisesKept: 10,
+      locationConsent: 'GRANTED',
+      now,
+    });
+    expect(perfeito.score!).toBeLessThanOrEqual(100);
+  });
+
+  it('promessas movem o score: cumprir sobe, quebrar desce (e entram na explicação)', () => {
+    const base = {
+      settled: [{ dueDate: d('2026-06-01'), settledAt: d('2026-06-01') }],
+      claims: [],
+      logins: [],
+      now,
+    };
+    const neutro = debtorProfile(base);
+    const cumpridor = debtorProfile({ ...base, promisesKept: 2 });
+    const quebrador = debtorProfile({ ...base, promisesBroken: 2 });
+    expect(cumpridor.score!).toBeGreaterThan(neutro.score!);
+    expect(quebrador.score!).toBeLessThan(neutro.score!);
+    expect(cumpridor.scoreExplanation).toMatch(/cumpriu 2 promessas/);
+    expect(quebrador.scoreExplanation).toMatch(/não cumpriu 2 promessas/);
+  });
+
   it('melhor horário = moda dos logins (≥3)', () => {
     const logins = [d('2026-06-28T20:00:00'), d('2026-06-21T21:00:00'), d('2026-06-14T20:30:00')]; // domingos à noite
     const p = debtorProfile({ settled: [], claims: [], logins, now });

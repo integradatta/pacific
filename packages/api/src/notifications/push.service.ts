@@ -52,7 +52,13 @@ export class PushService {
         sent++;
       } catch (e) {
         const code = (e as { statusCode?: number }).statusCode;
-        if (code === 404 || code === 410) await db.pushSubscription.delete({ where: { id: s.id } }).catch(() => undefined);
+        if (code === 404 || code === 410) {
+          await db.pushSubscription.delete({ where: { id: s.id } }).catch(() => undefined); // assinatura morta; poda best-effort
+        } else {
+          // Outros erros (429/5xx/rede) NÃO podem ser silenciosos: seria o push degradando sem ninguém saber.
+          // Não loga o endpoint completo — é capability URL (quem o tem consegue enviar push).
+          this.log.warn(`Falha ao enviar push (tenant ${tenantId}, status ${code ?? '?'}): ${String((e as Error)?.message ?? e)}`);
+        }
       }
     }
     return sent;

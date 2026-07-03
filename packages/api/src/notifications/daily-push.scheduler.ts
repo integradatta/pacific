@@ -24,7 +24,8 @@ export class DailyPushScheduler {
     const tenants = await this.scoped
       .raw()
       .tenant.findMany({ where: { approval: 'APPROVED', status: 'ACTIVE' }, select: { id: true } })
-      .catch(() => [] as { id: string }[]);
+      // Falha ao listar tenants NÃO pode ser silenciosa: o cron viraria no-op sem ninguém saber.
+      .catch((e: unknown) => { this.log.error(`Falha ao listar carteiras — digest push PULADO: ${String(e)}`); return [] as { id: string }[]; });
     let sent = 0;
     for (const t of tenants) {
       try {

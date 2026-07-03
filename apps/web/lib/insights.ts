@@ -4,17 +4,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { DebtorProfile, CashForecast } from '@pacific/shared';
 import { apiGet, apiPost, apiDelete } from './api';
 
-export interface CoolingRow { debtId: string; debtorId: string; debtorName: string; amountDue: string; daysRemaining: number; score: number; reasons: string[]; bestTimeLabel: string | null }
-
 /** #4 Previsão de caixa ponderada (faixas + por mês). */
 export function useCashForecast() {
   return useQuery({ queryKey: ['insights', 'cash-forecast'], queryFn: () => apiGet<CashForecast>('/insights/cash-forecast'), staleTime: 5 * 60_000 });
 }
 
-/** #5 Radar de esfriamento (sobrinhos com sinais de risco). */
-export function useRadar() {
-  return useQuery({ queryKey: ['insights', 'radar'], queryFn: () => apiGet<CoolingRow[]>('/insights/radar'), staleTime: 5 * 60_000 });
-}
+// (useRadar/CoolingRow removidos: o radar alimenta as sugestões do "Hoje" no servidor — o endpoint
+// GET /insights/radar continua existindo; nenhuma tela consome o hook diretamente.)
 
 export interface Suggestion { id: string; kind: 'support' | 'claim' | 'cooling' | 'overdue' | 'due_soon' | 'intent'; title: string; body: string; href?: string; priority: number }
 

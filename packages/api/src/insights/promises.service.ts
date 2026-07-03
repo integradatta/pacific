@@ -36,7 +36,8 @@ export class PromisesService {
     const tenants = await this.scoped
       .raw()
       .tenant.findMany({ where: { status: 'ACTIVE' }, select: { id: true } })
-      .catch(() => [] as { id: string }[]);
+      // Falha ao listar tenants NÃO pode ser silenciosa: o cron viraria no-op sem ninguém saber.
+      .catch((e: unknown) => { this.log.error(`Falha ao listar carteiras — resolução de promessas PULADA: ${String(e)}`); return [] as { id: string }[]; });
     let changed = 0;
     for (const t of tenants) {
       try {

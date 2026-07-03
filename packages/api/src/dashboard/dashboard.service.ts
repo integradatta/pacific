@@ -162,21 +162,19 @@ export class DashboardService {
 
   /**
    * Persiste o snapshot da semana atual (idempotente por tenant+semana). Chamado pelo CRON diário —
-   * NUNCA no caminho de leitura do dashboard. Best-effort: nunca lança.
+   * NUNCA no caminho de leitura do dashboard. Erros SOBEM para o scheduler (que loga por tenant);
+   * um catch interno aqui anularia essa observabilidade.
    */
   async captureWeeklySnapshot(tenantId: string, asOf: Date = new Date(), thresholds: IntelligenceThresholds = DEFAULT_THRESHOLDS): Promise<void> {
     const rows = await this.portfolio(tenantId, asOf);
     const point = currentWeeklyPoint(rows, asOf, thresholds);
     const weekStart = new Date(point.weekStart);
     const data = { healthScore: point.healthScore, state: point.state, receivable: point.receivable, overdue: point.overdue, expectedProfit: point.expectedProfit, opsActive: point.opsActive };
-    await this.scoped
-      .raw()
-      .portfolioSnapshot.upsert({
-        where: { tenantId_weekStart: { tenantId, weekStart } },
-        create: { tenantId, weekStart, ...data },
-        update: { ...data, capturedAt: new Date() },
-      })
-      .catch(() => undefined);
+    await this.scoped.raw().portfolioSnapshot.upsert({
+      where: { tenantId_weekStart: { tenantId, weekStart } },
+      create: { tenantId, weekStart, ...data },
+      update: { ...data, capturedAt: new Date() },
+    });
   }
 
   /**
