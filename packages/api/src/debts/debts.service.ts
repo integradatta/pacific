@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import type { Debt, Prisma } from '@pacific/database';
+import { Prisma, type Debt } from '@pacific/database';
 import { summarize, normalizeTags, balanceAt, operationPreview, recoverabilityScore, type DebtSummary, type DebtRecord, type DebtEvent, type OperationPreview } from '@pacific/shared';
 import type { PayDebtInput } from './dto/pay-debt.dto.js';
 import type { PreviewDebtDto } from './dto/preview-debt.dto.js';
@@ -164,7 +164,7 @@ export class DebtsService {
    */
   async pay(tenantId: string, id: string, input: PayDebtInput, now: Date = new Date()): Promise<DebtRecord> {
     return this.scoped.withTenant(tenantId, async (tx) => {
-      const debt = await this.findOne(tx, tenantId, id);
+      const debt = await this.findOneForUpdate(tx, tenantId, id); // lock: evita perda de atualização
       await this.applyPayment(tx, tenantId, debt, input, now);
       return this.toRecord(await this.findOne(tx, tenantId, id));
     });
@@ -233,14 +233,19 @@ export class DebtsService {
     });
   }
 
-  /** Confirma um pagamento informado: vira pagamento de fato (reusa applyPayment) e marca o claim. */
-  async confirmClaim(tenantId: string, claimId: string, now: Date = new Date()): Promise<void> {
+  /**
+   * Confirma um pagamento informado: vira pagamento de fato (reusa applyPayment) e marca o claim.
+   * `amountOverride` permite confirmar COM AJUSTE (ex.: avisou 500, caiu 480) — o valor efetivo é o
+   * ajustado; o claim guarda o que foi de fato confirmado.
+   */
+  async confirmClaim(tenantId: string, claimId: string, amountOverride?: string, now: Date = new Date()): Promise<void> {
     return this.scoped.withTenant(tenantId, async (tx) => {
       const claim = await tx.paymentClaim.findFirst({ where: { id: claimId, tenantId } });
       if (!claim || claim.status !== 'PENDING') throw new NotFoundException('Pagamento informado não encontrado');
-      const debt = await this.findOne(tx, tenantId, claim.debtId);
-      await this.applyPayment(tx, tenantId, debt, { amount: claim.amount.toString() }, now);
-      await tx.paymentClaim.update({ where: { id: claimId }, data: { status: 'CONFIRMED', resolvedAt: now } });
+      const amount = amountOverride && Number(amountOverride) > 0 ? new Decimal(amountOverride).toFixed(2) : claim.amount.toString();
+      const debt = await this.findOneForUpdate(tx, tenantId, claim.debtId); // lock: evita perda de atualização
+      await this.applyPayment(tx, tenantId, debt, { amount }, now);
+      await tx.paymentClaim.update({ where: { id: claimId }, data: { status: 'CONFIRMED', resolvedAt: now, amount } });
     });
   }
 
@@ -266,7 +271,7 @@ export class DebtsService {
     now: Date = new Date(),
   ): Promise<DebtRecord> {
     return this.scoped.withTenant(tenantId, async (tx) => {
-      const debt = await this.findOne(tx, tenantId, id);
+      const debt = await this.findOneForUpdate(tx, tenantId, id); // lock: renegociação também muta a dívida
       if (debt.settledAt) throw new BadRequestException('Operação quitada não pode ser renegociada.');
 
       const newDue = new Date(input.dueDate);
@@ -430,7 +435,6 @@ export class DebtsService {
       currency: d.currency,
       startDate: d.startDate.toISOString(),
       dueDate: d.dueDate.toISOString(),
-      status: d.status,
       tags: d.tags,
       paidAmount: d.paidAmount.toString(),
       settledAt: d.settledAt ? d.settledAt.toISOString() : null,
@@ -438,10 +442,23 @@ export class DebtsService {
     };
   }
 
-  // Finder padrão: só dívidas ATIVAS (fora da lixeira). Usado por get/summary/history/pay/renegotiate/remove.
+  // Finder padrão (SÓ leitura): dívidas ATIVAS (fora da lixeira). Usado por get/summary/history.
   private async findOne(tx: Prisma.TransactionClient, tenantId: string, id: string): Promise<DebtWithDebtor> {
     const debt = await tx.debt.findFirst({ where: { id, tenantId, deletedAt: null }, include: { debtor: { select: { name: true } } } });
     if (!debt) throw new NotFoundException('Dívida não encontrada');
     return debt;
+  }
+
+  /**
+   * Finder para ESCRITA: bloqueia a linha (SELECT … FOR UPDATE) dentro da transação, serializando
+   * o read-modify-write de paidAmount/settledAt. Sem isso, dois cliques simultâneos (pagar/confirmar)
+   * leem o mesmo paidAmount e um sobrescreve o outro (lost update). O lock cai no commit da tx.
+   */
+  private async findOneForUpdate(tx: Prisma.TransactionClient, tenantId: string, id: string): Promise<DebtWithDebtor> {
+    const locked = await tx.$queryRaw<{ id: string }[]>(
+      Prisma.sql`SELECT "id" FROM "Debt" WHERE "id" = ${id} AND "tenantId" = ${tenantId} AND "deletedAt" IS NULL FOR UPDATE`,
+    );
+    if (locked.length === 0) throw new NotFoundException('Dívida não encontrada');
+    return this.findOne(tx, tenantId, id);
   }
 }

@@ -16,8 +16,14 @@ export class LoginFailedDto {
 
 // Throttle simples em memória p/ o endpoint público (anti-spam): N por IP por janela.
 const hits = new Map<string, { n: number; t: number }>();
+let lastSweep = Date.now();
 function throttled(ip: string, limit = 20, windowMs = 60_000): boolean {
   const now = Date.now();
+  // Expurgo preguiçoso (no máx. 1×/janela): sem isso o Map acumula uma chave por IP para sempre.
+  if (now - lastSweep >= windowMs) {
+    lastSweep = now;
+    for (const [k, v] of hits) if (now - v.t >= windowMs) hits.delete(k);
+  }
   const h = hits.get(ip);
   if (!h || now - h.t >= windowMs) {
     hits.set(ip, { n: 1, t: now });

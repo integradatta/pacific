@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Pacific',
     short_name: 'Pacific',
-    description: 'Acompanhe sua conta no Pacific.',
+    description: 'Acompanhe suas metas e sua família.',
     start_url: '/',
     scope: '/',
     display: 'standalone',

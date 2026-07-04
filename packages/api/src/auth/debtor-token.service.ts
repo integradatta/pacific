@@ -8,14 +8,15 @@ export class DebtorTokenService {
   constructor(@Optional() private readonly secret?: string) {}
 
   sign(
-    params: { debtorId: string; tenantId: string },
+    params: { debtorId: string; tenantId: string; accessVersion?: number },
     expiresIn: jwt.SignOptions['expiresIn'] = '12h',
   ): string {
     const secret = this.secret ?? process.env.APP_JWT_SECRET ?? '';
     return jwt.sign(
       {
         sub: params.debtorId,
-        app_metadata: { role: 'DEBTOR', tenantId: params.tenantId, debtorId: params.debtorId },
+        // av = versão do link (DebtorAccess.rotatedAt em ms). Ao rotacionar, o guard rejeita o token antigo.
+        app_metadata: { role: 'DEBTOR', tenantId: params.tenantId, debtorId: params.debtorId, av: params.accessVersion ?? 0 },
       },
       secret,
       { expiresIn },

@@ -32,9 +32,22 @@ function fakeDb() {
     debt: { deleteMany: vi.fn(async () => ({ count: 2 })) },
     debtor: { deleteMany: vi.fn(async () => ({ count: 1 })) },
     notification: { deleteMany: vi.fn(async () => ({ count: 0 })) },
-    platformEvent: { count: vi.fn(async () => 0) },
+    platformEvent: { count: vi.fn(async () => 0), deleteMany: vi.fn(async () => ({ count: 0 })) },
     debtorLoginEvent: { count: vi.fn(async () => 3), deleteMany: vi.fn(async () => ({ count: 0 })) },
-    tenantStats: { findMany: vi.fn(async () => []), upsert: vi.fn(async () => ({})) },
+    tenantStats: { findMany: vi.fn(async () => []), upsert: vi.fn(async () => ({})), deleteMany: vi.fn(async () => ({ count: 0 })) },
+    // Tabelas de PII/derivadas apagadas no deleteTenant (LGPD):
+    paymentClaim: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    paymentPromise: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    debtorSignal: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    locationConsent: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    debtorPosition: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    locationPing: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    geofenceEvent: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    geofence: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    monthlyReport: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    portfolioSnapshot: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    deviceToken: { deleteMany: vi.fn(async () => ({ count: 0 })) },
+    pushSubscription: { deleteMany: vi.fn(async () => ({ count: 0 })) },
   };
 }
 const mkAuthAdmin = () => ({ sendPasswordReset: vi.fn(async () => {}), setBlocked: vi.fn(async () => {}), deleteUser: vi.fn(async () => {}) });
@@ -225,6 +238,12 @@ describe('SuperAdminService', () => {
       expect(db.debtor.deleteMany).toHaveBeenCalled();
       expect(db.user.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 't1' } });
       expect(db.tenant.delete).toHaveBeenCalledWith({ where: { id: 't1' } });
+      // Nada de PII pode sobreviver (LGPD): localização, push e derivados vão junto.
+      expect(db.locationPing.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 't1' } });
+      expect(db.debtorPosition.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 't1' } });
+      expect(db.pushSubscription.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 't1' } });
+      expect(db.deviceToken.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 't1' } });
+      expect(db.tenantStats.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 't1' } });
       expect(authAdmin.deleteUser).toHaveBeenCalledWith('sb-u1');
       expect(db.adminAuditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: 'tenant.delete' }) }));
     });

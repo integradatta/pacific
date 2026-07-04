@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { Notification } from '@pacific/database';
+import { randomUUID } from 'node:crypto';
+import { Prisma, type Notification } from '@pacific/database';
 import { daysRemaining } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 import type { Page } from '../common/pagination.js';
@@ -32,6 +33,27 @@ function alertBody(type: AlertType, days: number): string {
   return `A dívida vence em ${days} dia(s).`;
 }
 
+interface DueDebt { id: string; debtorId: string; principal: unknown; rate: unknown; ratePeriod: 'MONTHLY' | 'ANNUAL'; startDate: Date; dueDate: Date }
+export interface DueAlertRow { debtorId: string; debtId: string; type: AlertType; title: string; body: string }
+
+/**
+ * PURA: mapeia dívidas → linhas de alerta pela régua ativa (sem tocar no banco). Extraída para o
+ * caminho set-based (uma INSERT em vez de N upserts) e para testar a lógica de régua isoladamente.
+ */
+export function dueNotificationRows(debts: DueDebt[], active: ReadonlySet<AlertType>, asOf: Date): DueAlertRow[] {
+  const rows: DueAlertRow[] = [];
+  for (const d of debts) {
+    const days = daysRemaining(
+      { principal: String(d.principal), rate: String(d.rate), ratePeriod: d.ratePeriod, startDate: d.startDate, dueDate: d.dueDate },
+      asOf,
+    );
+    const type = milestoneFor(days);
+    if (!type || !active.has(type)) continue;
+    rows.push({ debtorId: d.debtorId, debtId: d.id, type, title: ALERT_TITLE[type], body: alertBody(type, days) });
+  }
+  return rows;
+}
+
 @Injectable()
 export class NotificationsService {
   constructor(private readonly scoped: TenantScopedService) {}
@@ -59,24 +81,22 @@ export class NotificationsService {
   ): Promise<{ created: number }> {
     const active = new Set<AlertType>(enabled);
     return this.scoped.withTenant(tenantId, async (tx) => {
-      const debts = await tx.debt.findMany({ where: { tenantId, deletedAt: null } });
-      let created = 0;
-      for (const d of debts) {
-        const days = daysRemaining(
-          { principal: d.principal.toString(), rate: d.rate.toString(), ratePeriod: d.ratePeriod, startDate: d.startDate, dueDate: d.dueDate },
-          asOf,
-        );
-        const type = milestoneFor(days);
-        if (!type || !active.has(type)) continue;
-        const body = alertBody(type, days);
-        await tx.notification.upsert({
-          where: { debtId_type: { debtId: d.id, type } },
-          create: { tenantId, debtorId: d.debtorId, debtId: d.id, type, title: ALERT_TITLE[type], body },
-          update: { body },
-        });
-        created++;
-      }
-      return { created };
+      // Só dívidas ABERTAS: quitada não gera "vencida". Sem o settledAt:null, uma dívida paga e
+      // vencida ressurgia todo dia (pay() apaga a notificação e o cron recriava).
+      const debts = await tx.debt.findMany({ where: { tenantId, deletedAt: null, settledAt: null } });
+      const rows = dueNotificationRows(debts, active, asOf);
+      if (rows.length === 0) return { created: 0 };
+      // SET-BASED: uma única INSERT (era N upserts, um round-trip por dívida). Idempotente por
+      // (debtId, type) — reexecuções/duas réplicas apenas atualizam o corpo, sem duplicar.
+      const values = rows.map(
+        (r) => Prisma.sql`(${randomUUID()}, ${tenantId}, ${r.debtorId}, ${r.debtId}, ${r.type}::"NotificationType", ${r.title}, ${r.body})`,
+      );
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO "Notification" ("id", "tenantId", "debtorId", "debtId", "type", "title", "body")
+        VALUES ${Prisma.join(values)}
+        ON CONFLICT ("debtId", "type") DO UPDATE SET "body" = EXCLUDED."body"
+      `);
+      return { created: rows.length };
     });
   }
 
@@ -87,6 +107,10 @@ export class NotificationsService {
    */
   async generateWeeklyDigest(tenantId: string, opts: { force?: boolean } = {}, now: Date = new Date()): Promise<{ created: number }> {
     return this.scoped.withTenant(tenantId, async (tx) => {
+      // Lock por transação (escopo de tenant): serializa réplicas concorrentes. Sem ele, o dedup
+      // check-then-create abaixo duplica o resumo quando 2 instâncias rodam o cron ao mesmo tempo.
+      // Funciona sob pgbouncer (transaction mode) por ser xact-scoped; cai no commit.
+      await tx.$executeRaw(Prisma.sql`SELECT pg_advisory_xact_lock(hashtext(${tenantId}), hashtext('weekly_digest'))`);
       const optedIn = await tx.user.findFirst({ where: { tenantId, role: 'CREDITOR', weeklyDigestOptIn: true }, select: { id: true } });
       if (!optedIn) return { created: 0 };
       if (!opts.force) {

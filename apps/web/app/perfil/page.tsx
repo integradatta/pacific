@@ -46,10 +46,10 @@ export default function PerfilPage() {
 
       <Card pad="px-5 py-1">
         <div style={{ borderBottom: `1px solid ${C.line}` }}>
-          <Row href="/local" icon={<LocationGlyph active />} title="Localização" subtitle="Compartilhar com seu padrinho — você no controle" />
+          <Row href="/local" icon={<LocationGlyph active />} title="Localização" subtitle="Compartilhar com a família — você no controle" />
         </div>
         <div style={{ borderBottom: `1px solid ${C.line}` }}>
-          <Row icon={<span aria-hidden>💬</span>} title="Ajuda" subtitle="Fale com seu padrinho se tiver qualquer dúvida" />
+          <Row icon={<span aria-hidden>💬</span>} title="Ajuda" subtitle="Fale com sua rede se tiver qualquer dúvida" />
         </div>
         <Row onClick={sair} icon={<span aria-hidden>👋</span>} title="Sair" danger />
       </Card>

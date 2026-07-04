@@ -51,4 +51,14 @@ describe('PrincipalGuard', () => {
     const guard = new PrincipalGuard(scoped({ role: 'CREDITOR', tenantId: 't1', revokedAfter: new Date(Date.now() - 10_000) }));
     await expect(guard.canActivate(ctx(user))).resolves.toBe(true);
   });
+
+  // Regressão: mesmo que o JWT já traga tenantId, o gate de revogação/aprovação NÃO pode ser pulado.
+  it('checa revogação mesmo com tenantId presente no token', async () => {
+    const past = Math.floor(Date.now() / 1000) - 3600;
+    const raw = { user: { findUnique: vi.fn(async () => ({ role: 'CREDITOR', tenantId: 't1', revokedAfter: new Date() })) } };
+    const user: AuthUser = { supabaseId: 'sb1', email: 'c@x.com', role: 'CREDITOR', tenantId: 't1', tokenIssuedAt: past };
+    const guard = new PrincipalGuard({ raw: () => raw } as never);
+    await expect(guard.canActivate(ctx(user))).rejects.toThrow(/encerrada/i);
+    expect(raw.user.findUnique).toHaveBeenCalled();
+  });
 });

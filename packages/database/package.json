@@ -6,6 +6,8 @@
     "db:generate": "prisma generate --schema=schema.prisma",
     "db:migrate": "prisma migrate dev --schema=schema.prisma",
     "db:deploy": "prisma migrate deploy --schema=schema.prisma",
+    "db:rls": "psql \"${DIRECT_URL:?defina DIRECT_URL (conexão dona) para aplicar a RLS}\" -v ON_ERROR_STOP=1 -f src/rls.sql",
+    "db:release": "prisma migrate deploy --schema=schema.prisma && npm run db:rls",
     "db:seed": "tsx seed.ts",
     "lint": "prisma validate --schema=schema.prisma"
   },

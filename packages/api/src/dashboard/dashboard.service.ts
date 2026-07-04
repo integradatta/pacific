@@ -1,67 +1,49 @@
 import { Injectable } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
-import { balanceAt, deriveStatus, daysRemaining, outstanding, recoverabilityScore, temperatureScore, paymentProbability, riskLevel, riskReason, portfolioIntelligence, currentWeeklyPoint, portfolioTrend, weeklySummary, DEFAULT_THRESHOLDS, type DashboardKpis, type DebtStatus, type RiskLevel, type PortfolioRow, type PortfolioIntelligence, type HealthState, type WeeklyPoint, type IntelligenceThresholds } from '@pacific/shared';
+import { balanceAt, deriveStatus, daysRemaining, outstanding, recoverabilityScore, temperatureScore, paymentProbability, riskReason, portfolioKpis, portfolioIntelligence, currentWeeklyPoint, portfolioTrend, weeklySummary, DEFAULT_THRESHOLDS, type DashboardKpis, type PortfolioRow, type PortfolioIntelligence, type HealthState, type WeeklyPoint, type IntelligenceThresholds } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
+import { DebtsService, type PaymentClaimRow } from '../debts/debts.service.js';
+
+/** Payload agregado do dashboard: computa o portfolio UMA vez e deriva tudo dele (menos round-trips). */
+export interface DashboardHome {
+  kpis: DashboardKpis;
+  portfolio: PortfolioRow[];
+  intelligence: PortfolioIntelligence;
+  pendingClaims: PaymentClaimRow[];
+}
 
 @Injectable()
 export class DashboardService {
-  constructor(private readonly scoped: TenantScopedService) {}
+  constructor(
+    private readonly scoped: TenantScopedService,
+    private readonly debts: DebtsService,
+  ) {}
+
+  /**
+   * #Leveza — uma chamada por tela. Computa o portfolio UMA vez e deriva KPIs + inteligência dele;
+   * busca os pagamentos avisados em paralelo. Antes o cliente pedia kpis/portfolio/intelligence/claims
+   * separados e o servidor recomputava o portfolio 2x. "Tela que abre pronta."
+   */
+  async home(tenantId: string, asOf: Date = new Date(), thresholds: IntelligenceThresholds = DEFAULT_THRESHOLDS): Promise<DashboardHome> {
+    const rows = await this.portfolio(tenantId, asOf);
+    const [intelligence, pendingClaims] = await Promise.all([
+      this.intelligenceFromRows(tenantId, rows, asOf, thresholds),
+      this.debts.pendingClaims(tenantId),
+    ]);
+    return { kpis: portfolioKpis(rows), portfolio: rows, intelligence, pendingClaims };
+  }
 
   // Agregação de carteira (escala pequena, ~100 dívidas/tenant). Saldo/status calculados
   // pelo motor financeiro; somatórios em Decimal.js. Operações quitadas saem de "a receber"
   // e das contagens em aberto; o "a receber"/"vencido" usam o DEVIDO (bruto − pago).
   async kpis(tenantId: string, asOf: Date = new Date()): Promise<DashboardKpis> {
-    const debts = await this.scoped.withTenant(tenantId, (tx) => tx.debt.findMany({ where: { tenantId, deletedAt: null } }));
-    let totalLent = new Decimal(0);
-    let totalReceivable = new Decimal(0);
-    let totalOverdue = new Decimal(0);
-    let totalExpectedReturn = new Decimal(0);
-    let totalReceived = new Decimal(0);
-    let countActive = 0;
-    let countSettled = 0;
-    const countByStatus: Record<DebtStatus, number> = { GREEN: 0, YELLOW: 0, ORANGE: 0, RED: 0 };
-    const riskDistribution: Record<RiskLevel, number> = { LOW: 0, MEDIUM: 0, HIGH: 0 };
-    for (const d of debts) {
-      const terms = {
-        principal: d.principal.toString(),
-        rate: d.rate.toString(),
-        ratePeriod: d.ratePeriod,
-        startDate: d.startDate,
-        dueDate: d.dueDate,
-      };
-      totalLent = totalLent.plus(d.principal.toString());
-      totalReceived = totalReceived.plus(d.paidAmount.toString());
-
-      const settled = d.settledAt != null;
-      if (settled) {
-        countSettled += 1;
-        continue; // quitada: não entra em a receber/vencido/contagens em aberto
-      }
-
-      const balance = balanceAt(terms, asOf);
-      const due = new Decimal(outstanding(balance, d.paidAmount.toString(), false));
-      const status = deriveStatus(daysRemaining(terms, asOf));
-      totalReceivable = totalReceivable.plus(due);
-      totalExpectedReturn = totalExpectedReturn.plus(balanceAt(terms, terms.dueDate)); // valor final no vencimento
-      if (status === 'RED') totalOverdue = totalOverdue.plus(due);
-      else countActive += 1;
-      countByStatus[status] += 1;
-      riskDistribution[riskLevel(recoverabilityScore(terms, asOf))] += 1;
-    }
-    return {
-      totalLent: totalLent.toFixed(2),
-      totalReceivable: totalReceivable.toFixed(2),
-      totalOverdue: totalOverdue.toFixed(2),
-      totalExpectedReturn: totalExpectedReturn.toFixed(2),
-      totalReceived: totalReceived.toFixed(2),
-      countActive,
-      countSettled,
-      countByStatus,
-      riskDistribution,
-    };
+    // Deriva do portfolio (fonte única): mesma verdade do resto da tela, sem lógica de somatório duplicada.
+    return portfolioKpis(await this.portfolio(tenantId, asOf));
   }
 
   async portfolio(tenantId: string, asOf: Date = new Date()): Promise<PortfolioRow[]> {
+    // #Escalabilidade — transação CURTA: busca as linhas dentro do withTenant e fecha; o cálculo de
+    // juros (Decimal, pesado) roda FORA da transação, para não monopolizar conexão do pool sob pgbouncer.
     const debts = await this.scoped.withTenant(tenantId, (tx) =>
       tx.debt.findMany({
         where: { tenantId, deletedAt: null },
@@ -108,9 +90,16 @@ export class DashboardService {
    * Tudo DERIVADO da carteira (reusa `portfolio`); nenhuma infra/envio externo. In-app/assistivo.
    */
   async intelligence(tenantId: string, asOf: Date = new Date(), thresholds: IntelligenceThresholds = DEFAULT_THRESHOLDS): Promise<PortfolioIntelligence> {
-    const rows = await this.portfolio(tenantId, asOf);
+    return this.intelligenceFromRows(tenantId, await this.portfolio(tenantId, asOf), asOf, thresholds);
+  }
+
+  /** Inteligência a partir de linhas já computadas (evita reconsultar o portfolio). */
+  private async intelligenceFromRows(tenantId: string, rows: PortfolioRow[], asOf: Date, thresholds: IntelligenceThresholds): Promise<PortfolioIntelligence> {
     const intel = portfolioIntelligence(rows, thresholds);
-    const points = await this.weeklyHistory(tenantId, currentWeeklyPoint(rows, asOf, thresholds));
+    // Histórico é SÓ leitura no caminho do dashboard; o ponto da semana atual entra em memória
+    // (a persistência ficou no cron diário — nada de escrita em hot path de leitura).
+    const history = await this.readWeeklyHistory(tenantId);
+    const points = this.mergeCurrentWeek(history, currentWeeklyPoint(rows, asOf, thresholds));
     return { ...intel, trend: portfolioTrend(points), weeklySummary: weeklySummary(points), patterns: this.detectPatterns(rows, intel, points) };
   }
 
@@ -149,23 +138,9 @@ export class DashboardService {
     return out;
   }
 
-  /**
-   * Persiste o snapshot da semana atual (idempotente por tenant+semana; best-effort, nunca quebra
-   * o dashboard) e devolve as últimas ~6 semanas. In-app — nenhum envio externo.
-   */
-  private async weeklyHistory(tenantId: string, point: WeeklyPoint): Promise<WeeklyPoint[]> {
+  /** Últimas ~6 semanas persistidas (SÓ leitura). Best-effort: falha vira histórico vazio. */
+  private async readWeeklyHistory(tenantId: string): Promise<WeeklyPoint[]> {
     const db = this.scoped.raw();
-    const weekStart = new Date(point.weekStart);
-    const data = { healthScore: point.healthScore, state: point.state, receivable: point.receivable, overdue: point.overdue, expectedProfit: point.expectedProfit, opsActive: point.opsActive };
-    try {
-      await db.portfolioSnapshot.upsert({
-        where: { tenantId_weekStart: { tenantId, weekStart } },
-        create: { tenantId, weekStart, ...data },
-        update: { ...data, capturedAt: new Date() },
-      });
-    } catch {
-      /* best-effort */
-    }
     const rows = await db.portfolioSnapshot
       .findMany({ where: { tenantId }, orderBy: { weekStart: 'desc' }, take: 6 })
       .catch(() => [] as Awaited<ReturnType<typeof db.portfolioSnapshot.findMany>>);
@@ -178,6 +153,28 @@ export class DashboardService {
       expectedProfit: s.expectedProfit.toString(),
       opsActive: s.opsActive,
     }));
+  }
+
+  /** Insere/substitui o ponto da semana ATUAL em memória (sem escrever) para exibir a tendência viva. */
+  private mergeCurrentWeek(points: WeeklyPoint[], current: WeeklyPoint): WeeklyPoint[] {
+    return [current, ...points.filter((p) => p.weekStart !== current.weekStart)].slice(0, 6);
+  }
+
+  /**
+   * Persiste o snapshot da semana atual (idempotente por tenant+semana). Chamado pelo CRON diário —
+   * NUNCA no caminho de leitura do dashboard. Erros SOBEM para o scheduler (que loga por tenant);
+   * um catch interno aqui anularia essa observabilidade.
+   */
+  async captureWeeklySnapshot(tenantId: string, asOf: Date = new Date(), thresholds: IntelligenceThresholds = DEFAULT_THRESHOLDS): Promise<void> {
+    const rows = await this.portfolio(tenantId, asOf);
+    const point = currentWeeklyPoint(rows, asOf, thresholds);
+    const weekStart = new Date(point.weekStart);
+    const data = { healthScore: point.healthScore, state: point.state, receivable: point.receivable, overdue: point.overdue, expectedProfit: point.expectedProfit, opsActive: point.opsActive };
+    await this.scoped.raw().portfolioSnapshot.upsert({
+      where: { tenantId_weekStart: { tenantId, weekStart } },
+      create: { tenantId, weekStart, ...data },
+      update: { ...data, capturedAt: new Date() },
+    });
   }
 
   /**

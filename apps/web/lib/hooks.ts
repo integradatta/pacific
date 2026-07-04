@@ -4,6 +4,24 @@ import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { DEFAULT_THRESHOLDS, normalizeThresholds, type DashboardKpis, type PortfolioRow, type PortfolioIntelligence, type IntelligenceThresholds } from '@pacific/shared';
 import { apiGet } from './api';
+import type { PaymentClaimRow } from './debts';
+
+/** Payload agregado do dashboard (uma chamada por tela). */
+export interface DashboardHome {
+  kpis: DashboardKpis;
+  portfolio: PortfolioRow[];
+  intelligence: PortfolioIntelligence;
+  pendingClaims: PaymentClaimRow[];
+}
+
+/** #Leveza — uma única chamada traz portfolio + KPIs + inteligência + pagamentos a confirmar. */
+export function useHome(t?: IntelligenceThresholds) {
+  const qs = t ? `?highRiskBelow=${t.highRiskBelow}&concentrationLimitPct=${t.concentrationLimitPct}&dueSoonDays=${t.dueSoonDays}` : '';
+  return useQuery({
+    queryKey: ['home', t?.highRiskBelow ?? 0, t?.concentrationLimitPct ?? 0, t?.dueSoonDays ?? 0],
+    queryFn: () => apiGet<DashboardHome>(`/dashboard/home${qs}`),
+  });
+}
 
 export function useKpis() {
   return useQuery({ queryKey: ['kpis'], queryFn: () => apiGet<DashboardKpis>('/dashboard/kpis') });

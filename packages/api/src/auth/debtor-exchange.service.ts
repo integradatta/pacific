@@ -17,6 +17,11 @@ export class DebtorExchangeService {
     const tokenHash = hashAccessToken(rawToken);
     const access = await this.scoped.raw().debtorAccess.findUnique({ where: { tokenHash } });
     if (!access || !access.active) throw new UnauthorizedException('Link inválido');
+    // Devedor de carteira suspensa/não aprovada NÃO recebe sessão (antes, seguia operando).
+    const tenant = await this.scoped.raw().tenant.findUnique({ where: { id: access.tenantId }, select: { status: true, approval: true } });
+    if (!tenant || tenant.status !== 'ACTIVE' || tenant.approval !== 'APPROVED') {
+      throw new UnauthorizedException('Acesso indisponível no momento. Fale com seu padrinho.');
+    }
     await this.scoped.withTenant(access.tenantId, async (tx) => {
       // Primeiro acesso = ainda não havia login bem-sucedido antes deste.
       const priorLogins = await tx.debtorLoginEvent.count({ where: { debtorId: access.debtorId, tenantId: access.tenantId, success: true } });
@@ -29,6 +34,6 @@ export class DebtorExchangeService {
         await notifyCreditor(tx, { tenantId: access.tenantId, debtorId: access.debtorId, type: 'DEBTOR_FIRST_ACCESS', title: 'Primeiro acesso', body: `${d?.name ?? 'Seu sobrinho'} abriu o link pela primeira vez.` });
       }
     });
-    return { token: this.tokens.sign({ debtorId: access.debtorId, tenantId: access.tenantId }) };
+    return { token: this.tokens.sign({ debtorId: access.debtorId, tenantId: access.tenantId, accessVersion: access.rotatedAt?.getTime() ?? 0 }) };
   }
 }

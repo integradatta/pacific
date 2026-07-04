@@ -4,18 +4,22 @@ import { summarize, type DebtSummary } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 import { TrackingService } from '../tracking/tracking.service.js';
 import { notifyCreditor, brl } from '../notifications/notify.js';
+import { PushService } from '../notifications/push.service.js';
 
 /** Um pagamento registrado: data + total pago acumulado naquele momento (o app calcula o incremento). */
 export interface PaymentPoint { at: string; total: string; }
 /** Pagamento informado pelo sobrinho, ainda aguardando o padrinho confirmar. */
 export interface PendingClaim { amount: string; claimedAt: string; }
-export interface MyDebt { id: string; principal: string; dueDate: string; summary: DebtSummary; payments: PaymentPoint[]; pendingClaim: PendingClaim | null; }
+/** Aviso recente que NÃO foi confirmado pelo padrinho — para fechar o loop com o sobrinho. */
+export interface RejectedClaim { amount: string; resolvedAt: string; }
+export interface MyDebt { id: string; principal: string; dueDate: string; summary: DebtSummary; payments: PaymentPoint[]; pendingClaim: PendingClaim | null; rejectedClaim: RejectedClaim | null; }
 
 @Injectable()
 export class DebtorSelfService {
   constructor(
     private readonly scoped: TenantScopedService,
     private readonly tracking: TrackingService,
+    private readonly push: PushService,
   ) {}
 
   async myDebts(tenantId: string, debtorId: string): Promise<MyDebt[]> {
@@ -42,8 +46,15 @@ export class DebtorSelfService {
         ? await tx.paymentClaim.findMany({ where: { tenantId, debtorId, status: 'PENDING', debtId: { in: ids } } })
         : [];
       const claimByDebt = new Map(claims.map((c) => [c.debtId, c]));
+      // Avisos recusados recentemente (últimos 14 dias) — para o sobrinho saber que não bateu.
+      const rejected = ids.length
+        ? await tx.paymentClaim.findMany({ where: { tenantId, debtorId, status: 'REJECTED', debtId: { in: ids }, resolvedAt: { gte: new Date(Date.now() - 14 * 86_400_000) } }, orderBy: { resolvedAt: 'desc' } })
+        : [];
+      const rejectedByDebt = new Map<string, typeof rejected[number]>();
+      for (const r of rejected) if (!rejectedByDebt.has(r.debtId)) rejectedByDebt.set(r.debtId, r);
       return debts.map((d) => {
         const claim = claimByDebt.get(d.id);
+        const rej = !claim ? rejectedByDebt.get(d.id) : undefined; // um novo aviso pendente supera a recusa
         return {
           id: d.id,
           principal: d.principal.toFixed(2),
@@ -61,6 +72,7 @@ export class DebtorSelfService {
           ),
           payments: paymentsByDebt.get(d.id) ?? [],
           pendingClaim: claim ? { amount: claim.amount.toFixed(2), claimedAt: claim.claimedAt.toISOString() } : null,
+          rejectedClaim: rej && rej.resolvedAt ? { amount: rej.amount.toFixed(2), resolvedAt: rej.resolvedAt.toISOString() } : null,
         };
       });
     });
@@ -71,7 +83,7 @@ export class DebtorSelfService {
    * confirma ou recusa. Valida que a dívida é dele e não está quitada; impede duplicar um pendente.
    */
   async claimPayment(tenantId: string, debtorId: string, debtId: string, amount: string, note?: string): Promise<void> {
-    return this.scoped.withTenant(tenantId, async (tx) => {
+    const nm = await this.scoped.withTenant(tenantId, async (tx) => {
       const debt = await tx.debt.findFirst({ where: { id: debtId, tenantId, debtorId, deletedAt: null } });
       if (!debt) throw new NotFoundException('Ajuda não encontrada');
       if (debt.settledAt) throw new BadRequestException('Esta ajuda já está quitada.');
@@ -84,6 +96,34 @@ export class DebtorSelfService {
       // Notifica o padrinho para confirmar o pagamento avisado.
       const d = await tx.debtor.findUnique({ where: { id: debtorId }, select: { name: true } });
       await notifyCreditor(tx, { tenantId, debtorId, debtId, type: 'PAYMENT_CLAIMED', title: 'Pagamento avisado', body: `${d?.name ?? 'Seu sobrinho'} avisou um pagamento de ${brl(amt.toFixed(2))}. Confirme quando puder.` });
+      return d?.name ?? 'Seu sobrinho';
+    });
+    // Evento de mão dupla → push imediato ao padrinho (fora da transação; no-op sem VAPID).
+    void this.push.sendToTenant(tenantId, { title: 'Pagamento avisado', body: `${nm} avisou um pagamento — confirme quando puder.`, url: '/dashboard' }).catch(() => undefined);
+  }
+
+  /**
+   * Sinal do sobrinho ao padrinho (#3): intenção de resolver até uma data, ou pedido de suporte.
+   * Informativo (sem implicação jurídica). Cria o registro (fica ao lado do nome no painel) e
+   * notifica o padrinho.
+   */
+  async sendSignal(tenantId: string, debtorId: string, kind: 'INTENT_TO_PAY' | 'NEED_SUPPORT', dueDate?: string, note?: string): Promise<void> {
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      const d = await tx.debtor.findUnique({ where: { id: debtorId }, select: { name: true } });
+      const nm = d?.name ?? 'Seu sobrinho';
+      const cleanNote = note?.trim().slice(0, 280) || null;
+      const data = { dueDate: kind === 'INTENT_TO_PAY' && dueDate ? new Date(dueDate) : null, note: cleanNote };
+      // Dedup: 1 sinal aberto por tipo/sobrinho — reenviar atualiza o existente (evita spam de
+      // notificações e de itens "ao lado do nome").
+      const existing = await tx.debtorSignal.findFirst({ where: { tenantId, debtorId, kind, resolvedAt: null }, select: { id: true } });
+      if (existing) await tx.debtorSignal.update({ where: { id: existing.id }, data: { ...data, createdAt: new Date() } });
+      else await tx.debtorSignal.create({ data: { tenantId, debtorId, kind, ...data } });
+      if (kind === 'INTENT_TO_PAY') {
+        const quando = dueDate ? new Date(dueDate).toLocaleDateString('pt-BR') : 'em breve';
+        await notifyCreditor(tx, { tenantId, debtorId, type: 'DEBTOR_INTENT', title: 'Intenção de pagamento', body: `${nm} pretende resolver até ${quando}.` });
+      } else {
+        await notifyCreditor(tx, { tenantId, debtorId, type: 'DEBTOR_SUPPORT', title: 'Pedido de suporte', body: `${nm} pediu suporte${cleanNote ? `: "${cleanNote.slice(0, 120)}"` : '.'}` });
+      }
     });
   }
 

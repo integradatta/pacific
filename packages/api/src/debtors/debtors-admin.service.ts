@@ -14,7 +14,9 @@ export class DebtorsAdminService {
   ) {}
 
   private link(token: string): string {
-    return `${process.env.WEB_ORIGIN ?? 'http://localhost:3000'}/d/${token}`;
+    // Token no FRAGMENT (#) — o fragment não vai ao servidor, então não vaza em logs da Vercel nem
+    // no unfurl do WhatsApp (o bot de preview só busca o path/query).
+    return `${process.env.WEB_ORIGIN ?? 'http://localhost:3000'}/d#${token}`;
   }
 
   async create(tenantId: string, name: string): Promise<{ debtorId: string; accessLink: string }> {

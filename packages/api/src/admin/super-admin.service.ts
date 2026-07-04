@@ -1,4 +1,4 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Decimal } from 'decimal.js';
 import type { AdminAccessLinkRow, AdminAuditEntry, AdminCreditorRow, AdminOverview, AdminTenantRow, AdminUserRow, TenantApproval } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
@@ -24,6 +24,7 @@ const clampSkip = (n: number | undefined): number => Math.max(n ?? 0, 0);
 // Toda mutação é auditada.
 @Injectable()
 export class SuperAdminService {
+  private readonly log = new Logger('SuperAdmin');
   constructor(
     private readonly scoped: TenantScopedService,
     private readonly dashboard: DashboardService,
@@ -246,18 +247,38 @@ export class SuperAdminService {
       throw new BadRequestException('Confirmação não confere. Digite o código da organização para excluir.');
     }
     const users = await this.db.user.findMany({ where: { tenantId }, select: { supabaseId: true } });
-    // Dados sob RLS: apaga dentro do contexto do tenant (ordem segura de FKs).
+    // Dados sob RLS (tenant-scoped): apaga dentro do contexto do tenant, detalhes antes de debt/debtor.
+    // NADA de PII pode sobreviver à exclusão da conta (LGPD) — inclui localização e relatórios.
     await this.scoped.withTenant(tenantId, async (tx) => {
-      await tx.debt.deleteMany({ where: { tenantId } });
-      await tx.debtor.deleteMany({ where: { tenantId } });
+      await tx.paymentClaim.deleteMany({ where: { tenantId } });
+      await tx.paymentPromise.deleteMany({ where: { tenantId } });
+      await tx.debtorSignal.deleteMany({ where: { tenantId } });
+      await tx.locationConsent.deleteMany({ where: { tenantId } });
+      await tx.debtorPosition.deleteMany({ where: { tenantId } });
+      await tx.locationPing.deleteMany({ where: { tenantId } });
+      await tx.geofenceEvent.deleteMany({ where: { tenantId } });
+      await tx.geofence.deleteMany({ where: { tenantId } });
+      await tx.monthlyReport.deleteMany({ where: { tenantId } });
       await tx.notification.deleteMany({ where: { tenantId } });
       await tx.debtorLoginEvent.deleteMany({ where: { tenantId } });
+      await tx.debt.deleteMany({ where: { tenantId } });
+      await tx.debtor.deleteMany({ where: { tenantId } });
     });
-    // Tabelas fora da RLS:
+    // Tabelas globais (RLS deny-by-default + app_full_access p/ pacific_app): apagar as linhas do tenant
+    // p/ não deixar coordenadas GPS (DeviceToken/PushSubscription) nem linha fantasma em stats/overview.
+    await this.db.platformEvent.deleteMany({ where: { tenantId } });
+    await this.db.tenantStats.deleteMany({ where: { tenantId } });
+    await this.db.portfolioSnapshot.deleteMany({ where: { tenantId } });
+    await this.db.deviceToken.deleteMany({ where: { tenantId } });
+    await this.db.pushSubscription.deleteMany({ where: { tenantId } });
     await this.db.debtorAccess.deleteMany({ where: { tenantId } });
     await this.db.user.deleteMany({ where: { tenantId } });
     await this.db.tenant.delete({ where: { id: tenantId } });
-    for (const u of users) await this.authAdmin.deleteUser(u.supabaseId).catch(() => undefined);
+    // Falha aqui deixaria usuário órfão no Supabase Auth (PII/LGPD) — precisa aparecer no log.
+    for (const u of users) {
+      await this.authAdmin.deleteUser(u.supabaseId)
+        .catch((e: unknown) => this.log.warn(`deleteTenant: falha ao remover usuário ${u.supabaseId} do Supabase Auth: ${String(e)}`));
+    }
     await this.audit(actor, 'tenant.delete', 'tenant', tenantId, { orgCode: tenant.orgCode, users: users.length });
   }
 

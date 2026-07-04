@@ -28,6 +28,8 @@ async function bootstrap(): Promise<void> {
   }
   app.enableCors({ origin: webOrigin ? webOrigin.split(',').map((o) => o.trim()) : true, credentials: true });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
+  // Shutdown limpo: dispara os lifecycle hooks (ex.: PrismaService.$disconnect) em SIGTERM/SIGINT.
+  app.enableShutdownHooks();
   // O filtro global de exceções é registrado via APP_FILTER (DI) no AppModule p/ injetar o tracking.
   // Railway/Render injetam PORT; bind em 0.0.0.0 para o container aceitar tráfego externo.
   await app.listen(Number(process.env.PORT ?? process.env.API_PORT ?? 3333), '0.0.0.0');

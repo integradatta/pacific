@@ -10,8 +10,9 @@ function pfDb(debts: ReturnType<typeof pfDebt>[]) {
   return { debt: { findMany: vi.fn(async () => debts) } };
 }
 const snapStore = () => ({ portfolioSnapshot: { upsert: vi.fn(async () => ({})), findMany: vi.fn(async () => []) } });
+const debtsStub = { pendingClaims: vi.fn(async () => []) };
 const svc = (db: ReturnType<typeof pfDb>) =>
-  new DashboardService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db), raw: () => snapStore() } as never);
+  new DashboardService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db), raw: () => snapStore() } as never, debtsStub as never);
 
 describe('DashboardService.portfolio', () => {
   it('mapeia dívidas para linhas com status/dias/saldo + nome do devedor', async () => {
@@ -55,6 +56,21 @@ describe('DashboardService.portfolio', () => {
     const rows = await svc(db).portfolio('t1', new Date('2026-02-01T00:00:00Z'));
     expect(rows[0]).toMatchObject({ id: 'p', amountDue: '600.00', paidAmount: '400.00', settled: false });
     expect(rows[1]).toMatchObject({ id: 'q', amountDue: '0.00', settled: true });
+  });
+
+  it('home() agrega portfolio + KPIs + inteligência + pagamentos avisados, computando o portfolio 1x', async () => {
+    const db = pfDb([pfDebt('a', 'Ana Souza', new Date('2026-01-20T00:00:00Z'), '0', '1000.00')]);
+    const claims = [{ id: 'c1', debtId: 'a', debtorName: 'Ana Souza', amount: '100.00', note: null, claimedAt: '2026-02-01T00:00:00Z' }];
+    const debts = { pendingClaims: vi.fn(async () => claims) };
+    const svc2 = new DashboardService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db), raw: () => snapStore() } as never, debts as never);
+    const out = await svc2.home('t1', new Date('2026-02-01T00:00:00Z'));
+    expect(out.portfolio).toHaveLength(1);
+    expect(out.kpis.totalLent).toBe('1000.00');
+    expect(out.pendingClaims).toEqual(claims);
+    expect(out.intelligence.summary).toContain('operação');
+    // O portfolio é consultado UMA vez (não recomputado por kpis/intelligence).
+    expect(db.debt.findMany).toHaveBeenCalledTimes(1);
+    expect(debts.pendingClaims).toHaveBeenCalledWith('t1');
   });
 
   it('intelligence() compõe saúde/resumo/cliente-chave a partir da carteira', async () => {

@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, UseGuards, ForbiddenException } from '@nestjs/common';
-import { IsIn, IsOptional, IsString, MaxLength, Matches } from 'class-validator';
+import { IsIn, IsOptional, IsString, MaxLength, Matches, IsDateString } from 'class-validator';
 import { JwtGuard } from '../auth/jwt.guard.js';
 import { TenantGuard } from '../tenancy/tenant.guard.js';
 import { DebtorGuard } from '../auth/debtor.guard.js';
@@ -18,6 +18,12 @@ export class PushTokenDto {
 export class ClaimPaymentDto {
   // Valor monetário em string (ex.: "150.00") — mesma convenção dos demais valores da API.
   @IsString() @Matches(/^\d+(\.\d{1,2})?$/, { message: 'Valor inválido' }) amount!: string;
+  @IsOptional() @IsString() @MaxLength(280) note?: string;
+}
+
+export class DebtorSignalDto {
+  @IsIn(['INTENT_TO_PAY', 'NEED_SUPPORT']) kind!: 'INTENT_TO_PAY' | 'NEED_SUPPORT';
+  @IsOptional() @IsDateString() dueDate?: string;
   @IsOptional() @IsString() @MaxLength(280) note?: string;
 }
 
@@ -42,6 +48,13 @@ export class DebtorSelfController {
   ): Promise<void> {
     if (!user.debtorId) throw new ForbiddenException('Sessão de devedor inválida');
     return this.self.claimPayment(tenantId, user.debtorId, debtId, dto.amount, dto.note);
+  }
+
+  // Sinal do sobrinho ao padrinho: intenção de resolver até uma data, ou pedido de suporte.
+  @Post('me/signals') @Roles('DEBTOR')
+  sendSignal(@TenantId() tenantId: string, @CurrentUser() user: AuthUser, @Body() dto: DebtorSignalDto): Promise<void> {
+    if (!user.debtorId) throw new ForbiddenException('Sessão de devedor inválida');
+    return this.self.sendSignal(tenantId, user.debtorId, dto.kind, dto.dueDate, dto.note);
   }
 
   // App nativo registra o token de push aqui (envio FCM é externo/manual).

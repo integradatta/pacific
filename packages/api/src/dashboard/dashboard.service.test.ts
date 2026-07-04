@@ -15,9 +15,12 @@ function fakeDb(rows?: Raw[]) {
   return {
     debt: {
       findMany: vi.fn(async () =>
-        base.map((d) => ({
+        base.map((d, i) => ({
+          id: `d${i}`,
           ratePeriod: 'MONTHLY',
           startDate: start,
+          tags: [],
+          debtor: { name: '—' }, // kpis() agora deriva do portfolio (que faz join do devedor)
           ...d,
           principal: dec(d.principal),
           rate: dec(d.rate),
@@ -28,8 +31,9 @@ function fakeDb(rows?: Raw[]) {
     },
   };
 }
+const debtsStub = { pendingClaims: vi.fn(async () => []) };
 const svc = (db: ReturnType<typeof fakeDb>) =>
-  new DashboardService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db) } as never);
+  new DashboardService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db) } as never, debtsStub as never);
 
 describe('DashboardService.kpis', () => {
   it('agrega carteira com saldos e status (asOf fixo)', async () => {

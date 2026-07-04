@@ -5,7 +5,7 @@ import { RolesGuard } from '../auth/roles.guard.js';
 import { PrincipalGuard } from '../auth/principal.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { TenantId } from '../tenancy/tenant-id.decorator.js';
-import { DashboardService, type CopilotResponse } from './dashboard.service.js';
+import { DashboardService, type CopilotResponse, type DashboardHome } from './dashboard.service.js';
 import { normalizeThresholds, type DashboardKpis, type PortfolioRow, type PortfolioIntelligence } from '@pacific/shared';
 
 const num = (v: string | undefined): number | undefined => (v == null || v === '' ? undefined : Number(v));
@@ -14,6 +14,18 @@ const num = (v: string | undefined): number | undefined => (v == null || v === '
 @UseGuards(new JwtGuard(), PrincipalGuard, TenantGuard, RolesGuard)
 export class DashboardController {
   constructor(private readonly dashboard: DashboardService) {}
+
+  // #Leveza — uma chamada por tela: portfolio + KPIs + inteligência + pagamentos avisados de uma vez.
+  @Get('home') @Roles('CREDITOR')
+  home(
+    @TenantId() tenantId: string,
+    @Query('highRiskBelow') highRiskBelow?: string,
+    @Query('concentrationLimitPct') concentrationLimitPct?: string,
+    @Query('dueSoonDays') dueSoonDays?: string,
+  ): Promise<DashboardHome> {
+    const thresholds = normalizeThresholds({ highRiskBelow: num(highRiskBelow), concentrationLimitPct: num(concentrationLimitPct), dueSoonDays: num(dueSoonDays) });
+    return this.dashboard.home(tenantId, undefined, thresholds);
+  }
 
   @Get('kpis') @Roles('CREDITOR')
   kpis(@TenantId() tenantId: string): Promise<DashboardKpis> {

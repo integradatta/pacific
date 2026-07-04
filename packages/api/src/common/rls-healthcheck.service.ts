@@ -5,6 +5,7 @@ import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 const FORCED_TABLES = [
   'Debtor', 'Debt', 'Notification', 'DebtorLoginEvent', 'PaymentClaim',
   'LocationConsent', 'DebtorPosition', 'LocationPing', 'Geofence', 'GeofenceEvent', 'MonthlyReport',
+  'DebtorSignal', 'PaymentPromise',
 ];
 
 /**
@@ -24,7 +25,9 @@ export class RlsHealthCheck implements OnApplicationBootstrap {
 
   async onApplicationBootstrap(): Promise<void> {
     if (process.env.RLS_HEALTHCHECK === 'off') return;
-    const strict = process.env.RLS_STRICT === 'on';
+    // Produção é STRICT por padrão (fail-closed): sem isolamento válido, melhor não subir. Escape
+    // explícito: RLS_STRICT=off. Fora de produção, strict só quando RLS_STRICT=on.
+    const strict = process.env.RLS_STRICT === 'on' || (process.env.RLS_STRICT !== 'off' && process.env.NODE_ENV === 'production');
 
     let bypass = false;
     let missing: string[] = [];
@@ -57,6 +60,6 @@ export class RlsHealthCheck implements OnApplicationBootstrap {
       // Falha dura: melhor não subir do que servir com isolamento de tenant inerte.
       throw new Error(`RLS inválida — abortando o boot (RLS_STRICT=on). ${msg}`);
     }
-    this.log.error('RLS_STRICT não está "on": subindo mesmo assim. Defina RLS_STRICT=on em produção após corrigir.');
+    this.log.error('RLS não-estrita (RLS_STRICT=off ou fora de produção): subindo mesmo assim. Corrija o quanto antes.');
   }
 }

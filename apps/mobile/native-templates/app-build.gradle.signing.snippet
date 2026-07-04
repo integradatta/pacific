@@ -1,0 +1,36 @@
+// Aplicar em: android/app/build.gradle
+//
+// 1) No TOPO do arquivo (antes de `android { ... }`), carregue o keystore.properties (gitignored):
+//
+//    def keystorePropsFile = rootProject.file("../keystore.properties")
+//    def keystoreProps = new Properties()
+//    if (keystorePropsFile.exists()) { keystoreProps.load(new FileInputStream(keystorePropsFile)) }
+//
+//    OBS: o caminho "../keystore.properties" assume que keystore.properties está em apps/mobile/
+//    (um nível acima de android/). Ajuste se mover o arquivo.
+//
+// 2) DENTRO de `android { ... }`, adicione o signingConfigs e referencie no buildType release:
+
+android {
+    signingConfigs {
+        release {
+            if (keystorePropsFile.exists()) {
+                storeFile file("../../" + keystoreProps['storeFile'])   // aponta p/ apps/mobile/pacific-upload.keystore
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false        // ligue depois com regras ProGuard se quiser reduzir o APK
+            // ...demais configs geradas pelo Capacitor permanecem...
+        }
+    }
+}
+
+// versionCode / versionName: em android/app/build.gradle (defaultConfig).
+//   versionCode inteiro, INCREMENTA a cada upload (1, 2, 3, ...).
+//   versionName string legível ("1.0.0"). Ver DEPLOY_MOBILE.md §versionamento.

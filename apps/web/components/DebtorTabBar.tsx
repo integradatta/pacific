@@ -2,13 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { C, sans, HomeGlyph, LocationGlyph, TripGlyph, ProfileGlyph } from '@/components/family';
+import { C, sans, HomeGlyph, LocationGlyph, CofreGlyph, ProfileGlyph } from '@/components/family';
 
-// Navegação do app do sobrinho — rede de confiança (nada de vigilância). 4 abas.
+// Navegação do app — família + metas de economia (nada de vigilância/cobrança). 4 abas.
 const TABS = [
   { href: '/me', label: 'Início', icon: HomeGlyph },
   { href: '/local', label: 'Localização', icon: LocationGlyph },
-  { href: '/viagem', label: 'Viagem', icon: TripGlyph },
+  { href: '/viagem', label: 'Cofre', icon: CofreGlyph },
   { href: '/perfil', label: 'Perfil', icon: ProfileGlyph },
 ];
 

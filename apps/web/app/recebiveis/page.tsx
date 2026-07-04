@@ -9,6 +9,7 @@ import { usePortfolio } from '@/lib/hooks';
 import { formatBRL } from '@/lib/format';
 import { ListSkeleton } from '@/components/Skeleton';
 import { ErrorState, EmptyState } from '@/components/States';
+import { CashForecastCard } from '@/components/CashForecastCard';
 
 const MONTHS_AHEAD = 12;
 const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -103,6 +104,9 @@ export default function RecebiveisPage() {
         <EmptyState glyph="▦" title="Nada a receber no momento." hint="cadastre ajudas em aberto para ver o fluxo por mês" />
       ) : (
         <div className="space-y-5 max-w-3xl">
+          {/* #4 Previsão ponderada por probabilidade */}
+          <CashForecastCard />
+
           {/* KPIs de caixa futuro */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <Kpi label="Total a receber" value={formatBRL(data.totalOpen.toFixed(2))} />

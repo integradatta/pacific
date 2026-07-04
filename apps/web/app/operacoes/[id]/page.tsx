@@ -10,6 +10,8 @@ import { ErrorState } from '@/components/States';
 import { TagInput } from '@/components/Tags';
 import { RiskBadge } from '@/components/RiskBadge';
 import { useDebt, useDebtSummary, useDebtHistory, useSetDebtTags, usePayDebt, useDeleteDebt, useRenegotiateDebt, useUpdateDebtDates } from '@/lib/debts';
+import { DebtorProfileCard } from '@/components/DebtorProfileCard';
+import { useDebtorPromises, useCreatePromise, useDeletePromise, type PromiseRow } from '@/lib/insights';
 import { formatBRL, venceEm } from '@/lib/format';
 import { STATUS_COLOR, STATUS_LABEL } from '@/lib/status';
 
@@ -136,6 +138,97 @@ function EditDatesBox({ id, start, due }: { id: string; start: string; due: stri
           </div>
           <p className="font-sans text-[11px] text-muted">A gratidão acumulada é recalculada a partir da nova data inicial.</p>
         </div>
+      )}
+    </section>
+  );
+}
+
+// #4 Promessas rastreadas — o padrinho registra "combinou pagar até <data>"; o desfecho é
+// resolvido sozinho (cumprida/quebrada) e pesa no DebtorScore. Sem implicação jurídica.
+const PROMISE_STATUS: Record<PromiseRow['status'], { label: string; cls: string }> = {
+  OPEN: { label: 'combinado', cls: 'border-sonar/40 bg-sonar/10 text-sonar' },
+  KEPT: { label: 'cumpriu', cls: 'border-status-green/40 bg-status-green/10 text-status-green' },
+  BROKEN: { label: 'não cumpriu', cls: 'border-status-red/40 bg-status-red/10 text-status-red' },
+};
+
+function PromisesBox({ debtId, debtorId }: { debtId: string; debtorId: string }) {
+  const list = useDebtorPromises(debtorId);
+  const create = useCreatePromise(debtorId);
+  const del = useDeletePromise(debtorId);
+  const [open, setOpen] = useState(false);
+  const [promisedAt, setPromisedAt] = useState('');
+  const [amount, setAmount] = useState('');
+
+  function submit(): void {
+    if (!promisedAt) return;
+    const body: { debtId: string; promisedAt: string; amount?: string } = { debtId, promisedAt: new Date(promisedAt).toISOString() };
+    if (amount.trim() && Number(amount) > 0) body.amount = Number(amount).toFixed(2);
+    create.mutate(body, { onSuccess: () => { setOpen(false); setPromisedAt(''); setAmount(''); } });
+  }
+
+  const rows = list.data ?? [];
+  return (
+    <section className="panel p-6">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="font-mono text-xs text-muted uppercase tracking-widest">Promessas</h3>
+          <p className="font-sans text-sm text-text-dim mt-1">Combinou uma data com ele? Registre aqui — o cumprimento entra no histórico e no score.</p>
+        </div>
+        {!open && (
+          <button type="button" onClick={() => setOpen(true)} className="font-mono text-[10px] uppercase tracking-widest text-iris border border-iris/40 rounded px-3 py-1.5 hover:bg-iris/10 transition-colors shrink-0">Registrar</button>
+        )}
+      </div>
+
+      {open && (
+        <div className="mt-4 space-y-3 border-t border-line pt-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="pr-date" className="block font-mono text-[10px] text-muted uppercase tracking-wider mb-1">Prometeu até</label>
+              <input id="pr-date" type="date" min={todayISO()} value={promisedAt} onChange={(e) => setPromisedAt(e.target.value)}
+                className="w-full bg-surface2 border border-line rounded-lg px-3 py-2.5 text-text font-mono text-sm focus:outline-none focus:border-iris transition-all" />
+            </div>
+            <div>
+              <label htmlFor="pr-amount" className="block font-mono text-[10px] text-muted uppercase tracking-wider mb-1">Valor (opcional)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono text-xs text-muted">R$</span>
+                <input id="pr-amount" type="number" inputMode="decimal" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="—"
+                  className="w-full bg-surface2 border border-line rounded-lg pl-9 pr-3 py-2.5 text-text font-mono text-sm tabular-nums focus:outline-none focus:border-iris transition-all" />
+              </div>
+            </div>
+          </div>
+          {create.isError && <p role="alert" className="font-mono text-xs text-status-red">Não foi possível registrar. Verifique a data.</p>}
+          <div className="flex gap-2">
+            <button type="button" onClick={submit} disabled={!promisedAt || create.isPending}
+              className="bg-iris text-ink font-mono text-xs font-semibold uppercase tracking-widest px-4 py-2.5 rounded-lg hover:brightness-110 active:translate-y-px disabled:opacity-40 transition-all">
+              {create.isPending ? 'Registrando…' : 'Registrar promessa'}
+            </button>
+            <button type="button" onClick={() => setOpen(false)} className="font-mono text-[10px] uppercase tracking-widest text-muted hover:text-text px-3">Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {rows.length > 0 && (
+        <ul className="mt-4 space-y-2 border-t border-line pt-4">
+          {rows.map((p) => {
+            const st = PROMISE_STATUS[p.status];
+            return (
+              <li key={p.id} className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-sans text-sm text-text">
+                    {p.amount ? formatBRL(p.amount) : 'Pagamento'} <span className="text-text-dim">até {new Date(p.promisedAt).toLocaleDateString('pt-BR')}</span>
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={`font-mono text-[10px] uppercase tracking-widest px-2 py-0.5 rounded-full border ${st.cls}`}>{st.label}</span>
+                  {p.status === 'OPEN' && (
+                    <button type="button" onClick={() => del.mutate(p.id)} disabled={del.isPending} aria-label="Remover promessa"
+                      className="font-mono text-[10px] text-muted hover:text-status-red transition-colors">✕</button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
       )}
     </section>
   );
@@ -364,10 +457,13 @@ export default function OperacaoDetalhePage({ params }: { params: { id: string }
                   {debt.data.description ? <p className="font-sans text-sm text-text-dim mt-1">{debt.data.description}</p> : null}
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="inline-flex items-center gap-2 font-mono text-xs text-muted">
-                    <span className={`w-2 h-2 rounded-full ${STATUS_COLOR[debt.data.status]}`} />
-                    {STATUS_LABEL[debt.data.status]}
-                  </span>
+                  {/* Status DERIVADO (do resumo), não a coluna Debt.status (removida — era sempre GREEN). */}
+                  {summary.data ? (
+                    <span className="inline-flex items-center gap-2 font-mono text-xs text-muted">
+                      <span className={`w-2 h-2 rounded-full ${summary.data.settled ? STATUS_COLOR.GREEN : STATUS_COLOR[summary.data.status]}`} />
+                      {summary.data.settled ? 'Quitada' : STATUS_LABEL[summary.data.status]}
+                    </span>
+                  ) : null}
                   <button
                     type="button"
                     onClick={handleDelete}
@@ -423,8 +519,14 @@ export default function OperacaoDetalhePage({ params }: { params: { id: string }
               </section>
             </div>
 
+            {/* Perfil comportamental do sobrinho (#2 + #6) — compacto */}
+            <DebtorProfileCard debtorId={debt.data.debtorId} name={debt.data.debtorName} />
+
             {/* Editar datas — corrigir/registrar dívidas antigas (vale mesmo se quitada) */}
             <EditDatesBox id={params.id} start={debt.data.startDate} due={debt.data.dueDate} />
+
+            {/* Promessas rastreadas (#4) — combinados com desfecho automático; só em operação aberta */}
+            {summary.data && !summary.data.settled && <PromisesBox debtId={params.id} debtorId={debt.data.debtorId} />}
 
             {/* Renegociação — só faz sentido em operação aberta */}
             {summary.data && !summary.data.settled && <RenegotiateBox id={params.id} />}

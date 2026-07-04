@@ -10,7 +10,7 @@ type Claims = {
   email?: unknown;
   iss?: string;
   iat?: number;
-  app_metadata?: { role?: string; tenantId?: string; debtorId?: string };
+  app_metadata?: { role?: string; tenantId?: string; debtorId?: string; av?: number };
 };
 
 // Cache do conjunto de chaves por URL de JWKS (jose já faz cache interno das chaves).
@@ -46,7 +46,7 @@ export class JwtGuard implements CanActivate {
       role,
       tenantId: role === 'SUPER_ADMIN' ? null : (meta.tenantId ?? null),
       ...(typeof payload.iat === 'number' ? { tokenIssuedAt: payload.iat } : {}),
-      ...(role === 'DEBTOR' ? { debtorId: meta.debtorId ?? String(payload.sub ?? '') } : {}),
+      ...(role === 'DEBTOR' ? { debtorId: meta.debtorId ?? String(payload.sub ?? ''), accessVersion: typeof meta.av === 'number' ? meta.av : 0 } : {}),
     };
     return true;
   }

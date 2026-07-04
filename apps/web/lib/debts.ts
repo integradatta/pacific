@@ -18,19 +18,16 @@ export function useDebt(id: string) {
   return useQuery({ queryKey: ['debt', id], queryFn: () => apiGet<DebtRecord>(`/debts/${id}`) });
 }
 
-/** Pagamentos informados pelos sobrinhos aguardando confirmação (toda a carteira). */
-export function usePendingClaims() {
-  return useQuery({ queryKey: ['claims', 'pending'], queryFn: () => apiGet<PaymentClaimRow[]>('/debts/claims/pending') });
-}
-
 /** Confirma um pagamento informado → vira pagamento de fato. Atualiza carteira/KPIs/claims. */
 export function useConfirmClaim() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => apiPost<void>(`/debts/claims/${id}/confirm`),
+    // Confirma; com `amount` confirma COM AJUSTE (ex.: avisou 500, caiu 480).
+    mutationFn: ({ id, amount }: { id: string; amount?: string }) => apiPost<void>(`/debts/claims/${id}/confirm`, amount ? { amount } : undefined),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['claims'] });
       void qc.invalidateQueries({ queryKey: ['portfolio'] });
+      void qc.invalidateQueries({ queryKey: ['home'] });
       void qc.invalidateQueries({ queryKey: ['kpis'] });
       void qc.invalidateQueries({ queryKey: ['debt'] });
     },
@@ -42,7 +39,10 @@ export function useRejectClaim() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => apiPost<void>(`/debts/claims/${id}/reject`),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['claims'] }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['claims'] });
+      void qc.invalidateQueries({ queryKey: ['home'] });
+    },
   });
 }
 
@@ -62,6 +62,7 @@ export function useSetDebtTags(id: string) {
     onSuccess: (rec) => {
       qc.setQueryData(['debt', id], rec);
       void qc.invalidateQueries({ queryKey: ['portfolio'] });
+      void qc.invalidateQueries({ queryKey: ['home'] });
     },
   });
 }
@@ -76,6 +77,7 @@ export function useUpdateDebtDates(id: string) {
       void qc.invalidateQueries({ queryKey: ['debt', id, 'summary'] });
       void qc.invalidateQueries({ queryKey: ['debt', id, 'history'] });
       void qc.invalidateQueries({ queryKey: ['portfolio'] });
+      void qc.invalidateQueries({ queryKey: ['home'] });
       void qc.invalidateQueries({ queryKey: ['kpis'] });
     },
   });
@@ -91,6 +93,7 @@ export function usePayDebt(id: string) {
       void qc.invalidateQueries({ queryKey: ['debt', id, 'summary'] });
       void qc.invalidateQueries({ queryKey: ['debt', id, 'history'] });
       void qc.invalidateQueries({ queryKey: ['portfolio'] });
+      void qc.invalidateQueries({ queryKey: ['home'] });
       void qc.invalidateQueries({ queryKey: ['kpis'] });
       void qc.invalidateQueries({ queryKey: ['notifications'] });
     },
@@ -108,6 +111,7 @@ export function useRenegotiateDebt(id: string) {
       void qc.invalidateQueries({ queryKey: ['debt', id, 'summary'] });
       void qc.invalidateQueries({ queryKey: ['debt', id, 'history'] });
       void qc.invalidateQueries({ queryKey: ['portfolio'] });
+      void qc.invalidateQueries({ queryKey: ['home'] });
       void qc.invalidateQueries({ queryKey: ['kpis'] });
     },
   });
@@ -120,6 +124,7 @@ export function useDeleteDebt(id: string) {
     mutationFn: () => apiDelete<void>(`/debts/${id}`),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['portfolio'] });
+      void qc.invalidateQueries({ queryKey: ['home'] });
       void qc.invalidateQueries({ queryKey: ['kpis'] });
       void qc.invalidateQueries({ queryKey: ['trash'] });
     },
@@ -147,6 +152,7 @@ export function useRestoreDebt() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['trash'] });
       void qc.invalidateQueries({ queryKey: ['portfolio'] });
+      void qc.invalidateQueries({ queryKey: ['home'] });
       void qc.invalidateQueries({ queryKey: ['kpis'] });
     },
   });

@@ -27,12 +27,7 @@ enum TenantApproval {
   REJECTED
 }
 
-enum DebtStatus {
-  GREEN
-  YELLOW
-  ORANGE
-  RED
-}
+// (enum DebtStatus removido: o status da dívida é derivado em runtime, nunca persistido.)
 
 enum RatePeriod {
   MONTHLY
@@ -73,6 +68,17 @@ enum PaymentClaimStatus {
   REJECTED // padrinho recusou (não bate)
 }
 
+enum DebtorSignalKind {
+  INTENT_TO_PAY // "pretendo resolver até <dueDate>" (informativo, sem implicação jurídica)
+  NEED_SUPPORT // "preciso de suporte" (pede ajuda/conversa ao padrinho)
+}
+
+enum PromiseStatus {
+  OPEN // combinou pagar até a data; ainda no prazo
+  KEPT // cumpriu (houve quitação/aviso confirmado até a data + tolerância)
+  BROKEN // a data passou sem pagamento (resolvido automaticamente)
+}
+
 enum NotificationType {
   DUE_SOON // legado (mantido p/ registros antigos); a geração agora usa as réguas abaixo
   DUE_15
@@ -89,6 +95,8 @@ enum NotificationType {
   DEBT_SETTLED // ajuda quitada
   DEBTOR_FIRST_ACCESS // abriu o link pela primeira vez
   WEEKLY_DIGEST // resumo semanal da carteira (só p/ quem optou por receber)
+  DEBTOR_INTENT // sobrinho declarou intenção de resolver até uma data
+  DEBTOR_SUPPORT // sobrinho pediu suporte/ajuda
 }
 
 model Tenant {
@@ -169,10 +177,6 @@ model Debtor {
   user       User?     @relation(fields: [userId], references: [id])
   name       String
   email      String?
-  // Ponto de extensão INERTE p/ um futuro módulo de localização (opcional, voluntário,
-  // SIMULADO). Nenhum código grava/lê isto: sem rastreamento real de pessoas. Ver
-  // @pacific/shared/location (contratos) e o painel "Em desenvolvimento" no web.
-  lastLocation String?
   redeemedAt DateTime?
   createdAt  DateTime  @default(now())
   debts      Debt[]
@@ -200,7 +204,7 @@ model Debt {
   currency    String     @default("BRL")
   startDate   DateTime
   dueDate     DateTime
-  status      DebtStatus @default(GREEN)
+  // Sem coluna `status`: o status é DERIVADO pelo motor financeiro (deriveStatus), nunca persistido.
   // Pagamentos: total abatido e quando foi quitada (paga em total). Devido agora =
   // saldo bruto − paidAmount (piso 0); settledAt != null ⇒ quitada (devido 0).
   paidAmount  Decimal    @default(0) @db.Decimal(14, 2)
@@ -238,6 +242,43 @@ model PaymentClaim {
   @@index([debtId])
 }
 
+// Sinais que o SOBRINHO envia ao padrinho pelo app: intenção de resolver até uma data, ou pedido de
+// suporte. Informativo (sem implicação jurídica). O último em aberto fica visível ao lado do nome do
+// sobrinho no painel; também gera notificação. Tenant-scoped (RLS FORCE em src/rls.sql).
+model DebtorSignal {
+  id         String           @id @default(uuid())
+  tenantId   String
+  debtorId   String
+  debtId     String?
+  kind       DebtorSignalKind
+  dueDate    DateTime? // preenchido no INTENT_TO_PAY
+  note       String?
+  createdAt  DateTime         @default(now())
+  resolvedAt DateTime? // padrinho marcou como resolvido/ciente
+
+  @@index([tenantId, debtorId, resolvedAt])
+}
+
+// Promessa de pagamento que o padrinho registra ("combinou pagar R$X até <data>"). Ao contrário do
+// DebtorSignal (que o sobrinho envia), esta é o COMPROMISSO acordado, com desfecho rastreado:
+// cumprida (houve confirmação até a data + tolerância) ou quebrada (a data passou). O histórico de
+// cumprimento alimenta o DebtorScore. Informativo, sem implicação jurídica. Tenant-scoped (RLS FORCE).
+model PaymentPromise {
+  id         String        @id @default(uuid())
+  tenantId   String
+  debtorId   String
+  debtId     String
+  amount     Decimal?      @db.Decimal(14, 2) // opcional: valor combinado
+  promisedAt DateTime // data até quando prometeu resolver
+  note       String?
+  status     PromiseStatus @default(OPEN)
+  createdAt  DateTime      @default(now())
+  resolvedAt DateTime? // quando virou KEPT/BROKEN
+
+  @@index([tenantId, debtorId, status])
+  @@index([tenantId, debtId, status])
+}
+
 model Notification {
   id        String           @id @default(uuid())
   tenantId  String
@@ -267,6 +308,20 @@ model DeviceToken {
   lastSeenAt DateTime @default(now())
 
   @@index([tenantId, debtorId])
+}
+
+// Assinatura Web Push (VAPID) do PADRINHO (navegador/PWA). Global (filtrado por tenantId em código +
+// app_full_access). O envio real só ocorre com VAPID_* configurado; sem chaves, tudo é no-op.
+model PushSubscription {
+  id        String   @id @default(uuid())
+  tenantId  String
+  supabaseId String // dono da assinatura (o credor)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
 }
 
 model DebtorAccess {

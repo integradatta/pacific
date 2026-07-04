@@ -20,10 +20,13 @@ import { DebtsController } from './debts/debts.controller.js';
 import { DebtsService } from './debts/debts.service.js';
 import { DashboardController } from './dashboard/dashboard.controller.js';
 import { DashboardService } from './dashboard/dashboard.service.js';
+import { PortfolioSnapshotScheduler } from './dashboard/portfolio-snapshot.scheduler.js';
 import { NotificationsController } from './notifications/notifications.controller.js';
 import { NotificationsService } from './notifications/notifications.service.js';
 import { NotificationsScheduler } from './notifications/notifications.scheduler.js';
 import { WeeklyDigestScheduler } from './notifications/weekly-digest.scheduler.js';
+import { PushService } from './notifications/push.service.js';
+import { DailyPushScheduler } from './notifications/daily-push.scheduler.js';
 import { DebtorExchangeController } from './auth/debtor-exchange.controller.js';
 import { DebtorExchangeService } from './auth/debtor-exchange.service.js';
 import { DebtorTokenService } from './auth/debtor-token.service.js';
@@ -36,6 +39,9 @@ import { AUTH_ADMIN, createAuthAdmin } from './admin/auth-admin.js';
 import { TrackingService } from './tracking/tracking.service.js';
 import { EventsController, PublicEventsController } from './tracking/events.controller.js';
 import { DebtorGuard } from './auth/debtor.guard.js';
+import { InsightsService } from './insights/insights.service.js';
+import { PromisesService } from './insights/promises.service.js';
+import { InsightsController } from './insights/insights.controller.js';
 import { LocationService } from './location/location.service.js';
 import { LocationController } from './location/location.controller.js';
 import { LocationDebtorController } from './location/location-debtor.controller.js';
@@ -57,8 +63,8 @@ const throttlerStorage = _redis ? new ThrottlerStorageRedisService(_redis) : und
       ...(throttlerStorage ? { storage: throttlerStorage } : {}),
     }),
   ],
-  controllers: [HealthController, CreditorsController, DebtorProvisioningController, DebtsController, DashboardController, NotificationsController, DebtorExchangeController, DebtorSelfController, SuperAdminController, EventsController, PublicEventsController, LocationController, LocationDebtorController, ReportsController],
-  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, DebtorsAdminService, DebtsService, DashboardService, NotificationsService, NotificationsScheduler, WeeklyDigestScheduler, RetentionScheduler, RlsHealthCheck, DebtorExchangeService, DebtorTokenService, DebtorSelfService, SuperAdminService, StatsScheduler, TrackingService, LocationService, ReportsService, ReportsScheduler, DebtorGuard, { provide: AUTH_ADMIN, useFactory: createAuthAdmin }, { provide: APP_FILTER, useClass: AllExceptionsFilter }, { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor }, { provide: APP_GUARD, useClass: ThrottlerGuard }],
+  controllers: [HealthController, CreditorsController, DebtorProvisioningController, DebtsController, DashboardController, NotificationsController, DebtorExchangeController, DebtorSelfController, SuperAdminController, EventsController, PublicEventsController, LocationController, LocationDebtorController, ReportsController, InsightsController],
+  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, DebtorsAdminService, DebtsService, DashboardService, PortfolioSnapshotScheduler, NotificationsService, NotificationsScheduler, WeeklyDigestScheduler, PushService, DailyPushScheduler, RetentionScheduler, RlsHealthCheck, DebtorExchangeService, DebtorTokenService, DebtorSelfService, SuperAdminService, StatsScheduler, TrackingService, LocationService, ReportsService, ReportsScheduler, DebtorGuard, InsightsService, PromisesService, { provide: AUTH_ADMIN, useFactory: createAuthAdmin }, { provide: APP_FILTER, useClass: AllExceptionsFilter }, { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor }, { provide: APP_GUARD, useClass: ThrottlerGuard }],
   exports: [PrismaService],
 })
 export class AppModule {}

@@ -1,0 +1,29 @@
+# Dependências
+node_modules/
+
+# Projetos nativos gerados por `cap add` (regeneráveis; não versionar)
+/ios/
+/android/
+
+# 🔒 SEGREDOS — nunca versionar
+*.keystore
+*.jks
+keystore.properties
+QUANDO_EU_VOLTAR.md
+google-services.json
+GoogleService-Info.plist
+*.mobileprovision
+*.p8
+*.p12
+*.cer
+
+# Artefatos de build
+*.apk
+*.aab
+*.ipa
+dist/
+build/
+.DS_Store
+
+# temp da senha (apagado ao final)
+.ks_pass_tmp

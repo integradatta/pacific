@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { Shell } from '@/components/Shell';
-import { useKpis, usePortfolio, useIntelligence, useThresholds } from '@/lib/hooks';
+import { TodaySuggestions } from '@/components/TodaySuggestions';
+import { useHome, useThresholds } from '@/lib/hooks';
 import { HorizonteVencimentos } from '@/components/HorizonteVencimentos';
 import { KpiReadouts } from '@/components/KpiReadouts';
 import { CarteiraTable } from '@/components/CarteiraTable';
@@ -14,11 +15,10 @@ import { DashboardSkeleton } from '@/components/Skeleton';
 
 export default function DashboardPage() {
   const [thresholds] = useThresholds();
-  const kpis = useKpis();
-  const portfolio = usePortfolio();
-  const intelligence = useIntelligence(thresholds);
-  const loading = kpis.isLoading || portfolio.isLoading;
-  const error = kpis.isError || portfolio.isError;
+  const home = useHome(thresholds);
+  const data = home.data;
+  const loading = home.isLoading;
+  const error = home.isError;
 
   return (
     <Shell title="Torre de Controle">
@@ -33,13 +33,16 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="space-y-6">
+          {/* #1 Sugestões de hoje — o assistente propõe (não ordena); some quando não há nada */}
+          <TodaySuggestions />
+
           {/* Pagamentos informados pelos sobrinhos aguardando confirmação (some quando vazio) */}
-          <PendingClaims />
+          {data && data.pendingClaims.length > 0 ? <PendingClaims rows={data.pendingClaims} /> : null}
           {/* Sobrinhos que recusaram compartilhar localização (some quando vazio) */}
           <LocationDeclines />
           {/* IA-1 — Copiloto da carteira (perguntas sugeridas) */}
           <Copilot />
-          {intelligence.data ? (
+          {data ? (
             <>
               <div className="flex justify-end gap-2">
                 <Link href="/configuracoes" className="font-mono text-[11px] text-muted hover:text-sonar uppercase tracking-widest border border-line hover:border-sonar/40 rounded-lg px-3 py-1.5 transition-colors">
@@ -49,12 +52,12 @@ export default function DashboardPage() {
                   Exportar resumo →
                 </Link>
               </div>
-              <IntelligenceBlock intel={intelligence.data} />
+              <IntelligenceBlock intel={data.intelligence} />
             </>
           ) : null}
-          <HorizonteVencimentos rows={portfolio.data ?? []} />
-          {kpis.data ? <KpiReadouts kpis={kpis.data} /> : null}
-          <CarteiraTable rows={portfolio.data ?? []} />
+          <HorizonteVencimentos rows={data?.portfolio ?? []} />
+          {data ? <KpiReadouts kpis={data.kpis} /> : null}
+          <CarteiraTable rows={data?.portfolio ?? []} />
         </div>
       )}
     </Shell>
