@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import { Shell } from '@/components/Shell';
 import { useDebtors, useDebtorMutations } from '@/lib/debtors';
 import { LocationPanel } from '@/components/LocationPanel';
@@ -41,17 +41,11 @@ function LinkReveal({ link, onClose }: { link: string; onClose: () => void }) {
 
 export default function DevedoresPage() {
   const list = useDebtors();
-  const { create, rotate, revoke, reactivate } = useDebtorMutations();
-  const [name, setName] = useState('');
+  // Sobrinhos são criados junto da operação (Nova Ajuda → /debts/quick). Aqui só geramos/rotacionamos
+  // o link de acesso de um sobrinho que JÁ existe — nunca criar sobrinho avulso (evita duplicatas sem dívida).
+  const { rotate, revoke, reactivate } = useDebtorMutations();
   const [reveal, setReveal] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-
-  async function handleCreate(e: FormEvent): Promise<void> {
-    e.preventDefault();
-    const out = await create.mutateAsync(name.trim());
-    setReveal(out.accessLink);
-    setName('');
-  }
 
   async function handleRotate(id: string): Promise<void> {
     setBusyId(id);
@@ -75,42 +69,18 @@ export default function DevedoresPage() {
   return (
     <Shell title="Sobrinhos">
       <div className="space-y-6 max-w-4xl">
-        <section className="panel p-5">
-          <form onSubmit={handleCreate} className="flex gap-3 items-end">
-            <div className="flex-1">
-              <label htmlFor="name" className="block font-mono text-[10px] text-muted uppercase tracking-widest mb-1">
-                Cadastrar sobrinho
-              </label>
-              <input
-                id="name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                placeholder="Nome do sobrinho"
-                className="w-full bg-surface2 border border-line rounded-lg px-3.5 py-2.5 text-text font-sans text-sm placeholder:text-muted focus:outline-none focus:border-sonar focus:shadow-glow transition-all"
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={create.isPending || !name.trim()}
-              className="bg-sonar text-ink font-mono text-sm font-semibold uppercase tracking-widest py-2.5 px-5 rounded-lg shadow-[0_8px_24px_-10px_rgb(var(--sonar)/0.7)] hover:brightness-110 active:translate-y-px disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition-all"
-            >
-              {create.isPending ? 'Gerando…' : 'Gerar link'}
-            </button>
-          </form>
-          {reveal && (
-            <div className="mt-4">
-              <LinkReveal link={reveal} onClose={() => setReveal(null)} />
-            </div>
-          )}
-        </section>
+        {reveal && (
+          <section className="panel p-5">
+            <LinkReveal link={reveal} onClose={() => setReveal(null)} />
+          </section>
+        )}
 
         {list.isLoading ? (
           <ListSkeleton />
         ) : list.isError ? (
           <ErrorState message="Não foi possível carregar os sobrinhos." />
         ) : (list.data?.items ?? []).length === 0 ? (
-          <EmptyState glyph="◍" title="Nenhum sobrinho cadastrado." hint="cadastre o primeiro acima para gerar um link de acesso" />
+          <EmptyState glyph="◍" title="Nenhum sobrinho ainda." hint="cadastre uma operação em Nova Ajuda — o sobrinho é criado junto e aparece aqui para gerar o link" />
         ) : (
           <section className="panel overflow-hidden">
             <div className="px-6 py-4 border-b border-line flex items-baseline justify-between">
