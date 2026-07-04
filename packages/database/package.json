@@ -9,7 +9,7 @@
     "db:rls": "psql \"${DIRECT_URL:?defina DIRECT_URL (conexão dona) para aplicar a RLS}\" -v ON_ERROR_STOP=1 -f src/rls.sql",
     "db:release": "prisma migrate deploy --schema=schema.prisma && npm run db:rls",
     "db:seed": "tsx seed.ts",
-    "lint": "prisma validate --schema=schema.prisma"
+    "lint": "DATABASE_URL=\"${DATABASE_URL:-postgresql://validate:validate@localhost:5432/validate}\" DIRECT_URL=\"${DIRECT_URL:-postgresql://validate:validate@localhost:5432/validate}\" prisma validate --schema=schema.prisma"
   },
   "dependencies": {
     "@prisma/client": "^5.18.0"
