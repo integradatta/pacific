@@ -3,11 +3,11 @@
 // - Mesma origem (assets/páginas Next): network-first com fallback ao cache (offline básico).
 // IMPORTANTE: o fallback é a RAIZ "/" (entrada roteada por papel), NUNCA "/me" — senão uma
 // falha de rede jogaria padrinho/admin no app do sobrinho. Bump de versão limpa o cache antigo.
-const CACHE = 'pacific-v2';
+const CACHE = 'pacific-v3';
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['/', '/icon.svg']).catch(() => undefined)));
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(['/', '/icon-192.png']).catch(() => undefined)));
 });
 
 self.addEventListener('activate', (e) => {
@@ -23,8 +23,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || 'Pacific', {
       body: data.body || '',
-      icon: '/icon.svg',
-      badge: '/icon.svg',
+      icon: '/icon-192.png',
+      badge: '/favicon.png',
       data: { url: data.url || '/' },
     }),
   );
