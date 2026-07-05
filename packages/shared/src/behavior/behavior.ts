@@ -209,6 +209,33 @@ export function contractGuidance(i: ContractGuidanceInput): ContractGuidance {
   return { tone, headline, because: because.slice(0, 3) };
 }
 
+// ── Precificação sugestiva (P6) — taxa × desfecho na carteira do próprio padrinho ─────────────
+// Lê o histórico REAL do padrinho (quitadas): taxas acima da mediana pagaram melhor ou pior no
+// prazo? Posiciona a taxa que ele está digitando. Tom sugestivo; a decisão é sempre dele.
+export interface PricingHistory {
+  sampleSize: number; // nº de quitadas com desfecho
+  medianRateMonthlyPct: number;
+  avgRateMonthlyPct: number;
+  onTimeBelowMedian: number | null; // fração no prazo (0..1) das taxas ≤ mediana
+  onTimeAboveMedian: number | null; // fração no prazo das taxas > mediana
+}
+export interface PricingHint { show: boolean; tone: 'calm' | 'watch'; text: string }
+
+export function pricingHint(h: PricingHistory, proposedRateMonthlyPct: number): PricingHint {
+  if (h.sampleSize < 5 || h.onTimeAboveMedian == null || h.onTimeBelowMedian == null) {
+    return { show: false, tone: 'calm', text: '' };
+  }
+  const pct = (f: number) => Math.round(f * 100);
+  const gap = pct(h.onTimeBelowMedian - h.onTimeAboveMedian); // pontos a favor das taxas mais baixas
+  if (gap < 12) {
+    return { show: true, tone: 'calm', text: `No seu histórico (${h.sampleSize} quitadas), a taxa não tem pesado no pagamento. Média sua: ${h.avgRateMonthlyPct}% a.m.` };
+  }
+  if (proposedRateMonthlyPct > h.medianRateMonthlyPct) {
+    return { show: true, tone: 'watch', text: `Acima da sua mediana (${h.medianRateMonthlyPct}% a.m.), suas operações pagaram no prazo ${pct(h.onTimeAboveMedian)}% das vezes — contra ${pct(h.onTimeBelowMedian)}% abaixo. Vale ponderar; a decisão é sua.` };
+  }
+  return { show: true, tone: 'calm', text: `Dentro da faixa que, no seu histórico, costuma pagar melhor: ${pct(h.onTimeBelowMedian)}% no prazo abaixo da mediana (${h.medianRateMonthlyPct}% a.m.).` };
+}
+
 // ── #4 Previsão de caixa ponderada por probabilidade de pagamento ────────────────────────────
 export interface ForecastItem { amountDue: number; probability: number; dueDate: Date } // probability 0..1
 export interface ForecastBucket { key: string; label: string; nominal: number; expected: number }

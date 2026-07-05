@@ -8,7 +8,7 @@ import { Roles } from '../auth/roles.decorator.js';
 import { TenantId } from '../tenancy/tenant-id.decorator.js';
 import { InsightsService, type DebtorSignalRow, type CoolingRow, type SimulationResult, type Suggestion } from './insights.service.js';
 import { PromisesService, type PromiseRow } from './promises.service.js';
-import type { DebtorProfile, CashForecast } from '@pacific/shared';
+import type { DebtorProfile, CashForecast, PricingHistory } from '@pacific/shared';
 
 export class SimulateDto {
   @IsNumber() @Min(0) amount!: number;
@@ -53,6 +53,11 @@ export class InsightsController {
   @Post('simulate') @Roles('CREDITOR')
   simulate(@TenantId() tenantId: string, @Body() dto: SimulateDto): Promise<SimulationResult> {
     return this.insights.simulate(tenantId, { amount: dto.amount, debtorId: dto.debtorId });
+  }
+
+  @Get('pricing') @Roles('CREDITOR')
+  pricing(@TenantId() tenantId: string): Promise<PricingHistory> {
+    return this.insights.pricingHistory(tenantId);
   }
 
   @Get('debtors/:id/signals') @Roles('CREDITOR')

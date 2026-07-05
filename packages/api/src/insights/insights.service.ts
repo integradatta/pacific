@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import {
-  debtorProfile, cashForecast, coolingScore, bestTimeFromLogins, balanceAt, outstanding, daysRemaining, paymentProbability,
-  type DebtorProfile, type CashForecast, type Trend,
+  debtorProfile, cashForecast, coolingScore, bestTimeFromLogins, balanceAt, outstanding, daysRemaining, paymentProbability, monthlyRate,
+  type DebtorProfile, type CashForecast, type Trend, type PricingHistory,
 } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 import { DashboardService } from '../dashboard/dashboard.service.js';
@@ -70,6 +70,37 @@ export class InsightsService {
       .filter((r) => !r.settled)
       .map((r) => ({ amountDue: Number(r.amountDue), probability: r.paymentProbability / 100, dueDate: new Date(r.dueDate) }));
     return cashForecast(items, now, horizonDays);
+  }
+
+  /** P6 — Histórico de precificação: taxa (a.m.) × desfecho (no prazo) nas operações QUITADAS do
+   *  próprio padrinho. Alimenta um hint sugestivo ao cadastrar (o cliente posiciona a taxa digitada). */
+  async pricingHistory(tenantId: string): Promise<PricingHistory> {
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      const settled = await tx.debt.findMany({
+        where: { tenantId, deletedAt: null, settledAt: { not: null } },
+        select: { rate: true, ratePeriod: true, dueDate: true, settledAt: true },
+      });
+      const items = settled.map((d) => ({
+        ratePct: monthlyRate(d.rate.toString(), d.ratePeriod).times(100).toNumber(),
+        onTime: d.settledAt != null && d.settledAt.getTime() <= d.dueDate.getTime(),
+      }));
+      const n = items.length;
+      if (n === 0) return { sampleSize: 0, medianRateMonthlyPct: 0, avgRateMonthlyPct: 0, onTimeBelowMedian: null, onTimeAboveMedian: null };
+      const rates = items.map((i) => i.ratePct).sort((a, b) => a - b);
+      const median = rates[Math.floor((n - 1) / 2)]!;
+      const avg = rates.reduce((s, r) => s + r, 0) / n;
+      const below = items.filter((i) => i.ratePct <= median);
+      const above = items.filter((i) => i.ratePct > median);
+      const rate = (arr: { onTime: boolean }[]) => (arr.length ? arr.filter((x) => x.onTime).length / arr.length : null);
+      const round1 = (x: number) => Math.round(x * 10) / 10;
+      return {
+        sampleSize: n,
+        medianRateMonthlyPct: round1(median),
+        avgRateMonthlyPct: round1(avg),
+        onTimeBelowMedian: rate(below),
+        onTimeAboveMedian: rate(above),
+      };
+    });
   }
 
   /** #5 Radar de esfriamento — sobrinhos que dão sinais de risco (desengajamento + vencimento +
