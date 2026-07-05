@@ -31,6 +31,15 @@ function ScoreCell({ value, tone }: { value: number; tone: 'good' | 'urgency' })
   );
 }
 
+function Metric({ label, value, tone }: { label: string; value: string; tone?: boolean }) {
+  return (
+    <div className="min-w-0">
+      <p className="font-mono text-[9px] text-muted uppercase tracking-[0.15em] mb-0.5">{label}</p>
+      <p className={`font-mono text-[13px] tabular-nums truncate ${tone ? 'text-status-green/90' : 'text-text'}`}>{value}</p>
+    </div>
+  );
+}
+
 export function CarteiraTable({ rows }: { rows: PortfolioRow[] }) {
   if (rows.length === 0) {
     return (
@@ -54,7 +63,34 @@ export function CarteiraTable({ rows }: { rows: PortfolioRow[] }) {
         <h2 className="font-display text-lg font-semibold text-text tracking-tight">Carteira</h2>
         <span className="font-mono text-[10px] text-muted uppercase tracking-widest tabular-nums">{rows.length} ajudas</span>
       </div>
-      <div className="overflow-x-auto">
+      {/* Mobile: cards empilhados (sem rolagem horizontal) */}
+      <div className="md:hidden divide-y divide-line/70">
+        {rows.map((r) => (
+          <Link key={r.id} href={`/operacoes/${r.id}`} className="block px-5 py-4 active:bg-sonar/[0.04] transition-colors">
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-sans text-[15px] text-text truncate">{r.debtorName}</span>
+              {r.settled ? (
+                <span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-status-green shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-status-green" /> pago
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-muted shrink-0">
+                  <span className={`w-1.5 h-1.5 rounded-full ${STATUS_COLOR[r.status]}`} /> {STATUS_LABEL[r.status]}
+                </span>
+              )}
+            </div>
+            {r.tags.length > 0 && <div className="mt-1.5"><TagList tags={r.tags} /></div>}
+            <div className="grid grid-cols-3 gap-x-3 gap-y-2.5 mt-3">
+              <Metric label="Devido" value={formatBRL(r.amountDue)} />
+              <Metric label="Lucro esp." value={formatBRL(projectedProfit(r))} tone />
+              <Metric label="Vence" value={r.settled ? '—' : venceEm(r.daysRemaining)} />
+            </div>
+          </Link>
+        ))}
+      </div>
+
+      {/* Desktop: tabela completa */}
+      <div className="hidden md:block overflow-x-auto">
       <table className="w-full min-w-[760px]">
         <thead>
           <tr className="font-mono text-[10px] text-muted uppercase tracking-widest border-b border-line">
