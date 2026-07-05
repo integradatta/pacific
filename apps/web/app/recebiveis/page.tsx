@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Decimal } from 'decimal.js';
 import Link from 'next/link';
-import type { PortfolioRow } from '@pacific/shared';
+import { type PortfolioRow, receivableRisk } from '@pacific/shared';
 import { Shell } from '@/components/Shell';
 import { usePortfolio } from '@/lib/hooks';
 import { formatBRL } from '@/lib/format';
@@ -46,12 +46,41 @@ function build(rows: PortfolioRow[], now: Date): { overdue: PortfolioRow[]; mont
   return { overdue, months, totalOpen, next30 };
 }
 
-function Kpi({ label, value, tone }: { label: string; value: string; tone?: 'red' }) {
+function Kpi({ label, value, tone, sub }: { label: string; value: string; tone?: 'red'; sub?: string }) {
   return (
     <div className="panel p-4 sm:p-5 min-w-0">
       <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-2">{label}</p>
       <p className={`font-mono text-xl sm:text-2xl font-medium tabular-nums tracking-tight break-words ${tone === 'red' ? 'text-status-red' : 'text-text'}`}>{value}</p>
+      {sub ? <p className="font-sans text-[11px] text-text-dim mt-1.5 leading-snug">{sub}</p> : null}
     </div>
+  );
+}
+
+// "Onde mora o risco": as operações que concentram o que pode NÃO entrar (devido × chance de falhar).
+// Leitura, não alarme — mostra só quando há risco material e um punhado de operações o concentra.
+function RiskConcentration({ rows }: { rows: PortfolioRow[] }) {
+  const r = receivableRisk(rows, 3);
+  if (Number(r.atRisk) < 1 || r.drivers.length === 0) return null;
+  const share = Math.round(r.driversShare * 100);
+  return (
+    <section className="panel p-5 border-status-yellow/25 bg-status-yellow/[0.04]">
+      <h2 className="font-mono text-[11px] uppercase tracking-widest text-status-yellow mb-2">Onde mora o risco</h2>
+      <p className="font-sans text-sm text-text-dim leading-relaxed">
+        Se algo não entrar, tende a vir daqui: {r.drivers.length === 1 ? 'esta operação concentra' : `estas ${r.drivers.length} concentram`}{' '}
+        <span className="text-text font-medium">{share}%</span> do que está em jogo pelo comportamento de pagamento.
+      </p>
+      <ul className="mt-3 divide-y divide-line/60">
+        {r.drivers.map((d) => (
+          <li key={d.id} className="flex items-center justify-between gap-3 py-2">
+            <Link href={`/operacoes/${d.id}`} className="font-sans text-sm text-text hover:text-sonar truncate transition-colors">{d.name}</Link>
+            <span className="flex items-center gap-3 shrink-0 font-mono text-[11px] tabular-nums">
+              <span className="text-muted">{d.paymentProbability}% chance</span>
+              <span className="text-text">{formatBRL(d.amountDue)}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -107,12 +136,20 @@ export default function RecebiveisPage() {
           {/* #4 Previsão ponderada por probabilidade */}
           <CashForecastCard />
 
-          {/* KPIs de caixa futuro */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <Kpi label="Total a receber" value={formatBRL(data.totalOpen.toFixed(2))} />
-            <Kpi label="Próximos 30 dias" value={formatBRL(data.next30.toFixed(2))} />
-            <Kpi label="Em atraso" value={formatBRL(data.overdue.reduce((a, r) => a.plus(r.amountDue), new Decimal(0)).toFixed(2))} tone={data.overdue.length > 0 ? 'red' : undefined} />
-          </div>
+          {/* KPIs de caixa futuro — "Total a receber" ganha a leitura de confiança (provável) */}
+          {(() => {
+            const risk = receivableRisk(portfolio.data ?? []);
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Kpi label="Total a receber" value={formatBRL(data.totalOpen.toFixed(2))} sub={`~${formatBRL(risk.probable)} prováveis (${risk.confidencePct}%) pelo comportamento`} />
+                <Kpi label="Próximos 30 dias" value={formatBRL(data.next30.toFixed(2))} />
+                <Kpi label="Em atraso" value={formatBRL(data.overdue.reduce((a, r) => a.plus(r.amountDue), new Decimal(0)).toFixed(2))} tone={data.overdue.length > 0 ? 'red' : undefined} />
+              </div>
+            );
+          })()}
+
+          {/* Onde mora o risco — concentração do que pode não entrar */}
+          <RiskConcentration rows={portfolio.data ?? []} />
 
           {/* Em atraso (já venceu e segue em aberto) */}
           {data.overdue.length > 0 && (

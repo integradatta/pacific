@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { receivableRisk } from '@pacific/shared';
 import { Shell } from '@/components/Shell';
 import { TodaySuggestions } from '@/components/TodaySuggestions';
 import { useHome, useThresholds } from '@/lib/hooks';
@@ -56,7 +57,11 @@ export default function DashboardPage() {
             </>
           ) : null}
           <HorizonteVencimentos rows={data?.portfolio ?? []} />
-          {data ? <KpiReadouts kpis={data.kpis} /> : null}
+          {data ? (() => {
+            const risk = receivableRisk(data.portfolio);
+            const sub = Number(risk.nominal) > 0 ? `~${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(risk.probable))} prováveis (${risk.confidencePct}%)` : undefined;
+            return <KpiReadouts kpis={data.kpis} receivableSub={sub} />;
+          })() : null}
           <CarteiraTable rows={data?.portfolio ?? []} />
         </div>
       )}

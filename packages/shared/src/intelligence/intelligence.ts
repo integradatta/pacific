@@ -186,6 +186,44 @@ export function clientAggregates(rows: PortfolioRow[]): ClientAggregate[] {
   return aggs.sort((a, b) => new Decimal(b.exposure).minus(a.exposure).toNumber());
 }
 
+// ── Recebível ponderado por probabilidade (confiança + "onde mora o risco") ──
+// nominal = tudo que é devido hoje; provável = Σ devido×probabilidade; emRisco = Σ devido×(1−prob).
+// drivers = operações que concentram o "emRisco" (onde tende a vir a falha), sem tom alarmista.
+export interface RiskDriver { id: string; name: string; atRisk: string; amountDue: string; paymentProbability: number }
+export interface ReceivableRisk {
+  nominal: string;
+  probable: string;
+  atRisk: string;
+  confidencePct: number; // provável / nominal (0..100)
+  drivers: RiskDriver[]; // top por emRisco, desc
+  driversShare: number; // fração do emRisco coberta pelos drivers (0..1)
+}
+
+export function receivableRisk(rows: PortfolioRow[], topN = 3): ReceivableRisk {
+  const openDue = open(rows).filter((r) => new Decimal(r.amountDue).greaterThan(0));
+  let nominal = new Decimal(0);
+  let probable = new Decimal(0);
+  const perOp = openDue.map((r) => {
+    const due = new Decimal(r.amountDue);
+    const p = Math.max(0, Math.min(100, r.paymentProbability)) / 100;
+    nominal = nominal.plus(due);
+    probable = probable.plus(due.times(p));
+    return { id: r.id, name: r.debtorName, amountDue: money(due), paymentProbability: r.paymentProbability, atRiskDec: due.times(1 - p) };
+  });
+  const atRisk = perOp.reduce((s, o) => s.plus(o.atRiskDec), new Decimal(0));
+  const sorted = [...perOp].sort((a, b) => b.atRiskDec.minus(a.atRiskDec).toNumber());
+  const drivers = sorted.slice(0, topN).map((o) => ({ id: o.id, name: o.name, atRisk: money(o.atRiskDec), amountDue: o.amountDue, paymentProbability: o.paymentProbability }));
+  const coveredDec = sorted.slice(0, topN).reduce((s, o) => s.plus(o.atRiskDec), new Decimal(0));
+  return {
+    nominal: money(nominal),
+    probable: money(probable),
+    atRisk: money(atRisk),
+    confidencePct: nominal.isZero() ? 100 : pct(probable, nominal),
+    drivers,
+    driversShare: atRisk.isZero() ? 0 : coveredDec.div(atRisk).toNumber(),
+  };
+}
+
 // ── Concentração ──
 
 export function concentration(rows: PortfolioRow[], aggs = clientAggregates(rows)): Concentration {
