@@ -15,6 +15,12 @@ export function useRenegotiation() {
   return useQuery({ queryKey: ['insights', 'renegotiation'], queryFn: () => apiGet<RenegotiationEfficacy>('/insights/renegotiation'), staleTime: 10 * 60_000 });
 }
 
+/** P7 — track record previsto × realizado (meses reconciliados). Honesto, nunca promessa. */
+export interface ForecastPoint { month: string; predicted: string; realized: string | null }
+export function useForecastAccuracy() {
+  return useQuery({ queryKey: ['insights', 'forecast-accuracy'], queryFn: () => apiGet<ForecastPoint[]>('/insights/forecast-accuracy'), staleTime: 10 * 60_000 });
+}
+
 /** #4 Previsão de caixa ponderada (faixas + por mês). */
 export function useCashForecast() {
   return useQuery({ queryKey: ['insights', 'cash-forecast'], queryFn: () => apiGet<CashForecast>('/insights/cash-forecast'), staleTime: 5 * 60_000 });

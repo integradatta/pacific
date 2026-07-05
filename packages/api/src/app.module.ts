@@ -41,6 +41,8 @@ import { EventsController, PublicEventsController } from './tracking/events.cont
 import { DebtorGuard } from './auth/debtor.guard.js';
 import { InsightsService } from './insights/insights.service.js';
 import { PromisesService } from './insights/promises.service.js';
+import { ForecastService } from './insights/forecast.service.js';
+import { ForecastScheduler } from './insights/forecast.scheduler.js';
 import { InsightsController } from './insights/insights.controller.js';
 import { LocationService } from './location/location.service.js';
 import { LocationController } from './location/location.controller.js';
@@ -64,7 +66,7 @@ const throttlerStorage = _redis ? new ThrottlerStorageRedisService(_redis) : und
     }),
   ],
   controllers: [HealthController, CreditorsController, DebtorProvisioningController, DebtsController, DashboardController, NotificationsController, DebtorExchangeController, DebtorSelfController, SuperAdminController, EventsController, PublicEventsController, LocationController, LocationDebtorController, ReportsController, InsightsController],
-  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, DebtorsAdminService, DebtsService, DashboardService, PortfolioSnapshotScheduler, NotificationsService, NotificationsScheduler, WeeklyDigestScheduler, PushService, DailyPushScheduler, RetentionScheduler, RlsHealthCheck, DebtorExchangeService, DebtorTokenService, DebtorSelfService, SuperAdminService, StatsScheduler, TrackingService, LocationService, ReportsService, ReportsScheduler, DebtorGuard, InsightsService, PromisesService, { provide: AUTH_ADMIN, useFactory: createAuthAdmin }, { provide: APP_FILTER, useClass: AllExceptionsFilter }, { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor }, { provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [PrismaService, TenantDatasourceResolver, TenantScopedService, CreditorsService, DebtorsAdminService, DebtsService, DashboardService, PortfolioSnapshotScheduler, NotificationsService, NotificationsScheduler, WeeklyDigestScheduler, PushService, DailyPushScheduler, RetentionScheduler, RlsHealthCheck, DebtorExchangeService, DebtorTokenService, DebtorSelfService, SuperAdminService, StatsScheduler, TrackingService, LocationService, ReportsService, ReportsScheduler, DebtorGuard, InsightsService, PromisesService, ForecastService, ForecastScheduler, { provide: AUTH_ADMIN, useFactory: createAuthAdmin }, { provide: APP_FILTER, useClass: AllExceptionsFilter }, { provide: APP_INTERCEPTOR, useClass: LoggingInterceptor }, { provide: APP_GUARD, useClass: ThrottlerGuard }],
   exports: [PrismaService],
 })
 export class AppModule {}

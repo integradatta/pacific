@@ -224,6 +224,30 @@ export function receivableRisk(rows: PortfolioRow[], topN = 3): ReceivableRisk {
   };
 }
 
+// ── Previsto × realizado (P7) — acurácia HONESTA da previsão, sem prometer valor exato ─────────
+// realizedForDebt: soma o que ENTROU numa janela, robusto a renegociação (que zera o pago da dívida).
+// Cada evento 'paid' carrega o total acumulado da dívida naquele instante; 'reset' zera a base.
+export interface DebtPaymentEvent { at: number; kind: 'paid' | 'reset'; cumulative?: number }
+export function realizedForDebt(events: DebtPaymentEvent[], start: number, end: number): number {
+  let baseline = 0;
+  let realized = 0;
+  for (const e of [...events].sort((a, b) => a.at - b.at)) {
+    if (e.kind === 'reset') { baseline = 0; continue; }
+    const inc = Math.max(0, (e.cumulative ?? 0) - baseline);
+    if (e.at >= start && e.at < end) realized += inc;
+    baseline = e.cumulative ?? baseline;
+  }
+  return realized;
+}
+
+export interface ForecastAccuracy { months: number; avgRatioPct: number | null; note: string }
+export function forecastAccuracy(points: { predicted: number; realized: number }[]): ForecastAccuracy {
+  const valid = points.filter((p) => p.predicted > 0);
+  if (valid.length === 0) return { months: 0, avgRatioPct: null, note: '' };
+  const avg = Math.round((valid.reduce((s, p) => s + p.realized / p.predicted, 0) / valid.length) * 100);
+  return { months: valid.length, avgRatioPct: avg, note: `Nos últimos ${valid.length} ${valid.length === 1 ? 'mês' : 'meses'}, o que entrou ficou em média em ${avg}% do previsto.` };
+}
+
 // ── Segmentos por etiqueta (P4) — performance por tag: onde a carteira paga melhor/pior ──
 export interface TagSegment {
   tag: string;
