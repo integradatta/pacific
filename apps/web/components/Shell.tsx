@@ -111,33 +111,39 @@ export function Shell({ title, orgCode = 'ORG-000', children }: ShellProps) {
         </div>
       </nav>
 
-      {/* Mobile Top Bar (narrow screens) */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-20 glass border-b border-line flex items-center gap-4 px-4 h-12">
-        <span className="font-display text-sm font-semibold text-text tracking-tight">PACIFIC</span>
-        <nav aria-label="Navegação principal" className="flex gap-1 ml-auto">
-          {NAV_ITEMS.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-label={item.label}
-                aria-current={isActive ? 'page' : undefined}
-                className={`p-2 rounded-md text-base leading-none transition-colors ${
-                  isActive ? 'text-sonar' : 'text-muted hover:text-text'
-                }`}
-              >
-                {item.icon}
-              </Link>
-            );
-          })}
-        </nav>
+      {/* Mobile Top Bar (narrow screens) — paddingTop reserva a safe-area (barra de status do iOS)
+          quando aberto como PWA/atalho standalone; no navegador o inset é 0 (Safari já ocupa o topo). */}
+      <div
+        className="md:hidden fixed top-0 left-0 right-0 z-20 glass border-b border-line"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
+      >
+        <div className="flex items-center gap-4 px-4 h-12">
+          <span className="font-display text-sm font-semibold text-text tracking-tight">PACIFIC</span>
+          <nav aria-label="Navegação principal" className="flex gap-1 ml-auto">
+            {NAV_ITEMS.map((item) => {
+              const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-label={item.label}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`p-2 rounded-md text-base leading-none transition-colors ${
+                    isActive ? 'text-sonar' : 'text-muted hover:text-text'
+                  }`}
+                >
+                  {item.icon}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
       </div>
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Topbar */}
-        <header className="glass border-b border-line px-6 py-4 flex items-center justify-between md:mt-0 mt-12 sticky top-0 md:top-0 z-10">
+        <header className="glass border-b border-line px-6 py-4 flex items-center justify-between md:mt-0 mt-[calc(3rem_+_env(safe-area-inset-top))] sticky top-[calc(3rem_+_env(safe-area-inset-top))] md:top-0 z-10">
           <h1 className="font-display text-xl font-semibold text-text tracking-tight">{title}</h1>
           <div className="flex items-center gap-3">
             <Link
