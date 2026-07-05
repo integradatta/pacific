@@ -63,6 +63,38 @@ export function riskLevel(recoverability: number): RiskLevel {
   return 'HIGH';
 }
 
+export interface RiskPreset { tag: string; label: string; risk: RiskLevel }
+
+/**
+ * Etiquetas PRONTAS de classificação: o padrinho seleciona ao vincular a dívida em vez de
+ * criar do zero. A etiqueta escolhida DEFINE o risco (sobrepõe o cálculo por recuperabilidade —
+ * ver effectiveRisk). Os nomes evocam bom/médio/ruim sem serem literais. `tag` é o valor
+ * normalizado (minúsculo) gravado em Debt.tags; são mutuamente exclusivas na UI.
+ */
+export const RISK_PRESETS: readonly RiskPreset[] = [
+  { tag: 'tranquilo', label: 'Tranquilo', risk: 'LOW' },
+  { tag: 'atenção', label: 'Atenção', risk: 'MEDIUM' },
+  { tag: 'arriscado', label: 'Arriscado', risk: 'HIGH' },
+];
+
+const RISK_BY_TAG = new Map<string, RiskLevel>(RISK_PRESETS.map((p) => [p.tag, p.risk]));
+const RISK_ORDER: Record<RiskLevel, number> = { LOW: 0, MEDIUM: 1, HIGH: 2 };
+
+/** Risco derivado das etiquetas preset presentes (o PIOR, se houver mais de uma), ou null. */
+export function riskFromTags(tags: readonly string[]): RiskLevel | null {
+  let worst: RiskLevel | null = null;
+  for (const t of tags) {
+    const r = RISK_BY_TAG.get(t);
+    if (r && (worst === null || RISK_ORDER[r] > RISK_ORDER[worst])) worst = r;
+  }
+  return worst;
+}
+
+/** Risco EFETIVO: a etiqueta do padrinho sobrepõe; sem etiqueta preset, cai no cálculo financeiro. */
+export function effectiveRisk(recoverability: number, tags: readonly string[] = []): RiskLevel {
+  return riskFromTags(tags) ?? riskLevel(recoverability);
+}
+
 /**
  * KPIs da carteira DERIVADOS das linhas de portfolio (fonte única) — evita recomputar/reconsultar
  * as dívidas só para os totais. Quitadas saem de "a receber"/contagens em aberto; "a receber" e
@@ -90,7 +122,7 @@ export function portfolioKpis(rows: PortfolioRow[]): DashboardKpis {
     if (r.status === 'RED') totalOverdue = totalOverdue.plus(r.amountDue);
     else countActive += 1;
     countByStatus[r.status] += 1;
-    riskDistribution[riskLevel(r.recoverability)] += 1;
+    riskDistribution[effectiveRisk(r.recoverability, r.tags)] += 1;
   }
   return {
     totalLent: totalLent.toFixed(2),

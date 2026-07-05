@@ -1,5 +1,5 @@
 import type { PortfolioRow } from '@pacific/shared';
-import { riskLevel } from '@pacific/shared';
+import { effectiveRisk } from '@pacific/shared';
 import { STATUS_LABEL } from './status';
 
 const RISK_LABEL: Record<string, string> = { LOW: 'Baixo', MEDIUM: 'Médio', HIGH: 'Alto' };
@@ -33,7 +33,7 @@ export function exportCarteiraCsv(rows: PortfolioRow[]): void {
     String(r.daysRemaining),
     r.settled ? 'Quitada' : STATUS_LABEL[r.status],
     String(r.recoverability),
-    RISK_LABEL[riskLevel(r.recoverability)] ?? '—',
+    RISK_LABEL[effectiveRisk(r.recoverability, r.tags)] ?? '—',
     r.tags.join(', '),
     r.settled ? 'Sim' : 'Não',
   ]);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { monthlyRate, balanceAt, accruedInterest, deriveStatus, daysRemaining, summarize, recoverabilityScore, temperatureScore, paymentProbability, operationPreview, riskLevel, outstanding } from './finance.js';
+import { monthlyRate, balanceAt, accruedInterest, deriveStatus, daysRemaining, summarize, recoverabilityScore, temperatureScore, paymentProbability, operationPreview, riskLevel, riskFromTags, effectiveRisk, outstanding } from './finance.js';
 import type { DebtTerms } from '../types/financial.types.js';
 
 const terms = (over: Partial<DebtTerms> = {}): DebtTerms => ({
@@ -121,6 +121,26 @@ describe('riskLevel (score de risco)', () => {
     expect(riskLevel(40)).toBe('MEDIUM');
     expect(riskLevel(39)).toBe('HIGH');
     expect(riskLevel(0)).toBe('HIGH');
+  });
+});
+
+describe('etiquetas preset → risco (riskFromTags / effectiveRisk)', () => {
+  it('riskFromTags mapeia cada preset e ignora tags livres', () => {
+    expect(riskFromTags(['tranquilo'])).toBe('LOW');
+    expect(riskFromTags(['atenção'])).toBe('MEDIUM');
+    expect(riskFromTags(['arriscado'])).toBe('HIGH');
+    expect(riskFromTags(['negociando', 'judicial'])).toBeNull();
+    expect(riskFromTags([])).toBeNull();
+  });
+  it('com vários presets, pega o PIOR', () => {
+    expect(riskFromTags(['tranquilo', 'arriscado'])).toBe('HIGH');
+    expect(riskFromTags(['tranquilo', 'atenção'])).toBe('MEDIUM');
+  });
+  it('effectiveRisk: etiqueta sobrepõe; sem etiqueta cai na recuperabilidade', () => {
+    expect(effectiveRisk(95, ['arriscado'])).toBe('HIGH'); // recup. alta, mas etiqueta manda
+    expect(effectiveRisk(10, ['tranquilo'])).toBe('LOW'); // recup. baixa, mas etiqueta manda
+    expect(effectiveRisk(95, [])).toBe('LOW'); // sem etiqueta → financeiro
+    expect(effectiveRisk(10, ['negociando'])).toBe('HIGH'); // tag livre não conta
   });
 });
 
