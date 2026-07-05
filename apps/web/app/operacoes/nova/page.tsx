@@ -9,7 +9,7 @@ import { formatBRL, venceEm } from '@/lib/format';
 import { RiskBadge } from '@/components/RiskBadge';
 import { TagInput } from '@/components/Tags';
 import { useSimulate, usePricing } from '@/lib/insights';
-import { pricingHint } from '@pacific/shared';
+import { pricingHint, riskFromTags } from '@pacific/shared';
 
 // Resultado da prévia — calculado no SERVIDOR (o motor proprietário não vai no bundle do client).
 interface PreviewResult {
@@ -176,7 +176,7 @@ export default function NovaOperacaoPage() {
         <div className="panel p-6 self-start">
           <div className="flex items-center justify-between gap-3 mb-4">
             <p className="font-mono text-xs text-muted uppercase tracking-widest">Projeção da operação</p>
-            {recoverability !== null && <RiskBadge recoverability={recoverability} />}
+            {(recoverability !== null || riskFromTags(tags)) && <RiskBadge recoverability={recoverability ?? 0} tags={tags} />}
           </div>
           {!preview ? (
             <p className="font-sans text-sm text-muted">

@@ -497,7 +497,7 @@ export default function OperacaoDetalhePage({ params }: { params: { id: string }
               <section className="panel p-6">
                 <div className="flex items-center justify-between gap-3 mb-4">
                   <h3 className="font-mono text-xs text-muted uppercase tracking-widest">Situação atual</h3>
-                  {summary.data ? <RiskBadge recoverability={summary.data.scores.recoverability} /> : null}
+                  {summary.data ? <RiskBadge recoverability={summary.data.scores.recoverability} tags={debt.data?.tags ?? []} /> : null}
                 </div>
                 {summary.isLoading ? (
                   <div className="space-y-3">

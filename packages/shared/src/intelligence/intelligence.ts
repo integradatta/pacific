@@ -1,5 +1,5 @@
 import { Decimal } from 'decimal.js';
-import { riskLevel } from '../finance/finance.js';
+import { riskLevel, riskFromTags, RISK_PRESETS } from '../finance/finance.js';
 import { isoWeekStart } from '../utils/date.utils.js';
 import type { DebtStatus, PortfolioRow, RiskLevel } from '../types/financial.types.js';
 
@@ -357,14 +357,20 @@ export function executiveSummary(rows: PortfolioRow[], t: IntelligenceThresholds
 // ── Explicabilidade do score (motivo) ──
 
 export function riskReason(r: PortfolioRow, t: IntelligenceThresholds = DEFAULT_THRESHOLDS): string {
-  const level = riskLevel(r.recoverability);
+  // Etiqueta do padrinho sobrepõe o cálculo financeiro (e explica o motivo).
+  const preset = riskFromTags(r.tags);
+  const level = preset ?? riskLevel(r.recoverability);
+  const label = level === 'HIGH' ? 'Alto risco' : level === 'MEDIUM' ? 'Médio risco' : 'Baixo risco';
+  if (preset) {
+    const p = RISK_PRESETS.find((x) => x.risk === preset);
+    return `${label}: classificado como "${p?.label ?? ''}" pelo padrinho.`;
+  }
   const reasons: string[] = [];
   if (r.daysRemaining < 0) reasons.push(`atraso de ${Math.abs(r.daysRemaining)} dia(s)`);
   else if (r.daysRemaining <= t.dueSoonDays) reasons.push(`vence em ${r.daysRemaining} dia(s)`);
   const interest = opProfit(r);
   const principal = new Decimal(r.principal);
   if (!principal.isZero() && interest.div(principal).greaterThan(0.3)) reasons.push('carga de juros elevada');
-  const label = level === 'HIGH' ? 'Alto risco' : level === 'MEDIUM' ? 'Médio risco' : 'Baixo risco';
   return reasons.length ? `${label}: ${reasons.join(' + ')}.` : `${label}.`;
 }
 

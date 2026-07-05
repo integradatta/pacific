@@ -8,7 +8,7 @@ import { CarteiraTable } from '@/components/CarteiraTable';
 import { ListSkeleton } from '@/components/Skeleton';
 import { ErrorState } from '@/components/States';
 import { exportCarteiraCsv } from '@/lib/csv';
-import { riskLevel, type DebtStatus, type RiskLevel } from '@pacific/shared';
+import { effectiveRisk, type DebtStatus, type RiskLevel } from '@pacific/shared';
 
 const STATUS_OPTS: { v: DebtStatus | 'ALL'; label: string }[] = [
   { v: 'ALL', label: 'Status: todos' },
@@ -50,7 +50,7 @@ function CarteiraInner() {
       (r) =>
         (q === '' || r.debtorName.toLowerCase().includes(q)) &&
         (status === 'ALL' || r.status === status) &&
-        (risk === 'ALL' || riskLevel(r.recoverability) === risk) &&
+        (risk === 'ALL' || effectiveRisk(r.recoverability, r.tags) === risk) &&
         (tag === 'ALL' || r.tags.includes(tag)),
     );
   }, [portfolio.data, search, status, risk, tag]);
