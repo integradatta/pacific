@@ -113,7 +113,29 @@ function SegmentsSection({ rows }: { rows: PortfolioRow[] }) {
         <p className="font-mono text-[10px] text-muted uppercase tracking-[0.18em] mt-0.5">como cada etiqueta se comporta na carteira em aberto</p>
       </div>
       <div className="px-6 py-4"><SegmentReading segs={segs} /></div>
-      <div className="overflow-x-auto">
+
+      {/* Mobile: cards por etiqueta (sem rolagem horizontal) */}
+      <div className="md:hidden border-t border-line divide-y divide-line/70">
+        {segs.map((s) => (
+          <div key={s.tag} className="px-5 py-3.5">
+            <div className="flex items-baseline justify-between gap-3 mb-2">
+              <span className="font-sans text-sm text-text truncate">{s.tag}</span>
+              <span className="font-mono text-[11px] text-text tabular-nums shrink-0">{formatBRL(s.exposure)} <span className="text-muted">· {s.sharePct}%</span></span>
+            </div>
+            <span className="block h-1 rounded-full bg-line overflow-hidden mb-2.5">
+              <span className="block h-full bg-sonar" style={{ width: `${Math.round((Number(s.exposure) / maxExposure) * 100)}%` }} />
+            </span>
+            <div className="flex items-center gap-4 font-mono text-[11px] text-muted tabular-nums">
+              <span>{s.opsCount} ops</span>
+              <span className={s.overdueCount > 0 ? 'text-status-red' : ''}>{s.overdueCount} vencidas</span>
+              <span className="ml-auto text-text">{s.avgPaymentProbability}% prob.</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop: tabela */}
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full min-w-[560px]">
           <thead>
             <tr className="font-mono text-[10px] text-muted uppercase tracking-widest border-b border-line">

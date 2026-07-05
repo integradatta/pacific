@@ -451,12 +451,12 @@ export default function OperacaoDetalhePage({ params }: { params: { id: string }
         ) : (
           <div className="space-y-6">
             {/* Cabeçalho */}
-            <header className="panel p-6">
+            <header className="panel p-6 sm:p-7">
               <div className="flex items-start justify-between gap-4 flex-wrap">
-                <div>
-                  <p className="font-mono text-[10px] text-muted uppercase tracking-[0.18em] mb-1">Sobrinho</p>
-                  <h2 className="font-display text-2xl font-semibold text-text tracking-tight">{debt.data.debtorName}</h2>
-                  {debt.data.description ? <p className="font-sans text-sm text-text-dim mt-1">{debt.data.description}</p> : null}
+                <div className="min-w-0">
+                  <p className="font-mono text-[10px] text-muted uppercase tracking-[0.22em] mb-1.5">Sobrinho</p>
+                  <h2 className="font-display text-3xl font-semibold text-text tracking-tight leading-none">{debt.data.debtorName}</h2>
+                  {debt.data.description ? <p className="font-sans text-sm text-text-dim mt-2">{debt.data.description}</p> : null}
                 </div>
                 <div className="flex items-center gap-3">
                   {/* Status DERIVADO (do resumo), não a coluna Debt.status (removida — era sempre GREEN). */}
