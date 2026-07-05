@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { debtorProfile, cashForecast, coolingScore } from './behavior.js';
+import { debtorProfile, cashForecast, coolingScore, contractGuidance } from './behavior.js';
 
 const now = new Date('2026-07-02T12:00:00Z');
 const d = (iso: string) => new Date(iso);
@@ -149,5 +149,25 @@ describe('coolingScore', () => {
     const c = coolingScore({ daysToDue: 20, lastLoginDaysAgo: 2, engagementTrend: 'up', locationGranted: true, locationSilentDays: 0, paymentProbability: 85 });
     expect(c.cooling).toBe(false);
     expect(c.score).toBe(0);
+  });
+});
+
+describe('contractGuidance', () => {
+  it('quitada → calm, sem evidências', () => {
+    const g = contractGuidance({ settled: true, daysRemaining: -10, paymentProbability: 10, score: 20, scoreTrend: 'down', reliability: 'unpredictable' });
+    expect(g.tone).toBe('calm');
+    expect(g.because).toHaveLength(0);
+  });
+
+  it('vencida + prob baixa + score frágil + piorando → act (tom sugestivo)', () => {
+    const g = contractGuidance({ settled: false, daysRemaining: -12, paymentProbability: 25, score: 30, scoreTrend: 'down', reliability: 'unpredictable' });
+    expect(g.tone).toBe('act');
+    expect(g.headline).toMatch(/eu alinharia|conversa/i); // sugere, não ordena
+    expect(g.because.length).toBeGreaterThan(0);
+  });
+
+  it('no prazo + boa prob + bom histórico → calm', () => {
+    const g = contractGuidance({ settled: false, daysRemaining: 40, paymentProbability: 82, score: 78, scoreTrend: 'up', reliability: 'reliable' });
+    expect(g.tone).toBe('calm');
   });
 });

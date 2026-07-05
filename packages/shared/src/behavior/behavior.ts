@@ -151,6 +151,64 @@ export function debtorProfile(input: BehaviorInput): DebtorProfile {
   };
 }
 
+// ── Próxima ação (P1) — leitura SUGESTIVA no nível do contrato ────────────────────────────────
+// Sintetiza os sinais já calculados (probabilidade, DebtorScore, tendência, confiabilidade, atraso)
+// numa orientação. TOM: sugestão, nunca ordem — o padrinho decide, a plataforma só lê os sinais.
+export type GuidanceTone = 'calm' | 'watch' | 'act';
+export interface ContractGuidanceInput {
+  settled: boolean;
+  daysRemaining: number; // <0 = vencida há N dias
+  paymentProbability: number; // 0..100
+  score: number | null; // DebtorScore 0..100 (null = sem histórico)
+  scoreTrend: Trend;
+  reliability: Reliability;
+}
+export interface ContractGuidance {
+  tone: GuidanceTone;
+  headline: string; // frase sugestiva (o que o padrinho poderia considerar)
+  because: string[]; // evidências concretas que embasam a leitura (2–3)
+}
+
+export function contractGuidance(i: ContractGuidanceInput): ContractGuidance {
+  if (i.settled) return { tone: 'calm', headline: 'Combinado quitado — nada a fazer por aqui.', because: [] };
+
+  const overdue = i.daysRemaining < 0;
+  const because: string[] = [];
+  let concern = 0;
+
+  if (overdue) { concern += 2; because.push(`vencida há ${Math.abs(i.daysRemaining)} dia${Math.abs(i.daysRemaining) === 1 ? '' : 's'}`); }
+  else if (i.daysRemaining <= 7) { concern += 0.5; because.push(`vence em ${i.daysRemaining} dia${i.daysRemaining === 1 ? '' : 's'}`); }
+
+  if (i.paymentProbability < 40) { concern += 1.5; because.push(`probabilidade de pagamento baixa (${i.paymentProbability}%)`); }
+  else if (i.paymentProbability >= 70) { concern -= 1; because.push(`probabilidade de pagamento alta (${i.paymentProbability}%)`); }
+
+  if (i.score != null) {
+    if (i.score < 45) { concern += 1.5; because.push(`histórico frágil (score ${i.score})`); }
+    else if (i.score >= 70) { concern -= 1; because.push(`bom histórico (score ${i.score})`); }
+  }
+  if (i.scoreTrend === 'down') { concern += 1; because.push('comportamento piorando'); }
+  else if (i.scoreTrend === 'up') { concern -= 0.5; because.push('comportamento melhorando'); }
+
+  if (i.reliability === 'unpredictable') { concern += 0.5; if (i.score == null) because.push('pagamentos irregulares'); }
+  else if (i.reliability === 'reliable' && i.score == null) { concern -= 0.5; because.push('costuma pagar no prazo'); }
+
+  const tone: GuidanceTone = concern >= 2.5 ? 'act' : concern >= 1 ? 'watch' : 'calm';
+  const headline =
+    tone === 'act'
+      ? overdue
+        ? 'No seu lugar, eu alinharia um novo combinado antes de seguir.'
+        : 'Talvez valha uma conversa antes de renovar ou aumentar a linha.'
+      : tone === 'watch'
+        ? overdue
+          ? 'Um lembrete gentil pode ajudar a destravar.'
+          : 'Vale acompanhar de perto — um lembrete leve perto da data costuma bastar.'
+        : i.score == null
+          ? 'Sem histórico ainda — vale só observar como este primeiro combinado evolui.'
+          : 'Está tranquilo — dá pra deixar seguir no ritmo.';
+
+  return { tone, headline, because: because.slice(0, 3) };
+}
+
 // ── #4 Previsão de caixa ponderada por probabilidade de pagamento ────────────────────────────
 export interface ForecastItem { amountDue: number; probability: number; dueDate: Date } // probability 0..1
 export interface ForecastBucket { key: string; label: string; nominal: number; expected: number }
