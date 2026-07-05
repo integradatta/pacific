@@ -28,7 +28,7 @@ export interface GeofenceRow { id: string; label: string; lat: number; lng: numb
 
 const ONLINE_WINDOW_MS = Number(process.env.LOCATION_ONLINE_WINDOW_MS ?? 10 * 60_000);
 
-interface CachedFence { id: string; lat: number; lng: number; radiusM: number }
+interface CachedFence { id: string; label: string; lat: number; lng: number; radiusM: number }
 
 @Injectable()
 export class LocationService {
@@ -46,8 +46,8 @@ export class LocationService {
   private async fencesFor(tx: Parameters<Parameters<TenantScopedService['withTenant']>[1]>[0], tenantId: string): Promise<CachedFence[]> {
     const cached = this.fenceCache.get(tenantId);
     if (cached && Date.now() - cached.at < this.FENCE_TTL_MS) return cached.fences;
-    const rows = await tx.geofence.findMany({ where: { tenantId }, select: { id: true, lat: true, lng: true, radiusM: true } });
-    const fences = rows.map((f) => ({ id: f.id, lat: Number(f.lat), lng: Number(f.lng), radiusM: f.radiusM }));
+    const rows = await tx.geofence.findMany({ where: { tenantId }, select: { id: true, label: true, lat: true, lng: true, radiusM: true } });
+    const fences = rows.map((f) => ({ id: f.id, label: f.label, lat: Number(f.lat), lng: Number(f.lng), radiusM: f.radiusM }));
     this.fenceCache.set(tenantId, { at: Date.now(), fences });
     return fences;
   }
@@ -105,7 +105,7 @@ export class LocationService {
    */
   async recordPings(tenantId: string, debtorId: string, points: PingPoint[], now: Date = new Date()): Promise<{ accepted: number }> {
     if (points.length === 0) return { accepted: 0 };
-    return this.scoped.withTenant(tenantId, async (tx) => {
+    const result = await this.scoped.withTenant(tenantId, async (tx) => {
       const consent = await tx.locationConsent.findUnique({ where: { debtorId } });
       if (consent?.state !== 'GRANTED') throw new ForbiddenException('Compartilhamento de localização não está ativo.');
 
@@ -115,7 +115,7 @@ export class LocationService {
         .sort((a, b) => +new Date(a.recordedAt) - +new Date(b.recordedAt));
       const dropped = points.length - valid.length;
       if (dropped > 0) this.log.warn(`Pings descartados (timestamp futuro/inválido): ${dropped}/${points.length} (devedor ${debtorId.slice(0, 8)}).`);
-      if (valid.length === 0) return { accepted: 0 };
+      if (valid.length === 0) return { accepted: 0, exitMessages: [] as string[] };
 
       await tx.locationPing.createMany({
         data: valid.map((p) => ({ tenantId, debtorId, lat: p.lat, lng: p.lng, accuracy: p.accuracy ?? null, battery: p.battery ?? null, recordedAt: new Date(p.recordedAt) })),
@@ -140,33 +140,52 @@ export class LocationService {
         }
       } // else: já existe uma posição mais recente → ignora (lote atrasado)
 
-      if (advanced) {
-        await this.evaluateGeofences(tx, tenantId, debtorId, prev ? { lat: Number(prev.lat), lng: Number(prev.lng) } : null, { lat: latest.lat, lng: latest.lng });
-      }
-      return { accepted: valid.length };
+      const exitMessages = advanced
+        ? await this.evaluateGeofences(tx, tenantId, debtorId, prev ? { lat: Number(prev.lat), lng: Number(prev.lng) } : null, { lat: latest.lat, lng: latest.lng })
+        : [];
+      return { accepted: valid.length, exitMessages };
     });
+    // Saída de cerca → push imediato ao telefone do padrinho (fora da tx; no-op sem VAPID).
+    for (const body of result.exitMessages) {
+      void this.push.sendToTenant(tenantId, { title: 'Saída de área', body, url: '/localizacao' }).catch(() => undefined);
+    }
+    return { accepted: result.accepted };
   }
 
   // Entrada/saída de cerca: compara o conjunto "dentro" da posição anterior com o da nova.
+  // Grava os eventos e, na SAÍDA, notifica o padrinho (in-app). Devolve as mensagens de saída para
+  // o chamador disparar o push FORA da transação. Só saída notifica (a chegada fica só no histórico).
   private async evaluateGeofences(
     tx: Parameters<Parameters<TenantScopedService['withTenant']>[1]>[0],
     tenantId: string,
     debtorId: string,
     prev: { lat: number; lng: number } | null,
     next: { lat: number; lng: number },
-  ): Promise<void> {
+  ): Promise<string[]> {
     const fences = await this.fencesFor(tx, tenantId);
-    if (fences.length === 0) return;
+    if (fences.length === 0) return [];
     const inside = (pt: { lat: number; lng: number } | null, f: CachedFence) =>
       pt != null && distanceM(pt, { lat: f.lat, lng: f.lng }) <= f.radiusM;
-    const events = fences.flatMap((f) => {
+    const events: Array<{ tenantId: string; debtorId: string; geofenceId: string; type: string }> = [];
+    const exited: string[] = []; // labels das cercas de onde saiu
+    for (const f of fences) {
       const was = inside(prev, f);
       const now = inside(next, f);
-      if (!was && now) return [{ tenantId, debtorId, geofenceId: f.id, type: 'ARRIVAL' }];
-      if (was && !now) return [{ tenantId, debtorId, geofenceId: f.id, type: 'DEPARTURE' }];
-      return [];
-    });
+      if (!was && now) events.push({ tenantId, debtorId, geofenceId: f.id, type: 'ARRIVAL' });
+      else if (was && !now) { events.push({ tenantId, debtorId, geofenceId: f.id, type: 'DEPARTURE' }); exited.push(f.label); }
+    }
     if (events.length > 0) await tx.geofenceEvent.createMany({ data: events });
+    if (exited.length === 0) return [];
+
+    const d = await tx.debtor.findUnique({ where: { id: debtorId }, select: { name: true } });
+    const nm = d?.name ?? 'Seu sobrinho';
+    const messages: string[] = [];
+    for (const label of exited) {
+      const body = `${nm} saiu de “${label}”.`;
+      await notifyCreditor(tx, { tenantId, debtorId, type: 'GEOFENCE_EXIT', title: 'Saída de área', body });
+      messages.push(body);
+    }
+    return messages;
   }
 
   // ── PADRINHO ──────────────────────────────────────────────────────────────

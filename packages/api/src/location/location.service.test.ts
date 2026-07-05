@@ -25,7 +25,7 @@ function fakeDb(over: Record<string, unknown> = {}) {
   };
 }
 const tracking = { record: vi.fn(async () => undefined) };
-const push = { notifyImportant: vi.fn(async () => 0) };
+const push = { notifyImportant: vi.fn(async () => 0), sendToTenant: vi.fn(async () => 0) };
 const svc = (db: ReturnType<typeof fakeDb>) =>
   new LocationService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db) } as never, tracking as never, push as never);
 
@@ -103,6 +103,19 @@ describe('LocationService — pings', () => {
     db.geofence.findMany = vi.fn(async () => [{ id: 'g1', lat: -23.5, lng: -46.6, radiusM: 200 }]) as never;
     await svc(db).recordPings('t1', 'd1', [{ lat: -23.5, lng: -46.6, recordedAt: '2026-06-30T12:00:00Z' }], NOW); // dentro
     expect(db.geofenceEvent.createMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ geofenceId: 'g1', type: 'ARRIVAL' })] }));
+  });
+
+  it('gera DEPARTURE ao sair de uma geofence e notifica o padrinho (app + push)', async () => {
+    push.sendToTenant.mockClear();
+    const db = fakeDb();
+    db.locationConsent.findUnique = vi.fn(async () => ({ state: 'GRANTED' })) as never;
+    db.debtorPosition.findUnique = vi.fn(async () => ({ lat: -23.5, lng: -46.6, recordedAt: new Date('2026-06-30T11:00:00Z') })) as never; // dentro + antigo
+    db.debtorPosition.updateMany = vi.fn(async () => ({ count: 1 })) as never; // avançou
+    db.geofence.findMany = vi.fn(async () => [{ id: 'g1', label: 'Casa', lat: -23.5, lng: -46.6, radiusM: 200 }]) as never;
+    await svc(db).recordPings('t1', 'd1', [{ lat: 0, lng: 0, recordedAt: '2026-06-30T12:00:00Z' }], NOW); // longe → fora
+    expect(db.geofenceEvent.createMany).toHaveBeenCalledWith(expect.objectContaining({ data: [expect.objectContaining({ geofenceId: 'g1', type: 'DEPARTURE' })] }));
+    expect(db.notification.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ type: 'GEOFENCE_EXIT' }) }));
+    expect(push.sendToTenant).toHaveBeenCalledWith('t1', expect.objectContaining({ body: expect.stringContaining('Casa') }));
   });
 
   it('cache: dois pings que avançam consultam as geofences UMA vez (não a cada ping)', async () => {
