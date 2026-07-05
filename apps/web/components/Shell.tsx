@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useNotifications } from '@/lib/notifications';
 import { LogoutButton } from '@/components/LogoutButton';
 import { WeeklyDigestGate } from '@/components/WeeklyDigestGate';
+import { PushGate } from '@/components/PushGate';
 import { fetchMe, pathForMe } from '@/lib/auth-redirect';
 
 interface NavItem {
@@ -56,6 +57,7 @@ export function Shell({ title, orgCode = 'ORG-000', children }: ShellProps) {
   return (
     <div className="min-h-screen flex">
       <WeeklyDigestGate />
+      <PushGate />
       <a href="#conteudo" className="skip-link">Pular para o conteúdo</a>
       {/* Left Rail */}
       <nav
