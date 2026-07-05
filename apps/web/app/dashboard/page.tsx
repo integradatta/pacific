@@ -7,11 +7,9 @@ import { TodaySuggestions } from '@/components/TodaySuggestions';
 import { useHome, useThresholds } from '@/lib/hooks';
 import { HorizonteVencimentos } from '@/components/HorizonteVencimentos';
 import { KpiReadouts } from '@/components/KpiReadouts';
-import { CarteiraTable } from '@/components/CarteiraTable';
-import { IntelligenceBlock } from '@/components/Intelligence';
+import { HealthHero, PortfolioHighlights } from '@/components/Intelligence';
 import { PendingClaims } from '@/components/PendingClaims';
 import { LocationDeclines } from '@/components/LocationDeclines';
-import { Copilot } from '@/components/Copilot';
 import { DashboardSkeleton } from '@/components/Skeleton';
 
 export default function DashboardPage() {
@@ -34,35 +32,36 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          {/* #1 Sugestões de hoje — o assistente propõe (não ordena); some quando não há nada */}
+          {/* Acionável primeiro: o que fazer hoje + o que aguarda você (somem quando vazios) */}
           <TodaySuggestions />
-
-          {/* Pagamentos informados pelos sobrinhos aguardando confirmação (some quando vazio) */}
           {data && data.pendingClaims.length > 0 ? <PendingClaims rows={data.pendingClaims} /> : null}
-          {/* Sobrinhos que recusaram compartilhar localização (some quando vazio) */}
           <LocationDeclines />
-          {/* IA-1 — Copiloto da carteira (perguntas sugeridas) */}
-          <Copilot />
+
           {data ? (
             <>
-              <div className="flex justify-end gap-2">
-                <Link href="/configuracoes" className="font-mono text-[11px] text-muted hover:text-sonar uppercase tracking-widest border border-line hover:border-sonar/40 rounded-lg px-3 py-1.5 transition-colors">
-                  Ajustes
-                </Link>
+              {/* Headline: saúde da carteira + resumo automático */}
+              <HealthHero health={data.intelligence.health} summary={data.intelligence.summary} />
+
+              {/* Foco principal: os números-chave */}
+              {(() => {
+                const risk = receivableRisk(data.portfolio);
+                const sub = Number(risk.nominal) > 0 ? `~${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(risk.probable))} prováveis (${risk.confidencePct}%)` : undefined;
+                return <KpiReadouts kpis={data.kpis} receivableSub={sub} compact />;
+              })()}
+
+              {/* Foco principal: radar de vencimentos */}
+              <HorizonteVencimentos rows={data.portfolio} />
+
+              {/* Destaques (lucrativas/arriscadas/exposição) — recolhido por padrão */}
+              <PortfolioHighlights rankings={data.intelligence.rankings} />
+
+              <div className="flex justify-end gap-2 pt-1">
                 <Link href="/relatorio" className="font-mono text-[11px] text-muted hover:text-sonar uppercase tracking-widest border border-line hover:border-sonar/40 rounded-lg px-3 py-1.5 transition-colors">
                   Exportar resumo →
                 </Link>
               </div>
-              <IntelligenceBlock intel={data.intelligence} />
             </>
           ) : null}
-          <HorizonteVencimentos rows={data?.portfolio ?? []} />
-          {data ? (() => {
-            const risk = receivableRisk(data.portfolio);
-            const sub = Number(risk.nominal) > 0 ? `~${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(risk.probable))} prováveis (${risk.confidencePct}%)` : undefined;
-            return <KpiReadouts kpis={data.kpis} receivableSub={sub} />;
-          })() : null}
-          <CarteiraTable rows={data?.portfolio ?? []} />
         </div>
       )}
     </Shell>

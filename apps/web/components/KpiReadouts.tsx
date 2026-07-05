@@ -31,7 +31,7 @@ function DistBar({ segments, total }: { segments: { key: string; n: number; cls:
   );
 }
 
-export function KpiReadouts({ kpis, receivableSub }: { kpis: DashboardKpis; receivableSub?: string }) {
+export function KpiReadouts({ kpis, receivableSub, compact }: { kpis: DashboardKpis; receivableSub?: string; compact?: boolean }) {
   const total = STATUS_ORDER.reduce((sum, k) => sum + kpis.countByStatus[k], 0);
   const totalRisk = RISK_ORDER.reduce((sum, k) => sum + kpis.riskDistribution[k], 0);
 
@@ -53,7 +53,8 @@ export function KpiReadouts({ kpis, receivableSub }: { kpis: DashboardKpis; rece
         </div>
       )}
 
-      {/* Contagens + distribuições */}
+      {/* Contagens + distribuições — ocultas na Torre de Controle (compact); vivem na Carteira/Evolução */}
+      {!compact && (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Readout label="Operações ativas" value={String(kpis.countActive)} />
         <Readout label="Operações vencidas" value={String(kpis.countByStatus.RED)} accent={kpis.countByStatus.RED > 0} />
@@ -86,6 +87,7 @@ export function KpiReadouts({ kpis, receivableSub }: { kpis: DashboardKpis; rece
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }

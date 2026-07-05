@@ -94,19 +94,13 @@ export function HorizonteVencimentos({ rows }: { rows: PortfolioRow[] }) {
         })}
       </div>
 
-      {/* eixo de rótulos */}
-      <div className="relative h-4 mt-2">
-        <span className="absolute left-0 font-mono text-[10px] text-status-red/70 uppercase tracking-wider">vencidos</span>
-        {TICKS.map((t) => (
-          <span
-            key={t.label}
-            className={`absolute -translate-x-1/2 font-mono text-[10px] tracking-wider ${t.days === 0 ? 'text-sonar' : 'text-muted'}`}
-            style={{ left: `${xPercent(t.days)}%` }}
-          >
-            {t.label}
-          </span>
-        ))}
-        <span className="absolute right-0 font-mono text-[10px] text-muted tracking-wider">+30d</span>
+      {/* eixo de rótulos — linha flex (nunca sobrepõe, independe da largura) */}
+      <div className="flex items-center justify-between mt-2 font-mono text-[10px] tracking-wider">
+        <span className="text-status-red/70 uppercase">vencidos</span>
+        <span className="text-sonar">hoje</span>
+        <span className="text-muted">15d</span>
+        <span className="text-muted">30d</span>
+        <span className="text-muted">+30d</span>
       </div>
     </section>
   );

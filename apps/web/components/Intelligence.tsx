@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import type {
   PortfolioIntelligence,
@@ -208,6 +209,34 @@ function RankRow({ name, primary, secondary, href }: { name: string; primary: st
     </div>
   );
   return <li>{href ? <Link href={href}>{body}</Link> : body}</li>;
+}
+
+/** Destaques da carteira — UM card recolhido; ao clicar, abre os 3 rankings (lucrativas /
+ *  arriscadas / maior exposição). Mantém a Torre de Controle limpa por padrão. */
+export function PortfolioHighlights({ rankings: r }: { rankings: RankingsT }) {
+  const [open, setOpen] = useState(false);
+  const topProfit = r.mostProfitable[0];
+  const topRisk = r.riskiest[0];
+  const topExposure = r.clientsByExposure[0];
+  if (!topProfit && !topRisk && !topExposure) return null;
+  return (
+    <section className="panel overflow-hidden">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="w-full px-6 py-4 flex items-center justify-between gap-4 text-left hover:bg-sonar/[0.03] transition-colors">
+        <div className="min-w-0">
+          <h2 className="font-display text-lg font-semibold text-text tracking-tight">Destaques da carteira</h2>
+          <p className="font-mono text-[10px] text-muted uppercase tracking-[0.18em] mt-0.5 truncate">
+            {open ? 'mais lucrativas · mais arriscadas · maior exposição' : 'toque para ver lucrativas, arriscadas e maior exposição'}
+          </p>
+        </div>
+        <span className={`font-mono text-muted transition-transform shrink-0 ${open ? 'rotate-90' : ''}`} aria-hidden>▸</span>
+      </button>
+      {open && (
+        <div className="px-6 pb-6 pt-1">
+          <Rankings rankings={r} />
+        </div>
+      )}
+    </section>
+  );
 }
 
 /** Rankings: operações mais lucrativas / mais arriscadas + clientes por exposição. */
