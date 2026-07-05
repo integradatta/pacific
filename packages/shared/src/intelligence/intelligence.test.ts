@@ -15,6 +15,8 @@ import {
   weeklySummary,
   receivableRisk,
   tagSegments,
+  realizedForDebt,
+  forecastAccuracy,
   type WeeklyPoint,
 } from './intelligence.js';
 
@@ -151,6 +153,36 @@ describe('intelligence', () => {
     expect(intel.topClient?.name).toBe('A');
     expect(intel.summary).toContain('1 operação ativa');
     expect(Array.isArray(intel.actionItems)).toBe(true);
+  });
+});
+
+describe('realizedForDebt', () => {
+  it('soma incrementos na janela e ignora fora dela', () => {
+    const ev = [
+      { at: 10, kind: 'paid' as const, cumulative: 100 },
+      { at: 20, kind: 'paid' as const, cumulative: 300 }, // +200 na janela
+      { at: 40, kind: 'paid' as const, cumulative: 500 }, // fora
+    ];
+    expect(realizedForDebt(ev, 15, 30)).toBe(200);
+  });
+  it('renegociação zera a base — não conta incremento negativo', () => {
+    const ev = [
+      { at: 10, kind: 'paid' as const, cumulative: 500 },
+      { at: 20, kind: 'reset' as const }, // renegociou → base 0
+      { at: 30, kind: 'paid' as const, cumulative: 200 }, // +200 real, não -300
+    ];
+    expect(realizedForDebt(ev, 0, 100)).toBe(700);
+  });
+});
+
+describe('forecastAccuracy', () => {
+  it('média do realizado/previsto em %', () => {
+    const a = forecastAccuracy([{ predicted: 100, realized: 80 }, { predicted: 200, realized: 240 }]);
+    expect(a.months).toBe(2);
+    expect(a.avgRatioPct).toBe(100); // (0.8 + 1.2)/2 = 1.0
+  });
+  it('sem dados → null', () => {
+    expect(forecastAccuracy([]).avgRatioPct).toBeNull();
   });
 });
 

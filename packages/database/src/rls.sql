@@ -99,6 +99,13 @@ CREATE POLICY tenant_isolation_paymentpromise ON "PaymentPromise"
   USING ("tenantId" = current_setting('app.current_tenant', true))
   WITH CHECK ("tenantId" = current_setting('app.current_tenant', true));
 
+ALTER TABLE "ForecastMonth" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "ForecastMonth" FORCE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS tenant_isolation_forecastmonth ON "ForecastMonth";
+CREATE POLICY tenant_isolation_forecastmonth ON "ForecastMonth"
+  USING ("tenantId" = current_setting('app.current_tenant', true))
+  WITH CHECK ("tenantId" = current_setting('app.current_tenant', true));
+
 -- ─────────────────────────────────────────────────────────────────────────────────────────────
 -- Tabelas GLOBAIS (não tenant-scoped) — a migration 14 ligou RLS deny-by-default (sem FORCE) nelas
 -- como defesa contra PostgREST/anon. Isso funcionava com a API conectando como DONA das tabelas

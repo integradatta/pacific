@@ -2,10 +2,10 @@
 
 import { useMemo } from 'react';
 import Link from 'next/link';
-import { portfolioTrend, weeklySummary, tagSegments, type WeeklyPoint, type TagSegment, type PortfolioRow } from '@pacific/shared';
+import { portfolioTrend, weeklySummary, tagSegments, forecastAccuracy, type WeeklyPoint, type TagSegment, type PortfolioRow } from '@pacific/shared';
 import { Shell } from '@/components/Shell';
 import { useEvolution, usePortfolio } from '@/lib/hooks';
-import { useRenegotiation } from '@/lib/insights';
+import { useRenegotiation, useForecastAccuracy } from '@/lib/insights';
 import { formatBRL } from '@/lib/format';
 import { ListSkeleton } from '@/components/Skeleton';
 import { ErrorState, EmptyState } from '@/components/States';
@@ -168,6 +168,54 @@ function RenegotiationCard() {
   );
 }
 
+// P7 — previsto × realizado: track record HONESTO (estimativa, não promessa). Um erro vira calibração.
+const monthShort = (m: string) => {
+  const [y, mm] = m.split('-').map(Number);
+  return new Date(y!, mm! - 1, 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
+};
+function ForecastAccuracyCard() {
+  const q = useForecastAccuracy();
+  const rows = q.data ?? [];
+  if (rows.length === 0) return null; // nada a mostrar até haver mês reconciliado
+  const brl = (v: string) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(Number(v));
+  const acc = forecastAccuracy(rows.map((r) => ({ predicted: Number(r.predicted), realized: Number(r.realized ?? 0) })));
+  const calibration = acc.avgRatioPct == null ? null
+    : acc.avgRatioPct >= 95 && acc.avgRatioPct <= 105 ? 'As estimativas têm ficado bem próximas do que entrou.'
+    : acc.avgRatioPct < 95 ? 'As estimativas têm vindo acima do que entrou — vale ler o “provável” mais como teto do que como meta.'
+    : 'O que entrou tem superado a estimativa — o “provável” tem sido conservador.';
+  const asc = [...rows].reverse();
+  const max = Math.max(1, ...asc.map((r) => Math.max(Number(r.predicted), Number(r.realized ?? 0))));
+  return (
+    <section className="panel p-6">
+      <div className="flex items-center justify-between gap-3 mb-1">
+        <h2 className="font-mono text-xs text-muted uppercase tracking-widest">Previsto × realizado</h2>
+        <span className="font-mono text-[10px] text-muted uppercase tracking-wider">estimativa, não promessa</span>
+      </div>
+      {acc.avgRatioPct != null && rows.length >= 2 && (
+        <p className="font-sans text-sm text-text-dim leading-relaxed mb-4">{acc.note} {calibration}</p>
+      )}
+      <div className="space-y-3">
+        {asc.map((r) => {
+          const p = Number(r.predicted); const real = Number(r.realized ?? 0);
+          return (
+            <div key={r.month}>
+              <div className="flex items-baseline justify-between mb-1">
+                <span className="font-mono text-[11px] uppercase tracking-wider text-muted">{monthShort(r.month)}</span>
+                <span className="font-mono text-[11px] tabular-nums text-text-dim">previsto {brl(r.predicted)} · entrou <span className="text-text">{brl(r.realized ?? '0')}</span></span>
+              </div>
+              <div className="relative h-2 rounded-full bg-line overflow-hidden">
+                <span className="absolute inset-y-0 left-0 rounded-full bg-muted/50" style={{ width: `${Math.round((p / max) * 100)}%` }} title="previsto" />
+                <span className="absolute inset-y-0 left-0 rounded-full bg-sonar" style={{ width: `${Math.round((real / max) * 100)}%` }} title="realizado" />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="font-mono text-[10px] text-muted tracking-wider mt-4">O “previsto” é o provável ponderado por probabilidade — uma estimativa que calibramos mês a mês, nunca um valor prometido.</p>
+    </section>
+  );
+}
+
 export default function EvolucaoPage() {
   const evolution = useEvolution();
   const portfolio = usePortfolio();
@@ -187,6 +235,7 @@ export default function EvolucaoPage() {
           <TrendSection series={evolution.data ?? []} />
         )}
 
+        <ForecastAccuracyCard />
         <RenegotiationCard />
 
         {portfolio.isLoading ? (

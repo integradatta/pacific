@@ -441,6 +441,22 @@ model MonthlyReport {
   @@index([tenantId, month])
 }
 
+// P7 — Previsto × realizado (acurácia HONESTA). No 1º dia do mês capturamos o "provável a receber"
+// daquele mês (ponderado por probabilidade) e, no mês seguinte, reconciliamos com o que ENTROU.
+// Nunca é promessa: alimenta um track record transparente de calibração. Tenant-scoped (RLS FORCE).
+model ForecastMonth {
+  id           String    @id @default(uuid())
+  tenantId     String
+  month        String // 'YYYY-MM' que está sendo previsto
+  predicted    Decimal   @db.Decimal(14, 2) // provável a receber no mês (Σ devido×probabilidade)
+  capturedAt   DateTime  @default(now())
+  realized     Decimal?  @db.Decimal(14, 2) // o que de fato entrou no mês (reconciliado depois)
+  reconciledAt DateTime?
+
+  @@unique([tenantId, month])
+  @@index([tenantId, month])
+}
+
 // Estatísticas materializadas por tenant — agregados caros (computados a partir de Debt sob RLS)
 // pré-calculados por um job diário. O overview do super-admin LÊ daqui (1 linha por tenant) em vez
 // de varrer todas as dívidas de todos os credores a cada acesso → escala p/ milhares de credores.

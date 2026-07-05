@@ -8,6 +8,7 @@ import { Roles } from '../auth/roles.decorator.js';
 import { TenantId } from '../tenancy/tenant-id.decorator.js';
 import { InsightsService, type DebtorSignalRow, type CoolingRow, type SimulationResult, type Suggestion, type RenegotiationEfficacy } from './insights.service.js';
 import { PromisesService, type PromiseRow } from './promises.service.js';
+import { ForecastService, type ForecastPoint } from './forecast.service.js';
 import type { DebtorProfile, CashForecast, PricingHistory } from '@pacific/shared';
 
 export class SimulateDto {
@@ -28,6 +29,7 @@ export class InsightsController {
   constructor(
     private readonly insights: InsightsService,
     private readonly promises: PromisesService,
+    private readonly forecast: ForecastService,
   ) {}
 
   @Get('debtors/:id/profile') @Roles('CREDITOR')
@@ -63,6 +65,11 @@ export class InsightsController {
   @Get('renegotiation') @Roles('CREDITOR')
   renegotiation(@TenantId() tenantId: string): Promise<RenegotiationEfficacy> {
     return this.insights.renegotiationEfficacy(tenantId);
+  }
+
+  @Get('forecast-accuracy') @Roles('CREDITOR')
+  forecastAccuracy(@TenantId() tenantId: string): Promise<ForecastPoint[]> {
+    return this.forecast.accuracy(tenantId);
   }
 
   @Get('debtors/:id/signals') @Roles('CREDITOR')

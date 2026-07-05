@@ -55,6 +55,7 @@ Se você já subiu 24–26 em produção, **falta só aplicar a 27** antes do pr
 | 25 | `25_payment_promises` | enum `PromiseStatus` + tabela `PaymentPromise` (RLS FORCE) | **nova** — entra no healthcheck de RLS (§4) |
 | 26 | `26_drop_dead_columns` | **DROP** `Debt.status`, `Debtor.lastLocation`, enum `DebtStatus` | **nova, destrutiva** (dados eram inúteis: status sempre GREEN, lastLocation sempre null) |
 | 27 | `27_promise_events` | 3 valores no enum `PlatformEventType` (`PROMISE_MADE/KEPT/BROKEN`) — eventos de promessa na timeline | **nova**, aditiva/idempotente. **Aplicar ANTES do deploy**: o histórico da operação consulta esses valores |
+| 28 | `28_forecast_month` | tabela `ForecastMonth` (previsto×realizado, P7) com RLS FORCE + policy | **nova**, aditiva. Já inclui a RLS; `db:rls` também traz a policy (idempotente) |
 
 **Como aplicar:** cole o conteúdo de cada `packages/database/migrations/NN_*/migration.sql` no SQL Editor
 do Supabase, em ordem. Ou, se você mantém o `_prisma_migrations` em dia, use `npm run db:release`
