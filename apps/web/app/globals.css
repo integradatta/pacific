@@ -6,6 +6,9 @@
 :root {
   color-scheme: dark;
 
+  /* Easing de acabamento — desaceleração suave (premium), no lugar do ease genérico. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
   --ink: 7 10 17; /* canvas */
   --surface: 14 19 32; /* card */
   --surface-2: 20 27 42; /* aninhado / input / hover */
@@ -22,6 +25,9 @@
   --red: 240 85 106;
 }
 
+html {
+  scroll-behavior: smooth;
+}
 html,
 body {
   background-color: rgb(var(--ink));
@@ -36,11 +42,40 @@ body {
     radial-gradient(1100px 560px at 16% -12%, rgb(var(--sonar) / 0.06), transparent 60%),
     radial-gradient(820px 480px at 102% -6%, rgb(80 130 220 / 0.05), transparent 58%);
   background-attachment: fixed;
+  /* Acabamento tipográfico: texto mais nítido e leve em fundo escuro. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  -webkit-tap-highlight-color: transparent; /* sem flash azul ao tocar (mobile) */
 }
 
 ::selection {
   background: rgb(var(--sonar));
   color: rgb(var(--ink));
+}
+
+/* Scrollbar sob medida — fina, discreta, casa com o tema dark (nada de barra do SO). */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--line-strong)) transparent;
+}
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--line-strong));
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+  transition: background-color 0.2s var(--ease-out);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--muted));
+  background-clip: content-box;
 }
 
 /* Foco consistente e visível (piso de qualidade). */
@@ -95,13 +130,14 @@ body {
 
   .panel-hover {
     transition:
-      border-color 0.2s ease,
-      box-shadow 0.2s ease,
-      transform 0.2s ease;
+      border-color 0.25s var(--ease-out),
+      box-shadow 0.25s var(--ease-out),
+      transform 0.25s var(--ease-out);
   }
   .panel-hover:hover {
     border-color: rgb(var(--line-strong));
-    box-shadow: 0 1px 0 0 rgb(255 255 255 / 0.07) inset, 0 22px 46px -24px rgb(0 0 0 / 1);
+    transform: translateY(-2px); /* lift tátil sutil — sensação premium */
+    box-shadow: 0 1px 0 0 rgb(255 255 255 / 0.07) inset, 0 26px 50px -24px rgb(0 0 0 / 1);
   }
 
   /* Glass: nav e topbar sobre o canvas. */
@@ -129,6 +165,9 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
   *,
   *::before,
   *::after {

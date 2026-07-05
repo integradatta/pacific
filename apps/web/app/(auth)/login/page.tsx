@@ -7,6 +7,26 @@ import { supabase } from '@/lib/supabase';
 import { apiPost } from '@/lib/api';
 import { fetchMe, pathForMe } from '@/lib/auth-redirect';
 
+/* Sonar scope — o motivo do produto (torre de controle) como textura ambiente atrás da entrada.
+ * Anéis de alcance concêntricos + um "ping" que expande. Discreto, aria-hidden, sem custo de layout. */
+function SonarScope() {
+  const rings = [90, 190, 300, 420];
+  return (
+    <div className="absolute inset-0 z-0 pointer-events-none flex items-center justify-center overflow-hidden" aria-hidden>
+      <div className="relative" style={{ width: 840, height: 840, maxWidth: '150vw', maxHeight: '150vw', WebkitMaskImage: 'radial-gradient(closest-side, black 55%, transparent 100%)', maskImage: 'radial-gradient(closest-side, black 55%, transparent 100%)' }}>
+        {rings.map((r) => (
+          <span key={r} className="absolute top-1/2 left-1/2 rounded-full" style={{ width: r * 2, height: r * 2, marginLeft: -r, marginTop: -r, border: '1px solid rgb(var(--sonar) / 0.06)' }} />
+        ))}
+        {/* eixos finos */}
+        <span className="absolute top-1/2 left-0 right-0 h-px" style={{ background: 'rgb(var(--line) / 0.6)' }} />
+        <span className="absolute left-1/2 top-0 bottom-0 w-px" style={{ background: 'rgb(var(--line) / 0.6)' }} />
+        {/* ping expandindo — vida sutil */}
+        <span className="absolute top-1/2 left-1/2 rounded-full animate-ping2" style={{ width: 180, height: 180, marginLeft: -90, marginTop: -90, border: '1px solid rgb(var(--sonar) / 0.5)' }} />
+      </div>
+    </div>
+  );
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -79,8 +99,9 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-4">
-      <div className="w-full max-w-sm panel p-8 space-y-7 animate-rise">
+    <main className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
+      <SonarScope />
+      <div className="relative z-10 w-full max-w-sm panel p-8 space-y-7 animate-rise">
         {/* Brand */}
         <div className="space-y-1.5">
           <p className="font-mono text-[11px] text-muted uppercase tracking-[0.2em] flex items-center gap-1.5">

@@ -53,7 +53,7 @@ const config: Config = {
         shimmer: 'shimmer 1.5s ease-in-out infinite',
         sweep: 'sweep 6.5s cubic-bezier(0.6, 0, 0.4, 1) infinite',
         ping2: 'ping2 2.4s cubic-bezier(0, 0, 0.2, 1) infinite',
-        rise: 'rise 0.4s ease-out both',
+        rise: 'rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both',
         pop: 'pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both',
         floaty: 'floaty 4s ease-in-out infinite',
       },
