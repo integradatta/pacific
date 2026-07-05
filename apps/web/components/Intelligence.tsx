@@ -49,27 +49,45 @@ const TONE: Record<Insight['tone'], string> = {
   danger: 'text-status-red border-status-red/30 hover:bg-status-red/10',
 };
 
-/** Hero: saúde da carteira (indicador único) + resumo executivo automático. */
+const HEALTH_STROKE: Record<PortfolioHealth['state'], string> = {
+  HEALTHY: 'var(--green)',
+  ATTENTION: 'var(--yellow)',
+  CRITICAL: 'var(--red)',
+};
+
+/** Medidor de saúde — gauge de instrumento (arco 0–100) + resumo executivo. O número-herói da torre. */
 export function HealthHero({ health, summary }: { health: PortfolioHealth; summary: string }) {
   const h = HEALTH[health.state];
+  const stroke = HEALTH_STROKE[health.state];
+  const score = Math.max(0, Math.min(100, health.score));
+  const R = 54;
+  const C = 2 * Math.PI * R;
+  const dash = (score / 100) * C;
   return (
-    <section className={`panel p-6 border ${h.ring} ${h.soft}`}>
-      <div className="flex flex-col sm:flex-row sm:items-center gap-6">
-        {/* Indicador */}
-        <div className="flex items-center gap-4 shrink-0">
-          <div className={`relative w-20 h-20 rounded-full ${h.soft} border ${h.ring} flex items-center justify-center`}>
-            <span className="font-mono text-2xl font-semibold tabular-nums text-text">{health.score}</span>
-          </div>
-          <div>
-            <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-1">Saúde da carteira</p>
-            <p className={`font-display text-2xl font-semibold tracking-tight ${h.text}`}>{h.label}</p>
+    <section className={`panel p-6 sm:p-7 border ${h.ring} ${h.soft}`}>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-6 sm:gap-8">
+        {/* Gauge */}
+        <div className="relative w-32 h-32 shrink-0 mx-auto sm:mx-0">
+          <svg viewBox="0 0 128 128" className="w-full h-full -rotate-90">
+            <circle cx="64" cy="64" r={R} fill="none" stroke="rgb(var(--line))" strokeWidth="7" />
+            <circle
+              cx="64" cy="64" r={R} fill="none" stroke={`rgb(${stroke})`} strokeWidth="7" strokeLinecap="round"
+              strokeDasharray={`${dash} ${C}`}
+              style={{ transition: 'stroke-dasharray 0.9s cubic-bezier(0.22, 1, 0.36, 1)', filter: `drop-shadow(0 0 6px rgb(${stroke} / 0.45))` }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="font-mono text-[2.6rem] leading-none font-semibold tabular-nums text-text">{health.score}</span>
+            <span className="font-mono text-[9px] text-muted uppercase tracking-[0.2em] mt-1">de 100</span>
           </div>
         </div>
-        {/* Resumo + fatores */}
-        <div className="flex-1 min-w-0">
-          <p className="font-sans text-sm text-text-dim leading-relaxed">{summary}</p>
+        {/* Estado + resumo + fatores */}
+        <div className="flex-1 min-w-0 text-center sm:text-left">
+          <p className="font-mono text-[10px] text-muted uppercase tracking-[0.2em] mb-1.5">Saúde da carteira</p>
+          <p className={`font-display text-3xl font-semibold tracking-tight ${h.text}`}>{h.label}</p>
+          <p className="font-sans text-sm text-text-dim leading-relaxed mt-3">{summary}</p>
           {health.factors.length > 0 && (
-            <div className="flex gap-2 flex-wrap mt-3">
+            <div className="flex gap-2 flex-wrap mt-4 justify-center sm:justify-start">
               {health.factors.map((f) => (
                 <span key={f.label} className="font-mono text-[10px] text-muted uppercase tracking-wider border border-line rounded px-2 py-0.5">
                   {f.label} <span className="text-status-red">−{f.penalty}</span>
