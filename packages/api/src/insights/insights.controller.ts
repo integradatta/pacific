@@ -6,7 +6,7 @@ import { TenantGuard } from '../tenancy/tenant.guard.js';
 import { RolesGuard } from '../auth/roles.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { TenantId } from '../tenancy/tenant-id.decorator.js';
-import { InsightsService, type DebtorSignalRow, type CoolingRow, type SimulationResult, type Suggestion, type RenegotiationEfficacy } from './insights.service.js';
+import { InsightsService, type DebtorSignalRow, type CoolingRow, type SimulationResult, type Suggestion, type RenegotiationEfficacy, type BenchmarkResult } from './insights.service.js';
 import { PromisesService, type PromiseRow } from './promises.service.js';
 import { ForecastService, type ForecastPoint } from './forecast.service.js';
 import type { DebtorProfile, CashForecast, PricingHistory } from '@pacific/shared';
@@ -70,6 +70,11 @@ export class InsightsController {
   @Get('forecast-accuracy') @Roles('CREDITOR')
   forecastAccuracy(@TenantId() tenantId: string): Promise<ForecastPoint[]> {
     return this.forecast.accuracy(tenantId);
+  }
+
+  @Get('benchmark') @Roles('CREDITOR')
+  benchmark(@TenantId() tenantId: string): Promise<BenchmarkResult> {
+    return this.insights.benchmark(tenantId);
   }
 
   @Get('debtors/:id/signals') @Roles('CREDITOR')

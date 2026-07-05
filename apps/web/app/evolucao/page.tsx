@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { portfolioTrend, weeklySummary, tagSegments, forecastAccuracy, type WeeklyPoint, type TagSegment, type PortfolioRow } from '@pacific/shared';
 import { Shell } from '@/components/Shell';
 import { useEvolution, usePortfolio } from '@/lib/hooks';
-import { useRenegotiation, useForecastAccuracy } from '@/lib/insights';
+import { useRenegotiation, useForecastAccuracy, useBenchmark } from '@/lib/insights';
 import { formatBRL } from '@/lib/format';
 import { ListSkeleton } from '@/components/Skeleton';
 import { ErrorState, EmptyState } from '@/components/States';
@@ -216,6 +216,29 @@ function ForecastAccuracyCard() {
   );
 }
 
+// P9 — referência anônima da plataforma. Estritamente CONTEXTO, sem comparação/juízo (cores neutras,
+// sem "melhor/pior"). Só com k-anonimato (o backend exige ≥5 carteiras).
+function BenchmarkCard() {
+  const q = useBenchmark();
+  const d = q.data;
+  if (!d || !d.available || !d.overdueRate) return null;
+  const o = d.overdueRate;
+  return (
+    <section className="panel p-6">
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <h2 className="font-mono text-xs text-muted uppercase tracking-widest">Referência da plataforma</h2>
+        <span className="font-mono text-[10px] text-muted uppercase tracking-wider">anônimo · {d.sampleTenants} carteiras</span>
+      </div>
+      <p className="font-sans text-sm text-text-dim leading-relaxed">
+        Entre carteiras na plataforma, a parcela de operações em atraso costuma ficar entre{' '}
+        <span className="text-text">{o.p25}%</span> e <span className="text-text">{o.p75}%</span> (típico {o.median}%).
+        {d.yourOverdueRate != null && <> A sua está em <span className="text-text">{d.yourOverdueRate}%</span>.</>}{' '}
+        É só um ponto de contexto — cada carteira tem sua estratégia.
+      </p>
+    </section>
+  );
+}
+
 export default function EvolucaoPage() {
   const evolution = useEvolution();
   const portfolio = usePortfolio();
@@ -237,6 +260,7 @@ export default function EvolucaoPage() {
 
         <ForecastAccuracyCard />
         <RenegotiationCard />
+        <BenchmarkCard />
 
         {portfolio.isLoading ? (
           <ListSkeleton rows={3} />
