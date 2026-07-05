@@ -140,9 +140,14 @@ export class DashboardService {
 
   /** Últimas ~6 semanas persistidas (SÓ leitura). Best-effort: falha vira histórico vazio. */
   private async readWeeklyHistory(tenantId: string): Promise<WeeklyPoint[]> {
+    return this.weeklySeries(tenantId, 6);
+  }
+
+  /** Série semanal persistida (mais recente primeiro), para a curva de Evolução. Best-effort. */
+  async weeklySeries(tenantId: string, take = 26): Promise<WeeklyPoint[]> {
     const db = this.scoped.raw();
     const rows = await db.portfolioSnapshot
-      .findMany({ where: { tenantId }, orderBy: { weekStart: 'desc' }, take: 6 })
+      .findMany({ where: { tenantId }, orderBy: { weekStart: 'desc' }, take })
       .catch(() => [] as Awaited<ReturnType<typeof db.portfolioSnapshot.findMany>>);
     return rows.map((s) => ({
       weekStart: s.weekStart.toISOString(),

@@ -14,6 +14,7 @@ import {
   portfolioTrend,
   weeklySummary,
   receivableRisk,
+  tagSegments,
   type WeeklyPoint,
 } from './intelligence.js';
 
@@ -150,6 +151,23 @@ describe('intelligence', () => {
     expect(intel.topClient?.name).toBe('A');
     expect(intel.summary).toContain('1 operação ativa');
     expect(Array.isArray(intel.actionItems)).toBe(true);
+  });
+});
+
+describe('tagSegments', () => {
+  it('agrega por etiqueta, conta em cada tag e ordena por exposição', () => {
+    const rows = [
+      row({ id: '1', debtorName: 'A', amountDue: '3000.00', tags: ['trabalho'], status: 'GREEN' }),
+      row({ id: '2', debtorName: 'B', amountDue: '1000.00', tags: ['trabalho', 'urgente'], status: 'RED' }),
+      row({ id: '3', debtorName: 'C', amountDue: '500.00', tags: [] }),
+    ];
+    const segs = tagSegments(rows);
+    const trabalho = segs.find((s) => s.tag === 'trabalho')!;
+    expect(trabalho.opsCount).toBe(2);
+    expect(trabalho.exposure).toBe('4000.00');
+    expect(trabalho.overdueCount).toBe(1);
+    expect(segs[0]!.tag).toBe('trabalho'); // maior exposição
+    expect(segs.some((s) => s.tag === 'sem etiqueta')).toBe(true);
   });
 });
 

@@ -24,6 +24,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/vencimentos', label: 'Vencimentos', icon: '◷' },
   { href: '/recebiveis', label: 'Recebíveis', icon: '▦' },
   { href: '/relatorios', label: 'Relatórios', icon: '◆' },
+  { href: '/evolucao', label: 'Evolução', icon: '△' },
   { href: '/localizacao', label: 'Localização', icon: '◉' },
   { href: '/notificacoes', label: 'Notificações', icon: '◎' },
   { href: '/configuracoes', label: 'Configurações', icon: '⚙' },

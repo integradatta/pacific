@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { DEFAULT_THRESHOLDS, normalizeThresholds, type DashboardKpis, type PortfolioRow, type PortfolioIntelligence, type IntelligenceThresholds } from '@pacific/shared';
+import { DEFAULT_THRESHOLDS, normalizeThresholds, type DashboardKpis, type PortfolioRow, type PortfolioIntelligence, type IntelligenceThresholds, type WeeklyPoint } from '@pacific/shared';
 import { apiGet } from './api';
 import type { PaymentClaimRow } from './debts';
 
@@ -29,6 +29,11 @@ export function useKpis() {
 
 export function usePortfolio() {
   return useQuery({ queryKey: ['portfolio'], queryFn: () => apiGet<PortfolioRow[]>('/dashboard/portfolio') });
+}
+
+/** Série semanal (curva de Evolução). Mais recente primeiro. */
+export function useEvolution() {
+  return useQuery({ queryKey: ['evolution'], queryFn: () => apiGet<WeeklyPoint[]>('/dashboard/evolution'), staleTime: 10 * 60_000 });
 }
 
 // IA-1 — Copiloto (respostas prontas derivadas da carteira).

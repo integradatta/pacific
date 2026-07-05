@@ -6,7 +6,7 @@ import { PrincipalGuard } from '../auth/principal.guard.js';
 import { Roles } from '../auth/roles.decorator.js';
 import { TenantId } from '../tenancy/tenant-id.decorator.js';
 import { DashboardService, type CopilotResponse, type DashboardHome } from './dashboard.service.js';
-import { normalizeThresholds, type DashboardKpis, type PortfolioRow, type PortfolioIntelligence } from '@pacific/shared';
+import { normalizeThresholds, type DashboardKpis, type PortfolioRow, type PortfolioIntelligence, type WeeklyPoint } from '@pacific/shared';
 
 const num = (v: string | undefined): number | undefined => (v == null || v === '' ? undefined : Number(v));
 
@@ -41,6 +41,12 @@ export class DashboardController {
   @Get('copilot') @Roles('CREDITOR')
   copilot(@TenantId() tenantId: string): Promise<CopilotResponse> {
     return this.dashboard.copilot(tenantId);
+  }
+
+  // Evolução — série semanal persistida (curva de saúde/recebível/vencido).
+  @Get('evolution') @Roles('CREDITOR')
+  evolution(@TenantId() tenantId: string): Promise<WeeklyPoint[]> {
+    return this.dashboard.weeklySeries(tenantId, 26);
   }
 
   @Get('intelligence') @Roles('CREDITOR')
