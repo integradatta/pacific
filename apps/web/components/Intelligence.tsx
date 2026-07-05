@@ -242,8 +242,8 @@ export function PortfolioHighlights({ rankings: r }: { rankings: RankingsT }) {
       <button type="button" onClick={() => setOpen((v) => !v)} className="w-full px-6 py-4 flex items-center justify-between gap-4 text-left hover:bg-sonar/[0.03] transition-colors">
         <div className="min-w-0">
           <h2 className="font-display text-lg font-semibold text-text tracking-tight">Destaques da carteira</h2>
-          <p className="font-mono text-[10px] text-muted uppercase tracking-[0.18em] mt-0.5 truncate">
-            {open ? 'mais lucrativas · mais arriscadas · maior exposição' : 'toque para ver lucrativas, arriscadas e maior exposição'}
+          <p className="font-mono text-[10px] text-muted uppercase tracking-[0.16em] mt-1 truncate">
+            lucrativas · arriscadas · exposição
           </p>
         </div>
         <span className={`font-mono text-muted transition-transform shrink-0 ${open ? 'rotate-90' : ''}`} aria-hidden>▸</span>
