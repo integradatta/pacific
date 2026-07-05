@@ -10,8 +10,8 @@ const RISK_ORDER: RiskLevel[] = ['LOW', 'MEDIUM', 'HIGH'];
 function Readout({ label, value, accent, sub }: { label: string; value: string; accent?: boolean; sub?: string }) {
   return (
     <div className="panel panel-hover p-5 sm:p-6">
-      <p className="font-mono text-[10px] text-muted uppercase tracking-[0.2em] mb-2.5">{label}</p>
-      <p className={`font-mono text-3xl leading-none font-medium tabular-nums tracking-tight ${accent ? 'text-status-red' : 'text-text'}`}>{value}</p>
+      <p className="font-mono text-[10px] text-muted uppercase tracking-[0.18em] mb-2.5">{label}</p>
+      <p className={`font-mono text-[1.35rem] sm:text-3xl leading-none font-medium tabular-nums tracking-tight ${accent ? 'text-status-red' : 'text-text'}`}>{value}</p>
       {sub ? <p className="font-sans text-[11px] text-text-dim mt-2 leading-snug">{sub}</p> : null}
     </div>
   );
@@ -37,8 +37,8 @@ export function KpiReadouts({ kpis, receivableSub, compact }: { kpis: DashboardK
 
   return (
     <div className="space-y-4">
-      {/* Valores */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Valores — 2×2 no mobile (escaneável), 4 colunas no desktop */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Readout label="Total em ajudas" value={formatBRL(kpis.totalLent)} />
         <Readout label="A receber" value={formatBRL(kpis.totalReceivable)} sub={receivableSub} />
         <Readout label="Retorno esperado" value={formatBRL(kpis.totalExpectedReturn)} />
@@ -47,7 +47,7 @@ export function KpiReadouts({ kpis, receivableSub, compact }: { kpis: DashboardK
 
       {/* Pagamentos recebidos — só quando há atividade de quitação */}
       {(kpis.countSettled > 0 || Number(kpis.totalReceived) > 0) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <Readout label="Recebido" value={formatBRL(kpis.totalReceived)} />
           <Readout label="Quitadas" value={String(kpis.countSettled)} />
         </div>
