@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { C, sans, HomeGlyph, LocationGlyph, CofreGlyph, ProfileGlyph } from '@/components/family';
@@ -14,7 +16,15 @@ const TABS = [
 
 export function DebtorTabBar() {
   const pathname = usePathname();
-  return (
+  // Portal para o body: a barra é `position: fixed`, mas o Screen envolve o conteúdo num
+  // container com `animate-rise` (transform persistente por fill-mode `both`). Um ancestral
+  // transformado vira containing block do `fixed` → a barra colaria no rodapé do container
+  // curto (meio da tela) em vez da viewport. Renderizar fora dessa subárvore resolve.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+
+  return createPortal(
     <nav
       aria-label="Navegação"
       className="fixed bottom-0 inset-x-0 z-30"
@@ -38,6 +48,7 @@ export function DebtorTabBar() {
           );
         })}
       </div>
-    </nav>
+    </nav>,
+    document.body,
   );
 }
