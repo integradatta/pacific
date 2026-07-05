@@ -5,13 +5,15 @@ import Link from 'next/link';
 import { useSuggestions, type Suggestion } from '@/lib/insights';
 
 // #1 "Hoje" — SUGESTÕES gentis (nunca ordens), compactas e dispensáveis por dia. Mobile-harmônico.
+// Canais RGB definidos em globals.css (:root) — usados como `rgb(<accent> / 0.6)`.
 const ACCENT: Record<Suggestion['kind'], string> = {
-  support: 'var(--status-red)',
+  support: 'var(--red)',
   claim: 'var(--sonar)',
   cooling: 'var(--iris)',
-  overdue: 'var(--status-red)',
+  overdue: 'var(--red)',
   due_soon: 'var(--sonar)',
-  intent: 'var(--status-green)',
+  intent: 'var(--green)',
+  promise: 'var(--yellow)',
 };
 
 function dismissKey(): string {

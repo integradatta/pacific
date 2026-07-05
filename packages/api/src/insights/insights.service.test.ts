@@ -18,6 +18,7 @@ function fakeTx() {
     paymentClaim: { findMany: vi.fn(async () => [{ debtId: 'debt1', debtorId: 'd1', amount: '100' }]) },
     debtorSignal: { findMany: vi.fn(async () => [{ id: 's1', debtorId: 'd1', debtId: 'debt1', kind: 'NEED_SUPPORT', dueDate: null, note: null, createdAt: now }]) },
     debtor: { findMany: vi.fn(async () => [{ id: 'd1', name: 'João Silva' }]) },
+    paymentPromise: { findMany: vi.fn(async () => []) },
   };
 }
 
@@ -36,5 +37,19 @@ describe('InsightsService.suggestions', () => {
     expect(out[0]!.href).toBe('/operacoes/debt1');
     // dívida vence longe → não gera overdue/due_soon
     expect(out.some((s) => s.kind === 'overdue' || s.kind === 'due_soon')).toBe(false);
+  });
+
+  it('inclui promessa vencendo como lembrete (kind promise, entre suporte e pagamento)', async () => {
+    const tx = fakeTx();
+    const now = new Date();
+    tx.paymentPromise.findMany = vi.fn(async () => [
+      { id: 'p1', debtorId: 'd1', debtId: 'debt1', amount: '200.00', promisedAt: now, status: 'OPEN' },
+    ]) as never;
+    const out = await svc(tx).suggestions('t1');
+    const promise = out.find((s) => s.kind === 'promise');
+    expect(promise).toBeDefined();
+    expect(promise!.href).toBe('/operacoes/debt1');
+    // ordem por prioridade desc: suporte (100) > pagamento avisado (90) > promessa (85)
+    expect(out.map((s) => s.kind)).toEqual(['support', 'claim', 'promise']);
   });
 });

@@ -3,6 +3,7 @@ import { Cron } from '@nestjs/schedule';
 import type { Prisma } from '@pacific/database';
 import { Decimal } from 'decimal.js';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
+import { TrackingService } from '../tracking/tracking.service.js';
 
 const DAY = 86_400_000;
 const GRACE_DAYS = 2; // tolerância após a data prometida antes de considerar quebrada
@@ -28,7 +29,10 @@ export interface PromiseRow {
 export class PromisesService {
   private readonly log = new Logger('PromisesService');
 
-  constructor(private readonly scoped: TenantScopedService) {}
+  constructor(
+    private readonly scoped: TenantScopedService,
+    private readonly tracking: TrackingService,
+  ) {}
 
   /** Resolve promessas vencidas de todas as carteiras (fecha BROKEN/KEPT sem depender de visualização). */
   @Cron('0 9 * * *') // 06:00 BRT
@@ -61,6 +65,8 @@ export class PromisesService {
       const created = await tx.paymentPromise.create({
         data: { tenantId, debtorId: debt.debtorId, debtId: debt.id, promisedAt: when, amount, note: input.note?.trim().slice(0, 280) || null },
       });
+      // Timeline da operação: o combinado vira evento (auditável ao lado de pagamentos/alterações).
+      await this.tracking.record(tx, { tenantId, actorType: 'CREDITOR', type: 'PROMISE_MADE', targetType: 'debt', targetId: debt.id, detail: { amount, promisedAt: when.toISOString() } });
       return this.toRow(created);
     });
   }
@@ -118,9 +124,11 @@ export class PromisesService {
         (confirmsBy.get(p.debtId) ?? []).some((t) => t >= created && t <= deadline);
       if (paidByDeadline) {
         await tx.paymentPromise.update({ where: { id: p.id }, data: { status: 'KEPT', resolvedAt: new Date() } });
+        await this.tracking.record(tx, { tenantId, actorType: 'SYSTEM', type: 'PROMISE_KEPT', targetType: 'debt', targetId: p.debtId, detail: { promisedAt: p.promisedAt.toISOString() } });
         changed++;
       } else if (nowMs > deadline) {
         await tx.paymentPromise.update({ where: { id: p.id }, data: { status: 'BROKEN', resolvedAt: new Date() } });
+        await this.tracking.record(tx, { tenantId, actorType: 'SYSTEM', type: 'PROMISE_BROKEN', targetType: 'debt', targetId: p.debtId, detail: { promisedAt: p.promisedAt.toISOString() } });
         changed++;
       }
     }

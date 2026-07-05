@@ -12,7 +12,7 @@ export function useCashForecast() {
 // (useRadar/CoolingRow removidos: o radar alimenta as sugestões do "Hoje" no servidor — o endpoint
 // GET /insights/radar continua existindo; nenhuma tela consome o hook diretamente.)
 
-export interface Suggestion { id: string; kind: 'support' | 'claim' | 'cooling' | 'overdue' | 'due_soon' | 'intent'; title: string; body: string; href?: string; priority: number }
+export interface Suggestion { id: string; kind: 'support' | 'claim' | 'cooling' | 'overdue' | 'due_soon' | 'intent' | 'promise'; title: string; body: string; href?: string; priority: number }
 
 /** #1 "Hoje" — sugestões acionáveis (compostas dos sinais). Tom de sugestão, nunca ordem. */
 export function useSuggestions() {

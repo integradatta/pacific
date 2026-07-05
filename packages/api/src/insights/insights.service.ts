@@ -37,7 +37,7 @@ export interface SimulationResult {
   reliability: string | null;
 }
 
-export type SuggestionKind = 'support' | 'claim' | 'cooling' | 'overdue' | 'due_soon' | 'intent';
+export type SuggestionKind = 'support' | 'claim' | 'cooling' | 'overdue' | 'due_soon' | 'intent' | 'promise';
 export interface Suggestion {
   id: string;
   kind: SuggestionKind;
@@ -195,6 +195,13 @@ export class InsightsService {
         tx.debt.findMany({ where: { tenantId, deletedAt: null, settledAt: null }, include: { debtor: { select: { id: true, name: true } } } }),
         tx.debtor.findMany({ where: { tenantId }, select: { id: true, name: true } }),
       ]);
+      // Promessas vencendo (lembrete no dia): resolve as vencidas e pega as que ainda estão OPEN
+      // com prazo até amanhã — o combinado deixa de morar só na cabeça do padrinho.
+      await this.promises.resolveDue(tx, tenantId, undefined, now);
+      const duePromises = await tx.paymentPromise.findMany({
+        where: { tenantId, status: 'OPEN', promisedAt: { lte: new Date(now.getTime() + 86_400_000) } },
+        orderBy: { promisedAt: 'asc' },
+      });
       const nameBy = new Map(debtors.map((d) => [d.id, d.name]));
       const firstDebtBy = new Map<string, string>();
       for (const d of openDebts) if (!firstDebtBy.has(d.debtorId)) firstDebtBy.set(d.debtorId, d.id);
@@ -207,6 +214,15 @@ export class InsightsService {
         const href = s.debtId ? `/operacoes/${s.debtId}` : firstDebtBy.get(s.debtorId) ? `/operacoes/${firstDebtBy.get(s.debtorId)}` : undefined;
         if (s.kind === 'NEED_SUPPORT') out.push({ id: `sig-${s.id}`, kind: 'support', title: `💬 ${nm} pediu ajuda`, body: `Que tal dar um alô?${s.note ? ` Ele comentou: “${s.note}”.` : ' Às vezes uma conversa já resolve.'}`, href, priority: 100 });
         else out.push({ id: `sig-${s.id}`, kind: 'intent', title: `🤝 ${nm} pretende resolver`, body: s.dueDate ? `Ele avisou que pretende resolver até ${new Date(s.dueDate).toLocaleDateString('pt-BR')}. Nada a fazer agora.` : 'Ele avisou que pretende resolver em breve.', href, priority: 20 });
+      }
+
+      // Promessas vencendo (lembrete no dia do combinado).
+      for (const pr of duePromises) {
+        const nm = first(nameBy.get(pr.debtorId) ?? 'seu sobrinho');
+        const dias = Math.round((pr.promisedAt.getTime() - now.getTime()) / 86_400_000);
+        const quando = dias < 0 ? 'era para hoje ou antes' : dias === 0 ? 'é hoje' : 'é amanhã';
+        const valor = pr.amount != null ? ` de ${Number(pr.amount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : '';
+        out.push({ id: `prom-${pr.id}`, kind: 'promise', title: `🤝 Promessa de ${nm} ${quando}`, body: `Ele combinou pagar${valor} até ${pr.promisedAt.toLocaleDateString('pt-BR')}. Vale um lembrete gentil.`, href: `/operacoes/${pr.debtId}`, priority: 85 });
       }
 
       // Pagamentos avisados a confirmar.
