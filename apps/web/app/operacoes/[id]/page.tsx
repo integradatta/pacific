@@ -38,7 +38,7 @@ function RenegotiateBox({ id }: { id: string }) {
   }
 
   return (
-    <section className="panel p-6">
+    <section className="rounded-xl border border-line/70 p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="font-mono text-xs text-muted uppercase tracking-widest">Renegociar</h3>
@@ -105,7 +105,7 @@ function EditDatesBox({ id, start, due }: { id: string; start: string; due: stri
   }
 
   return (
-    <section className="panel p-6">
+    <section className="rounded-xl border border-line/70 p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="font-mono text-xs text-muted uppercase tracking-widest">Editar datas</h3>
@@ -169,7 +169,7 @@ function PromisesBox({ debtId, debtorId }: { debtId: string; debtorId: string })
 
   const rows = list.data ?? [];
   return (
-    <section className="panel p-6">
+    <section className="rounded-xl border border-line/70 p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="font-mono text-xs text-muted uppercase tracking-widest">Promessas</h3>
@@ -527,14 +527,14 @@ export default function OperacaoDetalhePage({ params }: { params: { id: string }
             {/* Perfil comportamental do sobrinho (#2 + #6) — compacto */}
             <DebtorProfileCard debtorId={debt.data.debtorId} name={debt.data.debtorName} />
 
-            {/* Editar datas — corrigir/registrar dívidas antigas (vale mesmo se quitada) */}
-            <EditDatesBox id={params.id} start={debt.data.startDate} due={debt.data.dueDate} />
-
-            {/* Promessas rastreadas (#4) — combinados com desfecho automático; só em operação aberta */}
-            {summary.data && !summary.data.settled && <PromisesBox debtId={params.id} debtorId={debt.data.debtorId} />}
-
-            {/* Renegociação — só faz sentido em operação aberta */}
-            {summary.data && !summary.data.settled && <RenegotiateBox id={params.id} />}
+            {/* Ações da operação — secundárias (contorno leve), agrupadas para não competir com
+                os cards de decisão/dado acima. */}
+            <div className="space-y-3 pt-1">
+              <p className="font-mono text-[10px] text-muted uppercase tracking-[0.22em] px-1">Ações</p>
+              <EditDatesBox id={params.id} start={debt.data.startDate} due={debt.data.dueDate} />
+              {summary.data && !summary.data.settled && <PromisesBox debtId={params.id} debtorId={debt.data.debtorId} />}
+              {summary.data && !summary.data.settled && <RenegotiateBox id={params.id} />}
+            </div>
 
             {/* Histórico */}
             <section className="panel p-6">
