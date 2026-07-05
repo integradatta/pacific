@@ -21,6 +21,12 @@ export function useForecastAccuracy() {
   return useQuery({ queryKey: ['insights', 'forecast-accuracy'], queryFn: () => apiGet<ForecastPoint[]>('/insights/forecast-accuracy'), staleTime: 10 * 60_000 });
 }
 
+/** P9 — referência anônima da plataforma (faixa típica de atraso). Contexto, sem comparação/juízo. */
+export interface BenchmarkResult { available: boolean; sampleTenants: number; overdueRate: { p25: number; median: number; p75: number } | null; yourOverdueRate: number | null }
+export function useBenchmark() {
+  return useQuery({ queryKey: ['insights', 'benchmark'], queryFn: () => apiGet<BenchmarkResult>('/insights/benchmark'), staleTime: 30 * 60_000 });
+}
+
 /** #4 Previsão de caixa ponderada (faixas + por mês). */
 export function useCashForecast() {
   return useQuery({ queryKey: ['insights', 'cash-forecast'], queryFn: () => apiGet<CashForecast>('/insights/cash-forecast'), staleTime: 5 * 60_000 });

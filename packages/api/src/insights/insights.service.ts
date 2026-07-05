@@ -48,6 +48,14 @@ export interface Suggestion {
 }
 
 export interface RenegotiationEfficacy { total: number; settled: number; onTime: number }
+/** P9 — referência anônima da plataforma (sem comparação/juízo). Só com k-anonimato (≥ MIN). */
+export interface BenchmarkResult {
+  available: boolean;
+  sampleTenants: number;
+  overdueRate: { p25: number; median: number; p75: number } | null; // % de operações vencidas
+  yourOverdueRate: number | null;
+}
+const BENCHMARK_MIN_TENANTS = 5;
 
 const DAY = 86_400_000;
 const CONCENTRATION_LIMIT = 0.3; // 30% da carteira numa única ajuda/sobrinho = alerta
@@ -72,6 +80,26 @@ export class InsightsService {
       .filter((r) => !r.settled)
       .map((r) => ({ amountDue: Number(r.amountDue), probability: r.paymentProbability / 100, dueDate: new Date(r.dueDate) }));
     return cashForecast(items, now, horizonDays);
+  }
+
+  /** P9 — Referência anônima da plataforma: faixa típica de atraso entre carteiras. SEM comparação
+   *  nem juízo — só contexto. Agregado com k-anonimato (nunca expõe carteira individual). */
+  async benchmark(tenantId: string): Promise<BenchmarkResult> {
+    const stats = await this.scoped.raw().tenantStats.findMany({ select: { tenantId: true, opsActive: true, opsOverdue: true } });
+    const rates = stats.filter((s) => s.opsActive > 0).map((s) => ({ tenantId: s.tenantId, rate: (s.opsOverdue / s.opsActive) * 100 }));
+    const sampleTenants = rates.length;
+    const mine = rates.find((r) => r.tenantId === tenantId);
+    if (sampleTenants < BENCHMARK_MIN_TENANTS) {
+      return { available: false, sampleTenants, overdueRate: null, yourOverdueRate: mine ? Math.round(mine.rate) : null };
+    }
+    const sorted = rates.map((r) => r.rate).sort((a, b) => a - b);
+    const q = (p: number) => Math.round(sorted[Math.min(sorted.length - 1, Math.floor(p * (sorted.length - 1)))]!);
+    return {
+      available: true,
+      sampleTenants,
+      overdueRate: { p25: q(0.25), median: q(0.5), p75: q(0.75) },
+      yourOverdueRate: mine ? Math.round(mine.rate) : null,
+    };
   }
 
   /** P10 — Eficácia de renegociação: das operações que o padrinho renegociou, quantas já foram
