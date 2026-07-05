@@ -9,10 +9,10 @@ const RISK_ORDER: RiskLevel[] = ['LOW', 'MEDIUM', 'HIGH'];
 
 function Readout({ label, value, accent, sub }: { label: string; value: string; accent?: boolean; sub?: string }) {
   return (
-    <div className="panel panel-hover p-5">
-      <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-2">{label}</p>
-      <p className={`font-mono text-2xl font-medium tabular-nums tracking-tight ${accent ? 'text-status-red' : 'text-text'}`}>{value}</p>
-      {sub ? <p className="font-sans text-[11px] text-text-dim mt-1.5 leading-snug">{sub}</p> : null}
+    <div className="panel panel-hover p-5 sm:p-6">
+      <p className="font-mono text-[10px] text-muted uppercase tracking-[0.2em] mb-2.5">{label}</p>
+      <p className={`font-mono text-3xl leading-none font-medium tabular-nums tracking-tight ${accent ? 'text-status-red' : 'text-text'}`}>{value}</p>
+      {sub ? <p className="font-sans text-[11px] text-text-dim mt-2 leading-snug">{sub}</p> : null}
     </div>
   );
 }
