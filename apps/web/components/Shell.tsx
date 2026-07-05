@@ -120,9 +120,13 @@ export function Shell({ title, orgCode = 'ORG-000', children }: ShellProps) {
         className="md:hidden fixed top-0 left-0 right-0 z-20 glass border-b border-line"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
-        <div className="flex items-center gap-4 px-4 h-12">
-          <span className="font-display text-sm font-semibold text-text tracking-tight">PACIFIC</span>
-          <nav aria-label="Navegação principal" className="flex gap-1 ml-auto">
+        <div className="flex items-center gap-3 px-4 h-12">
+          <span className="font-display text-sm font-semibold text-text tracking-tight shrink-0">PACIFIC</span>
+          {/* Rolável horizontalmente (swipe) — com 10+ abas os ícones não cabem; scrollbar oculta. */}
+          <nav
+            aria-label="Navegação principal"
+            className="flex gap-1 flex-1 min-w-0 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
             {NAV_ITEMS.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
               return (
@@ -131,7 +135,7 @@ export function Shell({ title, orgCode = 'ORG-000', children }: ShellProps) {
                   href={item.href}
                   aria-label={item.label}
                   aria-current={isActive ? 'page' : undefined}
-                  className={`p-2 rounded-md text-base leading-none transition-colors ${
+                  className={`shrink-0 p-2 rounded-md text-base leading-none transition-colors ${
                     isActive ? 'text-sonar' : 'text-muted hover:text-text'
                   }`}
                 >
