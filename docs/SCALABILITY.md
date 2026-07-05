@@ -55,5 +55,27 @@ Como a plataforma cresce sem reescritas. Decisões atuais + caminhos preparados.
 
 - Listas extensas: confirmar `limit/offset` (ou cursor) e busca **server-side** quando a base passar do teto da página.
 - Agregações cross-tenant: migrar para `TenantStats` materializada (acima).
-- Réplicas de API: o cron de alertas é idempotente (upsert) — seguro com N instâncias.
 - Cache: subir o TTL/!mover para Redis se o overview/admin virar hot path.
+
+## Schedulers em múltiplas réplicas (auditoria)
+
+Cada réplica roda o `@nestjs/schedule` de forma independente → um `@Cron` dispara **uma vez por réplica**.
+Hoje a produção é **réplica única** (sem problema). **ANTES de escalar horizontalmente**, tratar os
+schedulers **não-idempotentes** (marcados abaixo). Referência de guarda já existente:
+`notifications.service.ts` usa `pg_advisory_xact_lock(hashtext(tenant), 'weekly_digest')`.
+
+| Scheduler | Efeito | Multi-réplica |
+|---|---|---|
+| `notifications.scheduler` (8h) | gera réguas de vencimento | ✅ idempotente (upsert por debtId/type) |
+| `portfolio-snapshot` (5h) | snapshot semanal | ✅ idempotente (unique tenant/semana) |
+| `forecast.scheduler` (mensal) | ForecastMonth | ✅ idempotente (unique tenant/mês) |
+| `stats.scheduler` (4h) | TenantStats | ✅ idempotente (overwrite) |
+| `retention.scheduler` (3h) | expurgo | ✅ idempotente (delete-where) |
+| `weekly-digest` (seg 8h) | push semanal | ✅ protegido (advisory lock por tenant) |
+| **`daily-push` (8h BRT)** | **Web Push diário** | ⚠️ **NÃO idempotente** → push duplicado |
+| **`promises.service` (6h BRT)** | resolve promessas + push | ⚠️ **NÃO idempotente** → push/contagem duplicados |
+
+**Correção recomendada (quando escalar):** guarda de execução única por (job, dia). Opções: (a) tabela de
+idempotência `ScheduledRun(job, runDate UNIQUE)` — INSERT falha na 2ª réplica → pula (robusto com pooler);
+(b) advisory lock em conexão fixada. **É decisão arquitetural** (pooler do Prisma dificulta lock de sessão) —
+não aplicada ainda por não haver bug em réplica única.
