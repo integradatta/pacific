@@ -73,8 +73,13 @@ export function AdminShell({ title, children }: { title: string; children: React
             </span>
             centro de comando
           </p>
-          <span className="font-display text-lg font-semibold text-text tracking-tight">PACIFIC</span>
-          <span className="font-mono text-[10px] text-iris ml-1.5 align-middle">COMANDO</span>
+          <span className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand-mark.png" alt="" aria-hidden className="h-7 w-auto" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand-wordmark.png" alt="Pacific" className="h-[18px] w-auto" />
+            <span className="font-mono text-[10px] text-iris align-middle">COMANDO</span>
+          </span>
         </div>
         <ul className="flex-1 py-4 space-y-0.5 px-2.5">
           {nav.map((item) => {
@@ -103,7 +108,13 @@ export function AdminShell({ title, children }: { title: string; children: React
 
       {/* Barra mobile: nav rolável por ícones (telas estreitas) */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-20 glass border-b border-line flex items-center gap-3 px-4 h-12">
-        <span className="font-display text-sm font-semibold text-text tracking-tight shrink-0">PACIFIC<span className="font-mono text-[9px] text-iris ml-1 align-middle">COMANDO</span></span>
+        <span className="flex items-center gap-1.5 shrink-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand-mark.png" alt="" aria-hidden className="h-5 w-auto" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand-wordmark.png" alt="Pacific" className="h-[13px] w-auto" />
+          <span className="font-mono text-[9px] text-iris align-middle">COMANDO</span>
+        </span>
         <nav aria-label="Navegação do administrador" className="flex gap-0.5 ml-auto overflow-x-auto">
           {nav.map((item) => {
             const active = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href));

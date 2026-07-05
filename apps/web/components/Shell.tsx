@@ -74,7 +74,12 @@ export function Shell({ title, orgCode = 'ORG-000', children }: ShellProps) {
             </span>
             torre de controle
           </p>
-          <span className="font-display text-lg font-semibold text-text tracking-tight">PACIFIC</span>
+          <span className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand-mark.png" alt="" aria-hidden className="h-7 w-auto" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand-wordmark.png" alt="Pacific" className="h-[18px] w-auto" />
+          </span>
         </div>
 
         {/* Nav Items */}
@@ -121,7 +126,12 @@ export function Shell({ title, orgCode = 'ORG-000', children }: ShellProps) {
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
         <div className="flex items-center gap-3 px-4 h-12">
-          <span className="font-display text-sm font-semibold text-text tracking-tight shrink-0">PACIFIC</span>
+          <span className="flex items-center gap-1.5 shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand-mark.png" alt="" aria-hidden className="h-5 w-auto" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand-wordmark.png" alt="Pacific" className="h-[13px] w-auto" />
+          </span>
           {/* Rolável horizontalmente (swipe) — com 10+ abas os ícones não cabem; scrollbar oculta. */}
           <nav
             aria-label="Navegação principal"

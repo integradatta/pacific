@@ -23,7 +23,14 @@ export const metadata: Metadata = {
   description: 'Acompanhe suas metas e sua família, com respeito e transparência.',
   applicationName: 'Pacific',
   appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Pacific' },
-  icons: { icon: '/icon.svg', apple: '/icon.svg' },
+  icons: {
+    icon: [
+      { url: '/favicon.png', sizes: '48x48', type: 'image/png' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: '/apple-touch-icon.png',
+  },
 };
 
 export const viewport: Viewport = {

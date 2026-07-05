@@ -111,7 +111,12 @@ export default function LoginPage() {
             </span>
             torre de controle
           </p>
-          <h1 className="font-display text-3xl font-semibold text-text tracking-tight">PACIFIC</h1>
+          <h1 className="inline-flex items-center gap-2.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand-mark.png" alt="" aria-hidden className="h-10 w-auto" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand-wordmark.png" alt="Pacific" className="h-7 w-auto" />
+          </h1>
         </div>
 
         {/* Form */}
