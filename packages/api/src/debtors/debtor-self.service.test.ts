@@ -28,7 +28,7 @@ function fakeDb(debts: Array<{ id: string; settledAt?: Date | null }>, payEvents
   };
 }
 const tracking = { record: vi.fn(async () => undefined) };
-const push = { sendToTenant: vi.fn(async () => 0) };
+const push = { sendToTenant: vi.fn(async () => 0), notifyImportant: vi.fn(async () => 0) };
 const svc = (db: ReturnType<typeof fakeDb>) =>
   new DebtorSelfService(
     { withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db), raw: () => db } as never,

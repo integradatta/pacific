@@ -3,6 +3,7 @@ import { distanceM } from '@pacific/shared';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 import { TrackingService } from '../tracking/tracking.service.js';
 import { notifyCreditor } from '../notifications/notify.js';
+import { PushService } from '../notifications/push.service.js';
 
 // Módulo de Localização — compartilhamento CONSENTIDO (ver docs/LOCATION_DESIGN.md).
 // Posição real só de devedores GRANTED. Tudo dentro de withTenant (RLS + escopo por código).
@@ -39,6 +40,7 @@ export class LocationService {
   constructor(
     private readonly scoped: TenantScopedService,
     private readonly tracking: TrackingService,
+    private readonly push: PushService,
   ) {}
 
   private async fencesFor(tx: Parameters<Parameters<TenantScopedService['withTenant']>[1]>[0], tenantId: string): Promise<CachedFence[]> {
@@ -60,7 +62,7 @@ export class LocationService {
 
   /** Define o consentimento. DECLINED é o gatilho da notificação ao padrinho (regra do produto). */
   async setConsent(tenantId: string, debtorId: string, state: SettableConsent, consentText?: string): Promise<{ state: ConsentState }> {
-    return this.scoped.withTenant(tenantId, async (tx) => {
+    const result = await this.scoped.withTenant(tenantId, async (tx) => {
       const now = new Date();
       const stamps =
         state === 'GRANTED' ? { grantedAt: now } : state === 'DECLINED' ? { declinedAt: now } : { revokedAt: now };
@@ -76,15 +78,21 @@ export class LocationService {
       if (state === 'DECLINED' || state === 'REVOKED') {
         const d = await tx.debtor.findUnique({ where: { id: debtorId }, select: { name: true } });
         const nm = d?.name ?? 'Seu sobrinho';
+        const type = state === 'DECLINED' ? 'LOCATION_DECLINED' as const : 'LOCATION_STOPPED' as const;
         await notifyCreditor(tx, {
-          tenantId, debtorId,
-          type: state === 'DECLINED' ? 'LOCATION_DECLINED' : 'LOCATION_STOPPED',
+          tenantId, debtorId, type,
           title: state === 'DECLINED' ? 'Localização não compartilhada' : 'Compartilhamento encerrado',
           body: state === 'DECLINED' ? `${nm} preferiu não compartilhar a localização por enquanto.` : `${nm} parou de compartilhar a localização.`,
         });
+        return { state, pushType: type, pushName: nm };
       }
-      return { state };
+      return { state, pushType: null, pushName: null };
     });
+    // Recusa/encerramento de localização → push imediato ao telefone do padrinho (fora da tx; no-op sem VAPID).
+    if (result.pushType && result.pushName) {
+      void this.push.notifyImportant(tenantId, result.pushType, result.pushName).catch(() => undefined);
+    }
+    return { state: result.state };
   }
 
   /**
@@ -250,9 +258,9 @@ export class LocationService {
    */
   async notifySilent(tenantId: string, thresholdMs = 48 * 3_600_000, now: Date = new Date()): Promise<number> {
     const cutoff = new Date(now.getTime() - thresholdMs);
-    return this.scoped.withTenant(tenantId, async (tx) => {
+    const silentNames = await this.scoped.withTenant(tenantId, async (tx) => {
       const granted = await tx.locationConsent.findMany({ where: { tenantId, state: 'GRANTED' }, select: { debtorId: true, grantedAt: true } });
-      let created = 0;
+      const names: string[] = [];
       for (const g of granted) {
         if (g.grantedAt && g.grantedAt > cutoff) continue; // ativou há pouco → ainda não conta silêncio
         const pos = await tx.debtorPosition.findUnique({ where: { debtorId: g.debtorId }, select: { recordedAt: true } });
@@ -268,9 +276,12 @@ export class LocationService {
         await tx.notification.create({
           data: { tenantId, debtorId: g.debtorId, type: 'LOCATION_SILENT', title: 'Sobrinho sem sinal', body: `${nm} está com a localização ativa, mas sem dar sinal há mais de 48h.` },
         });
-        created++;
+        names.push(nm);
       }
-      return created;
+      return names;
     });
+    // Cada novo episódio de silêncio → push ao telefone do padrinho (fora da tx; no-op sem VAPID).
+    for (const nm of silentNames) void this.push.notifyImportant(tenantId, 'LOCATION_SILENT', nm).catch(() => undefined);
+    return silentNames.length;
   }
 }

@@ -25,8 +25,9 @@ function fakeDb(over: Record<string, unknown> = {}) {
   };
 }
 const tracking = { record: vi.fn(async () => undefined) };
+const push = { notifyImportant: vi.fn(async () => 0) };
 const svc = (db: ReturnType<typeof fakeDb>) =>
-  new LocationService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db) } as never, tracking as never);
+  new LocationService({ withTenant: async (_t: string, fn: (tx: typeof db) => unknown) => fn(db) } as never, tracking as never, push as never);
 
 describe('LocationService — consentimento', () => {
   it('setConsent GRANTED faz upsert com grantedAt e registra o tracking', async () => {
@@ -45,11 +46,12 @@ describe('LocationService — consentimento', () => {
     expect(db.debtorPosition.deleteMany).toHaveBeenCalledWith({ where: { tenantId: 't1', debtorId: 'd1' } });
   });
 
-  it('setConsent DECLINED registra recusa + notifica o padrinho', async () => {
+  it('setConsent DECLINED registra recusa + notifica o padrinho (app + push)', async () => {
     const db = fakeDb();
     await svc(db).setConsent('t1', 'd1', 'DECLINED');
     expect(tracking.record).toHaveBeenCalledWith(db, expect.objectContaining({ type: 'LOCATION_CONSENT', detail: { state: 'DECLINED' } }));
     expect(db.notification.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ type: 'LOCATION_DECLINED' }) }));
+    expect(push.notifyImportant).toHaveBeenCalledWith('t1', 'LOCATION_DECLINED', expect.any(String));
   });
 });
 
