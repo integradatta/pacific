@@ -1,9 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
 import webpush from 'web-push';
+import type { NotificationType } from '@pacific/database';
 import { TenantScopedService } from '../tenancy/tenant-scoped.service.js';
 
 export interface WebPushSub { endpoint: string; keys: { p256dh: string; auth: string } }
 export interface PushPayload { title: string; body: string; url?: string }
+
+// Eventos do sobrinho que valem um toque no telefone do padrinho (push imediato). Os demais
+// (intenção, vencimentos) ficam no app e no resumo diário — push é resumo, não metralhadora.
+const IMPORTANT: Partial<Record<NotificationType, (name: string) => PushPayload>> = {
+  DEBTOR_FIRST_ACCESS: (n) => ({ title: 'Primeiro acesso', body: `${n} abriu o link pela primeira vez.`, url: '/dashboard' }),
+  LOCATION_DECLINED: (n) => ({ title: 'Localização não compartilhada', body: `${n} preferiu não compartilhar a localização.`, url: '/localizacao' }),
+  LOCATION_STOPPED: (n) => ({ title: 'Compartilhamento encerrado', body: `${n} parou de compartilhar a localização.`, url: '/localizacao' }),
+  LOCATION_SILENT: (n) => ({ title: 'Sobrinho sem sinal', body: `${n} está com a localização ativa, mas sem dar sinal há mais de 48h.`, url: '/localizacao' }),
+  PAYMENT_CLAIMED: (n) => ({ title: 'Pagamento avisado', body: `${n} avisou um pagamento — confirme quando puder.`, url: '/dashboard' }),
+  DEBTOR_SUPPORT: (n) => ({ title: 'Pedido de suporte', body: `${n} pediu ajuda — que tal dar um alô?`, url: '/dashboard' }),
+};
 
 /**
  * Envio de Web Push (VAPID) ao padrinho. NO-OP sem VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY (deploy não
@@ -29,6 +41,13 @@ export class PushService {
   }
 
   isEnabled(): boolean { return this.enabled; }
+
+  /** Push imediato de um evento importante do sobrinho. No-op para tipos não-importantes/sem VAPID. */
+  async notifyImportant(tenantId: string, type: NotificationType, name: string): Promise<number> {
+    const build = IMPORTANT[type];
+    if (!build) return 0;
+    return this.sendToTenant(tenantId, build(name));
+  }
 
   /** Guarda/atualiza a assinatura do navegador do padrinho (por endpoint). */
   async saveSubscription(tenantId: string, supabaseId: string, sub: WebPushSub): Promise<void> {

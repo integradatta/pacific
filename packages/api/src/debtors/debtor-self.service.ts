@@ -99,7 +99,7 @@ export class DebtorSelfService {
       return d?.name ?? 'Seu sobrinho';
     });
     // Evento de mão dupla → push imediato ao padrinho (fora da transação; no-op sem VAPID).
-    void this.push.sendToTenant(tenantId, { title: 'Pagamento avisado', body: `${nm} avisou um pagamento — confirme quando puder.`, url: '/dashboard' }).catch(() => undefined);
+    void this.push.notifyImportant(tenantId, 'PAYMENT_CLAIMED', nm).catch(() => undefined);
   }
 
   /**
@@ -128,7 +128,7 @@ export class DebtorSelfService {
     });
     // Pedido de suporte é urgente → push imediato ao telefone do padrinho (fora da tx; no-op sem VAPID).
     if (kind === 'NEED_SUPPORT') {
-      void this.push.sendToTenant(tenantId, { title: 'Pedido de suporte', body: `${nm} pediu ajuda — que tal dar um alô?`, url: '/dashboard' }).catch(() => undefined);
+      void this.push.notifyImportant(tenantId, 'DEBTOR_SUPPORT', nm).catch(() => undefined);
     }
   }
 

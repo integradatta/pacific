@@ -23,7 +23,8 @@ function deps(
   };
   const tokens = { sign: vi.fn(() => 'jwt-xyz') };
   const tracking = new TrackingService(scoped as never);
-  return { svc: new DebtorExchangeService(scoped as never, tokens as never, tracking), tx, tokens };
+  const push = { notifyImportant: vi.fn(async () => 0) };
+  return { svc: new DebtorExchangeService(scoped as never, tokens as never, tracking, push as never), tx, tokens, push };
 }
 
 describe('DebtorExchangeService.exchange', () => {
