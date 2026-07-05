@@ -13,6 +13,7 @@ import {
   currentWeeklyPoint,
   portfolioTrend,
   weeklySummary,
+  receivableRisk,
   type WeeklyPoint,
 } from './intelligence.js';
 
@@ -149,5 +150,22 @@ describe('intelligence', () => {
     expect(intel.topClient?.name).toBe('A');
     expect(intel.summary).toContain('1 operação ativa');
     expect(Array.isArray(intel.actionItems)).toBe(true);
+  });
+});
+
+describe('receivableRisk', () => {
+  it('pondera nominal→provável e ordena drivers pelo em-risco', () => {
+    const rows = [
+      row({ id: '1', debtorName: 'Alta', amountDue: '1000.00', paymentProbability: 90 }), // em risco 100
+      row({ id: '2', debtorName: 'Baixa', amountDue: '1000.00', paymentProbability: 20 }), // em risco 800
+      row({ id: '3', debtorName: 'Quitada', amountDue: '0.00', settled: true, paymentProbability: 50 }),
+    ];
+    const r = receivableRisk(rows, 1);
+    expect(r.nominal).toBe('2000.00');
+    expect(r.probable).toBe('1100.00'); // 900 + 200
+    expect(r.atRisk).toBe('900.00'); // 100 + 800
+    expect(r.confidencePct).toBe(55);
+    expect(r.drivers[0]!.name).toBe('Baixa'); // maior em-risco primeiro
+    expect(r.driversShare).toBeCloseTo(800 / 900, 5);
   });
 });

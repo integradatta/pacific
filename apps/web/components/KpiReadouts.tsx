@@ -7,11 +7,12 @@ import { RISK_META } from './RiskBadge';
 
 const RISK_ORDER: RiskLevel[] = ['LOW', 'MEDIUM', 'HIGH'];
 
-function Readout({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function Readout({ label, value, accent, sub }: { label: string; value: string; accent?: boolean; sub?: string }) {
   return (
     <div className="panel panel-hover p-5">
       <p className="font-mono text-[10px] text-muted uppercase tracking-widest mb-2">{label}</p>
       <p className={`font-mono text-2xl font-medium tabular-nums tracking-tight ${accent ? 'text-status-red' : 'text-text'}`}>{value}</p>
+      {sub ? <p className="font-sans text-[11px] text-text-dim mt-1.5 leading-snug">{sub}</p> : null}
     </div>
   );
 }
@@ -30,7 +31,7 @@ function DistBar({ segments, total }: { segments: { key: string; n: number; cls:
   );
 }
 
-export function KpiReadouts({ kpis }: { kpis: DashboardKpis }) {
+export function KpiReadouts({ kpis, receivableSub }: { kpis: DashboardKpis; receivableSub?: string }) {
   const total = STATUS_ORDER.reduce((sum, k) => sum + kpis.countByStatus[k], 0);
   const totalRisk = RISK_ORDER.reduce((sum, k) => sum + kpis.riskDistribution[k], 0);
 
@@ -39,7 +40,7 @@ export function KpiReadouts({ kpis }: { kpis: DashboardKpis }) {
       {/* Valores */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Readout label="Total em ajudas" value={formatBRL(kpis.totalLent)} />
-        <Readout label="A receber" value={formatBRL(kpis.totalReceivable)} />
+        <Readout label="A receber" value={formatBRL(kpis.totalReceivable)} sub={receivableSub} />
         <Readout label="Retorno esperado" value={formatBRL(kpis.totalExpectedReturn)} />
         <Readout label="Vencido" value={formatBRL(kpis.totalOverdue)} accent={Number(kpis.totalOverdue) > 0} />
       </div>
