@@ -19,9 +19,39 @@ function monthLabel(month: string): string {
   if (!y || !m) return month;
   return new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 }
+function monthShort(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  if (!y || !m) return month;
+  return new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }).replace('.', '');
+}
 
-function ReportCard({ r }: { r: MonthlyReportRow }) {
+// Leitura mês-a-mês: o número deixa de ser foto e vira comparação ("vencido subiu 40%").
+// Honesto e direto, sem alarme; só destaca variações materiais.
+type MoMTone = 'up' | 'down' | 'flat';
+function readMoM(curr: MonthlyReportRow, prev?: MonthlyReportRow): { text: string; tone: MoMTone } | null {
+  if (!prev) return null;
+  const parts: string[] = [];
+  let tone: MoMTone = 'flat';
+  const ov = Number(curr.totalOverdue);
+  const pov = Number(prev.totalOverdue);
+  if (pov === 0 && ov > 0) { parts.push('vencido apareceu'); tone = 'down'; }
+  else if (pov > 0) {
+    const d = Math.round(((ov - pov) / pov) * 100);
+    if (Math.abs(d) >= 5) { parts.push(`vencido ${d > 0 ? 'subiu' : 'caiu'} ${Math.abs(d)}%`); tone = d > 0 ? 'down' : 'up'; }
+  }
+  const ds = curr.healthScore - prev.healthScore;
+  if (Math.abs(ds) >= 3) {
+    parts.push(`saúde ${ds > 0 ? '+' : ''}${ds} pts`);
+    if (parts.length === 1) tone = ds < 0 ? 'down' : 'up';
+  }
+  if (parts.length === 0) return { text: `estável frente a ${monthShort(prev.month)}`, tone: 'flat' };
+  return { text: `${parts.join(' · ')} · vs ${monthShort(prev.month)}`, tone };
+}
+const MOM_CLS: Record<MoMTone, string> = { up: 'text-status-green', down: 'text-status-red', flat: 'text-muted' };
+
+function ReportCard({ r, prev }: { r: MonthlyReportRow; prev?: MonthlyReportRow }) {
   const h = HEALTH[r.healthState] ?? HEALTH.HEALTHY;
+  const mom = readMoM(r, prev);
   const kpis = [
     { label: 'Total investido', value: formatBRL(r.totalLent) },
     { label: 'A receber', value: formatBRL(r.totalReceivable) },
@@ -45,7 +75,10 @@ function ReportCard({ r }: { r: MonthlyReportRow }) {
           </div>
         ))}
       </div>
-      <p className="font-mono text-[10px] text-muted tracking-wider mt-3">{r.opsActive} ativas · {r.opsSettled} quitadas</p>
+      <div className="flex items-center justify-between gap-3 mt-3 flex-wrap">
+        <p className="font-mono text-[10px] text-muted tracking-wider">{r.opsActive} ativas · {r.opsSettled} quitadas</p>
+        {mom ? <p className={`font-sans text-[11px] ${MOM_CLS[mom.tone]}`}>{mom.text}</p> : null}
+      </div>
     </section>
   );
 }
@@ -53,7 +86,8 @@ function ReportCard({ r }: { r: MonthlyReportRow }) {
 export default function RelatoriosPage() {
   const reports = useReports();
   const generate = useGenerateReport();
-  const rows = reports.data ?? [];
+  // Mais recente primeiro; cada card compara com o mês imediatamente anterior (o próximo da lista).
+  const rows = [...(reports.data ?? [])].sort((a, b) => (a.month < b.month ? 1 : -1));
 
   function gerar() {
     generate.mutate(undefined, {
@@ -85,7 +119,7 @@ export default function RelatoriosPage() {
           <EmptyState glyph="◆" title="Nenhum relatório ainda." hint="gere o do mês atual ou aguarde a virada do mês" action={{ label: 'Gerar mês atual', onClick: gerar, pending: generate.isPending }} />
         ) : (
           <div className="space-y-4">
-            {rows.map((r) => <ReportCard key={r.month} r={r} />)}
+            {rows.map((r, i) => <ReportCard key={r.month} r={r} prev={rows[i + 1]} />)}
           </div>
         )}
       </div>
