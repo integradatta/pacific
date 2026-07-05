@@ -3,7 +3,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiGet, apiPost, apiPatch } from './api';
 
-export type NotificationType = 'DUE_SOON' | 'DUE_15' | 'DUE_7' | 'DUE_3' | 'DUE_1' | 'DUE_TODAY' | 'OVERDUE';
+// Réguas de vencimento (configuráveis no painel). DUE_SOON é legado.
+export type AlertRuleType = 'DUE_15' | 'DUE_7' | 'DUE_3' | 'DUE_1' | 'DUE_TODAY' | 'OVERDUE';
+// Todos os tipos que uma notificação pode ter: réguas + eventos do sobrinho que o padrinho vê.
+export type NotificationType =
+  | 'DUE_SOON' | AlertRuleType
+  | 'LOCATION_DECLINED' | 'LOCATION_STOPPED' | 'LOCATION_SILENT' | 'GEOFENCE_EXIT'
+  | 'PAYMENT_CLAIMED' | 'DEBT_SETTLED' | 'DEBTOR_FIRST_ACCESS' | 'WEEKLY_DIGEST'
+  | 'DEBTOR_INTENT' | 'DEBTOR_SUPPORT';
 
 export interface NotificationRow {
   id: string;
@@ -13,8 +20,6 @@ export interface NotificationRow {
   readAt: string | null;
   createdAt: string;
 }
-
-export type AlertRuleType = Exclude<NotificationType, 'DUE_SOON'>;
 
 // Réguas configuráveis no painel (DUE_SOON é legado e não aparece no painel).
 export const ALERT_RULES: { type: AlertRuleType; label: string; dot: string }[] = [
@@ -26,6 +31,7 @@ export const ALERT_RULES: { type: AlertRuleType; label: string; dot: string }[] 
   { type: 'OVERDUE', label: 'Após vencer', dot: 'bg-status-red' },
 ];
 
+// Cor da bolinha por tipo. Exaustivo: se um NotificationType novo for adicionado, o TS acusa aqui.
 export const TYPE_DOT: Record<NotificationType, string> = {
   DUE_SOON: 'bg-status-orange',
   DUE_15: 'bg-status-green',
@@ -34,6 +40,17 @@ export const TYPE_DOT: Record<NotificationType, string> = {
   DUE_1: 'bg-status-orange',
   DUE_TODAY: 'bg-status-orange',
   OVERDUE: 'bg-status-red',
+  // Eventos do sobrinho
+  LOCATION_DECLINED: 'bg-status-red',
+  LOCATION_STOPPED: 'bg-status-red',
+  LOCATION_SILENT: 'bg-status-orange',
+  GEOFENCE_EXIT: 'bg-status-orange',
+  PAYMENT_CLAIMED: 'bg-status-yellow',
+  DEBT_SETTLED: 'bg-status-green',
+  DEBTOR_FIRST_ACCESS: 'bg-status-green',
+  WEEKLY_DIGEST: 'bg-sonar',
+  DEBTOR_INTENT: 'bg-status-green',
+  DEBTOR_SUPPORT: 'bg-status-orange',
 };
 
 interface Page<T> {

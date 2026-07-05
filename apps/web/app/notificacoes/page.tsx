@@ -151,7 +151,7 @@ export default function NotificacoesPage() {
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${TYPE_DOT[n.type]}`} />
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${TYPE_DOT[n.type] ?? 'bg-muted/40'}`} />
                     <p className="font-display text-sm text-text">{n.title}</p>
                   </div>
                   <p className="font-sans text-sm text-muted mt-1">{n.body}</p>
