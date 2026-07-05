@@ -224,6 +224,46 @@ export function receivableRisk(rows: PortfolioRow[], topN = 3): ReceivableRisk {
   };
 }
 
+// ── Segmentos por etiqueta (P4) — performance por tag: onde a carteira paga melhor/pior ──
+export interface TagSegment {
+  tag: string;
+  opsCount: number;
+  exposure: string; // Σ devido (abertas)
+  sharePct: number; // % da exposição aberta total
+  overdueCount: number;
+  avgRecoverability: number;
+  avgPaymentProbability: number;
+}
+const UNTAGGED = 'sem etiqueta';
+
+export function tagSegments(rows: PortfolioRow[]): TagSegment[] {
+  const openRows = open(rows);
+  const totalExposure = openRows.reduce((s, r) => s.plus(r.amountDue), new Decimal(0));
+  const byTag = new Map<string, PortfolioRow[]>();
+  for (const r of openRows) {
+    const tags = r.tags.length > 0 ? r.tags : [UNTAGGED];
+    for (const tag of tags) {
+      const list = byTag.get(tag) ?? [];
+      list.push(r);
+      byTag.set(tag, list);
+    }
+  }
+  const out: TagSegment[] = [];
+  for (const [tag, list] of byTag) {
+    const exposure = list.reduce((s, r) => s.plus(r.amountDue), new Decimal(0));
+    out.push({
+      tag,
+      opsCount: list.length,
+      exposure: money(exposure),
+      sharePct: pct(exposure, totalExposure),
+      overdueCount: list.filter((r) => r.status === 'RED').length,
+      avgRecoverability: Math.round(list.reduce((s, r) => s + r.recoverability, 0) / list.length),
+      avgPaymentProbability: Math.round(list.reduce((s, r) => s + r.paymentProbability, 0) / list.length),
+    });
+  }
+  return out.sort((a, b) => new Decimal(b.exposure).minus(a.exposure).toNumber());
+}
+
 // ── Concentração ──
 
 export function concentration(rows: PortfolioRow[], aggs = clientAggregates(rows)): Concentration {
