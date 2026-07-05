@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { portfolioTrend, weeklySummary, tagSegments, type WeeklyPoint, type TagSegment, type PortfolioRow } from '@pacific/shared';
 import { Shell } from '@/components/Shell';
 import { useEvolution, usePortfolio } from '@/lib/hooks';
+import { useRenegotiation } from '@/lib/insights';
 import { formatBRL } from '@/lib/format';
 import { ListSkeleton } from '@/components/Skeleton';
 import { ErrorState, EmptyState } from '@/components/States';
@@ -148,6 +149,25 @@ function SegmentsSection({ rows }: { rows: PortfolioRow[] }) {
   );
 }
 
+// P10 — leitura da eficácia de renegociação (só com histórico material, ≥3).
+function RenegotiationCard() {
+  const q = useRenegotiation();
+  const d = q.data;
+  if (!d || d.total < 3) return null;
+  const pctSettled = Math.round((d.settled / d.total) * 100);
+  return (
+    <section className="panel p-6">
+      <h2 className="font-mono text-xs text-muted uppercase tracking-widest mb-2">Renegociar tem funcionado?</h2>
+      <p className="font-sans text-sm text-text-dim leading-relaxed">
+        Das <span className="text-text font-medium">{d.total}</span> operações que você renegociou,{' '}
+        <span className="text-text font-medium">{d.settled}</span> já foram quitadas ({pctSettled}%)
+        {d.settled > 0 ? <> — <span className="text-status-green">{d.onTime} no novo prazo</span></> : null}.
+        {' '}Um sinal de quando vale propor um novo combinado; a decisão é sua.
+      </p>
+    </section>
+  );
+}
+
 export default function EvolucaoPage() {
   const evolution = useEvolution();
   const portfolio = usePortfolio();
@@ -166,6 +186,8 @@ export default function EvolucaoPage() {
         ) : (
           <TrendSection series={evolution.data ?? []} />
         )}
+
+        <RenegotiationCard />
 
         {portfolio.isLoading ? (
           <ListSkeleton rows={3} />

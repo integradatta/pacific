@@ -9,6 +9,12 @@ export function usePricing() {
   return useQuery({ queryKey: ['insights', 'pricing'], queryFn: () => apiGet<PricingHistory>('/insights/pricing'), staleTime: 10 * 60_000 });
 }
 
+/** P10 — eficácia de renegociação (das renegociadas, quantas quitaram e no novo prazo). */
+export interface RenegotiationEfficacy { total: number; settled: number; onTime: number }
+export function useRenegotiation() {
+  return useQuery({ queryKey: ['insights', 'renegotiation'], queryFn: () => apiGet<RenegotiationEfficacy>('/insights/renegotiation'), staleTime: 10 * 60_000 });
+}
+
 /** #4 Previsão de caixa ponderada (faixas + por mês). */
 export function useCashForecast() {
   return useQuery({ queryKey: ['insights', 'cash-forecast'], queryFn: () => apiGet<CashForecast>('/insights/cash-forecast'), staleTime: 5 * 60_000 });

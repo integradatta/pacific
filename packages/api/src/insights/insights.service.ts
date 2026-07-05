@@ -47,6 +47,8 @@ export interface Suggestion {
   priority: number;
 }
 
+export interface RenegotiationEfficacy { total: number; settled: number; onTime: number }
+
 const DAY = 86_400_000;
 const CONCENTRATION_LIMIT = 0.3; // 30% da carteira numa única ajuda/sobrinho = alerta
 
@@ -70,6 +72,26 @@ export class InsightsService {
       .filter((r) => !r.settled)
       .map((r) => ({ amountDue: Number(r.amountDue), probability: r.paymentProbability / 100, dueDate: new Date(r.dueDate) }));
     return cashForecast(items, now, horizonDays);
+  }
+
+  /** P10 — Eficácia de renegociação: das operações que o padrinho renegociou, quantas já foram
+   *  quitadas (e no novo prazo). Sinal de que renegociar, com este padrinho, tende a funcionar. */
+  async renegotiationEfficacy(tenantId: string): Promise<RenegotiationEfficacy> {
+    return this.scoped.withTenant(tenantId, async (tx) => {
+      const events = await tx.platformEvent.findMany({
+        where: { tenantId, type: 'OPERATION_UPDATED', targetType: 'debt' },
+        select: { targetId: true, detail: true },
+      });
+      const ids = [...new Set(events.filter((e) => (e.detail as { renegotiated?: boolean } | null)?.renegotiated && e.targetId).map((e) => e.targetId!))];
+      if (ids.length === 0) return { total: 0, settled: 0, onTime: 0 };
+      const debts = await tx.debt.findMany({ where: { tenantId, id: { in: ids }, deletedAt: null }, select: { settledAt: true, dueDate: true } });
+      let settled = 0;
+      let onTime = 0;
+      for (const d of debts) {
+        if (d.settledAt) { settled++; if (d.settledAt.getTime() <= d.dueDate.getTime()) onTime++; }
+      }
+      return { total: debts.length, settled, onTime };
+    });
   }
 
   /** P6 — Histórico de precificação: taxa (a.m.) × desfecho (no prazo) nas operações QUITADAS do
