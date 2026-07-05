@@ -34,11 +34,13 @@ export class DailyPushScheduler {
         const due = sugg.filter((s) => s.kind === 'due_soon' || s.kind === 'overdue').length;
         const claims = sugg.filter((s) => s.kind === 'claim').length;
         const support = sugg.filter((s) => s.kind === 'support').length;
+        const promises = sugg.filter((s) => s.kind === 'promise').length;
         const cooling = sugg.find((s) => s.kind === 'cooling');
         const parts: string[] = [];
-        if (due) parts.push(`${due} vencimento${due > 1 ? 's' : ''}`);
-        if (claims) parts.push(`${claims} pagamento${claims > 1 ? 's' : ''} a confirmar`);
         if (support) parts.push(`${support} pedido${support > 1 ? 's' : ''} de suporte`);
+        if (promises) parts.push(`${promises} promessa${promises > 1 ? 's' : ''} a vencer`);
+        if (claims) parts.push(`${claims} pagamento${claims > 1 ? 's' : ''} a confirmar`);
+        if (due) parts.push(`${due} vencimento${due > 1 ? 's' : ''}`);
         if (cooling && parts.length < 3) parts.push(cooling.title.replace(/^🌡️ Talvez valha um oi para /, 'contato: '));
         if (parts.length === 0) continue;
         sent += await this.push.sendToTenant(t.id, { title: 'Pacific — seu resumo de hoje', body: parts.join(' · '), url: '/dashboard' });

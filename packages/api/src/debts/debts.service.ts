@@ -369,9 +369,9 @@ export class DebtsService {
           where: { tenantId, debtorId: debt.debtorId, success: true },
           orderBy: { at: 'asc' },
         }),
-        // Alterações e pagamentos da operação registrados pela camada de tracking (inclui parciais).
+        // Alterações, pagamentos e promessas da operação registrados pela camada de tracking.
         tx.platformEvent.findMany({
-          where: { tenantId, targetType: 'debt', targetId: id, type: { in: ['OPERATION_UPDATED', 'OPERATION_PAID'] } },
+          where: { tenantId, targetType: 'debt', targetId: id, type: { in: ['OPERATION_UPDATED', 'OPERATION_PAID', 'PROMISE_MADE', 'PROMISE_KEPT', 'PROMISE_BROKEN'] } },
           orderBy: { at: 'asc' },
         }),
       ]);
@@ -394,13 +394,20 @@ export class DebtsService {
       // Alterações/pagamentos do tracking (timeline de mudanças, inclui pagamentos parciais).
       let trackedSettlement = false;
       for (const c of changes) {
-        const d = (c.detail ?? {}) as { field?: string; paidAmount?: string; settled?: boolean; renegotiated?: boolean; toDueDate?: string };
+        const d = (c.detail ?? {}) as { field?: string; paidAmount?: string; settled?: boolean; renegotiated?: boolean; toDueDate?: string; amount?: string; promisedAt?: string };
         if (c.type === 'OPERATION_UPDATED') {
           if (d.renegotiated) {
             events.push({ at: c.at.toISOString(), kind: 'updated', title: 'Operação renegociada', detail: d.toDueDate ? `Novo vencimento em ${new Date(d.toDueDate).toLocaleDateString('pt-BR')}` : undefined });
           } else {
             events.push({ at: c.at.toISOString(), kind: 'updated', title: d.field === 'tags' ? 'Etiquetas atualizadas' : 'Operação alterada' });
           }
+        } else if (c.type === 'PROMISE_MADE') {
+          const quando = d.promisedAt ? new Date(d.promisedAt).toLocaleDateString('pt-BR') : null;
+          events.push({ at: c.at.toISOString(), kind: 'promise', title: 'Promessa registrada', detail: [d.amount ? `R$ ${d.amount}` : null, quando ? `até ${quando}` : null].filter(Boolean).join(' ') || undefined });
+        } else if (c.type === 'PROMISE_KEPT') {
+          events.push({ at: c.at.toISOString(), kind: 'promise', title: 'Promessa cumprida' });
+        } else if (c.type === 'PROMISE_BROKEN') {
+          events.push({ at: c.at.toISOString(), kind: 'promise', title: 'Promessa não cumprida' });
         } else {
           if (d.settled) trackedSettlement = true;
           events.push({

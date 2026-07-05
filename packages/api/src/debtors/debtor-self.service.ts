@@ -108,9 +108,9 @@ export class DebtorSelfService {
    * notifica o padrinho.
    */
   async sendSignal(tenantId: string, debtorId: string, kind: 'INTENT_TO_PAY' | 'NEED_SUPPORT', dueDate?: string, note?: string): Promise<void> {
-    return this.scoped.withTenant(tenantId, async (tx) => {
+    const nm = await this.scoped.withTenant(tenantId, async (tx) => {
       const d = await tx.debtor.findUnique({ where: { id: debtorId }, select: { name: true } });
-      const nm = d?.name ?? 'Seu sobrinho';
+      const name = d?.name ?? 'Seu sobrinho';
       const cleanNote = note?.trim().slice(0, 280) || null;
       const data = { dueDate: kind === 'INTENT_TO_PAY' && dueDate ? new Date(dueDate) : null, note: cleanNote };
       // Dedup: 1 sinal aberto por tipo/sobrinho — reenviar atualiza o existente (evita spam de
@@ -124,7 +124,12 @@ export class DebtorSelfService {
       } else {
         await notifyCreditor(tx, { tenantId, debtorId, type: 'DEBTOR_SUPPORT', title: 'Pedido de suporte', body: `${nm} pediu suporte${cleanNote ? `: "${cleanNote.slice(0, 120)}"` : '.'}` });
       }
+      return name;
     });
+    // Pedido de suporte é urgente → push imediato ao telefone do padrinho (fora da tx; no-op sem VAPID).
+    if (kind === 'NEED_SUPPORT') {
+      void this.push.sendToTenant(tenantId, { title: 'Pedido de suporte', body: `${nm} pediu ajuda — que tal dar um alô?`, url: '/dashboard' }).catch(() => undefined);
+    }
   }
 
   /** Registra o token de push do dispositivo do sobrinho (app nativo). Envio (FCM) é externo.

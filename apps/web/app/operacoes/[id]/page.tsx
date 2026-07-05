@@ -245,6 +245,7 @@ const EVENT_GLYPH: Record<DebtEventKind, string> = {
   notification: '◎',
   due: '◷',
   paid: '✓',
+  promise: '🤝',
 };
 
 function fmtDateTime(iso: string): string {

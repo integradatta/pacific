@@ -42,8 +42,9 @@ Racional detalhado de cada item nas mensagens de commit e em `docs/SPECIFICATION
 
 ## 3. Migrações do banco (aplicar no Supabase, em ordem, ANTES do deploy)
 
-As **novas desta rodada**: **24, 25, 26**. As 20–23 são de rodadas anteriores (a **20 já foi aplicada**;
-**confirme 21, 22, 23** no Supabase — se faltarem, aplique antes das novas).
+As **novas**: **24, 25, 26** (rodada do produto) e **27** (loop de promessas). As 20–23 são de rodadas
+anteriores (a **20 já foi aplicada**; **confirme 21, 22, 23** no Supabase — se faltarem, aplique antes).
+Se você já subiu 24–26 em produção, **falta só aplicar a 27** antes do próximo deploy da API.
 
 | # | Arquivo | O quê | Observação |
 |---|---|---|---|
@@ -53,6 +54,7 @@ As **novas desta rodada**: **24, 25, 26**. As 20–23 são de rodadas anteriores
 | 24 | `24_push_subscription` | tabela `PushSubscription` (global, RLS + `app_full_access`) | **nova** — Web Push |
 | 25 | `25_payment_promises` | enum `PromiseStatus` + tabela `PaymentPromise` (RLS FORCE) | **nova** — entra no healthcheck de RLS (§4) |
 | 26 | `26_drop_dead_columns` | **DROP** `Debt.status`, `Debtor.lastLocation`, enum `DebtStatus` | **nova, destrutiva** (dados eram inúteis: status sempre GREEN, lastLocation sempre null) |
+| 27 | `27_promise_events` | 3 valores no enum `PlatformEventType` (`PROMISE_MADE/KEPT/BROKEN`) — eventos de promessa na timeline | **nova**, aditiva/idempotente. **Aplicar ANTES do deploy**: o histórico da operação consulta esses valores |
 
 **Como aplicar:** cole o conteúdo de cada `packages/database/migrations/NN_*/migration.sql` no SQL Editor
 do Supabase, em ordem. Ou, se você mantém o `_prisma_migrations` em dia, use `npm run db:release`

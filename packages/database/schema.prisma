@@ -47,6 +47,9 @@ enum PlatformEventType {
   OPERATION_UPDATED
   OPERATION_PAID
   PAYMENT_CLAIMED // sobrinho informou um pagamento (aguarda confirmação do padrinho)
+  PROMISE_MADE // padrinho registrou um combinado ("paga R$X até <data>")
+  PROMISE_KEPT // promessa cumprida (pagou até o prazo + tolerância) — resolvido pelo scheduler
+  PROMISE_BROKEN // promessa quebrada (prazo passou sem pagamento) — resolvido pelo scheduler
   LOCATION_CONSENT // sobrinho concedeu/recusou/revogou o compartilhamento de localização
   CLIENT_CREATED
   TENANT_APPROVED
