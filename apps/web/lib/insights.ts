@@ -1,8 +1,13 @@
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { DebtorProfile, CashForecast } from '@pacific/shared';
+import type { DebtorProfile, CashForecast, PricingHistory } from '@pacific/shared';
 import { apiGet, apiPost, apiDelete } from './api';
+
+/** P6 — histórico de precificação do padrinho (taxa × desfecho). Alimenta o hint sugestivo ao cadastrar. */
+export function usePricing() {
+  return useQuery({ queryKey: ['insights', 'pricing'], queryFn: () => apiGet<PricingHistory>('/insights/pricing'), staleTime: 10 * 60_000 });
+}
 
 /** #4 Previsão de caixa ponderada (faixas + por mês). */
 export function useCashForecast() {

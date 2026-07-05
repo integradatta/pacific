@@ -8,7 +8,8 @@ import { apiPost } from '@/lib/api';
 import { formatBRL, venceEm } from '@/lib/format';
 import { RiskBadge } from '@/components/RiskBadge';
 import { TagInput } from '@/components/Tags';
-import { useSimulate } from '@/lib/insights';
+import { useSimulate, usePricing } from '@/lib/insights';
+import { pricingHint } from '@pacific/shared';
 
 // Resultado da prévia — calculado no SERVIDOR (o motor proprietário não vai no bundle do client).
 interface PreviewResult {
@@ -68,6 +69,12 @@ export default function NovaOperacaoPage() {
   const recoverability = preview?.recoverability ?? null;
   // #9 Impacto na carteira (simulação ciente do portfólio) — usa o valor debounced.
   const sim = useSimulate(debounced ? Number(debounced.principal) : null);
+  // P6 Precificação sugestiva — posiciona a taxa digitada (a.m.) no histórico do padrinho.
+  const pricing = usePricing();
+  const proposedRateMonthly = ratePct.trim() === '' ? null : ratePeriod === 'MONTHLY' ? Number(ratePct) : Number(ratePct) / 12;
+  const priceHint = pricing.data && proposedRateMonthly != null && Number.isFinite(proposedRateMonthly)
+    ? pricingHint(pricing.data, proposedRateMonthly)
+    : null;
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
@@ -127,6 +134,12 @@ export default function NovaOperacaoPage() {
             {ratePct.trim() !== '' && (ratePeriod === 'MONTHLY' ? Number(ratePct) : Number(ratePct) / 12) > 1 && (
               <p className="font-sans text-[11px] text-status-yellow">
                 Acima de 1% ao mês — teto usual entre pessoas físicas no Brasil. Confirme o valor.
+              </p>
+            )}
+            {/* P6 — leitura sugestiva da taxa no histórico do próprio padrinho */}
+            {priceHint?.show && (
+              <p className={`font-sans text-[11px] leading-snug ${priceHint.tone === 'watch' ? 'text-status-yellow' : 'text-text-dim'}`}>
+                {priceHint.text}
               </p>
             )}
           </div>

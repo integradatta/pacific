@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { debtorProfile, cashForecast, coolingScore, contractGuidance } from './behavior.js';
+import { debtorProfile, cashForecast, coolingScore, contractGuidance, pricingHint } from './behavior.js';
 
 const now = new Date('2026-07-02T12:00:00Z');
 const d = (iso: string) => new Date(iso);
@@ -169,5 +169,25 @@ describe('contractGuidance', () => {
   it('no prazo + boa prob + bom histórico → calm', () => {
     const g = contractGuidance({ settled: false, daysRemaining: 40, paymentProbability: 82, score: 78, scoreTrend: 'up', reliability: 'reliable' });
     expect(g.tone).toBe('calm');
+  });
+});
+
+describe('pricingHint', () => {
+  it('amostra pequena → não mostra', () => {
+    const h = { sampleSize: 3, medianRateMonthlyPct: 5, avgRateMonthlyPct: 5, onTimeBelowMedian: 0.9, onTimeAboveMedian: 0.5 };
+    expect(pricingHint(h, 8).show).toBe(false);
+  });
+
+  it('taxa alta piora pagamento + proposta acima da mediana → watch (sugestivo)', () => {
+    const h = { sampleSize: 12, medianRateMonthlyPct: 5, avgRateMonthlyPct: 6, onTimeBelowMedian: 0.9, onTimeAboveMedian: 0.5 };
+    const r = pricingHint(h, 8);
+    expect(r.show).toBe(true);
+    expect(r.tone).toBe('watch');
+    expect(r.text).toMatch(/decisão é sua/i);
+  });
+
+  it('sem correlação material → calm informativo', () => {
+    const h = { sampleSize: 12, medianRateMonthlyPct: 5, avgRateMonthlyPct: 5, onTimeBelowMedian: 0.85, onTimeAboveMedian: 0.82 };
+    expect(pricingHint(h, 9).tone).toBe('calm');
   });
 });
