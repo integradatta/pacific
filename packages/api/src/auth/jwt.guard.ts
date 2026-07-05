@@ -62,7 +62,9 @@ export class JwtGuard implements CanActivate {
     const hs = this.secret ?? process.env.APP_JWT_SECRET ?? '';
     if (hs) {
       try {
-        return jwt.verify(token, hs) as Claims;
+        // Algoritmo FIXADO em HS256 (o único que emitimos p/ o devedor): impede algorithm-confusion
+        // e alg:none — jsonwebtoken só aceita a lista explícita.
+        return jwt.verify(token, hs, { algorithms: ['HS256'] }) as Claims;
       } catch {
         /* cai no erro abaixo */
       }
