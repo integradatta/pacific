@@ -11,6 +11,7 @@ import { TagInput } from '@/components/Tags';
 import { RiskBadge } from '@/components/RiskBadge';
 import { useDebt, useDebtSummary, useDebtHistory, useSetDebtTags, usePayDebt, useDeleteDebt, useRenegotiateDebt, useUpdateDebtDates } from '@/lib/debts';
 import { DebtorProfileCard } from '@/components/DebtorProfileCard';
+import { NextActionCard } from '@/components/NextActionCard';
 import { useDebtorPromises, useCreatePromise, useDeletePromise, type PromiseRow } from '@/lib/insights';
 import { formatBRL, venceEm } from '@/lib/format';
 import { STATUS_COLOR, STATUS_LABEL } from '@/lib/status';
@@ -487,6 +488,9 @@ export default function OperacaoDetalhePage({ params }: { params: { id: string }
                 ) : null}
               </div>
             </header>
+
+            {/* P1 — Próxima ação (leitura sugestiva; só operação aberta) */}
+            {summary.data && !summary.data.settled ? <NextActionCard debtorId={debt.data.debtorId} summary={summary.data} /> : null}
 
             <div className="grid gap-6 md:grid-cols-2">
               {/* Situação atual */}
