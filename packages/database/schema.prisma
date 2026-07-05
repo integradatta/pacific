@@ -94,6 +94,7 @@ enum NotificationType {
   LOCATION_DECLINED // recusou compartilhar localização
   LOCATION_STOPPED // parou de compartilhar (revogou)
   LOCATION_SILENT // localização ativa mas sem sinal há X tempo (proxy de "sumiu/desinstalou")
+  GEOFENCE_EXIT // sobrinho SAIU de uma cerca (área) definida pelo padrinho
   PAYMENT_CLAIMED // avisou um pagamento ("Já resolvi") — aguardando confirmação
   DEBT_SETTLED // ajuda quitada
   DEBTOR_FIRST_ACCESS // abriu o link pela primeira vez
