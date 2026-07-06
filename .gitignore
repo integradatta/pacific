@@ -10,3 +10,7 @@ dist/
 *.tsbuildinfo
 # Bundle de código gerado para análise — não versionar (grande/duplicado)
 pacific-bundle.txt
+# Dumps de banco — contêm PII, NUNCA versionar (repo público)
+backups/
+*.sql.gz
+*.dump

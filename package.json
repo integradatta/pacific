@@ -13,7 +13,8 @@
     "db:migrate": "npm run db:migrate -w @pacific/database",
     "db:rls": "npm run db:rls -w @pacific/database",
     "db:release": "npm run db:release -w @pacific/database",
-    "db:seed": "npm run db:seed -w @pacific/database"
+    "db:seed": "npm run db:seed -w @pacific/database",
+    "db:backup": "bash scripts/db-backup.sh"
   },
   "devDependencies": { "turbo": "^2.0.0", "typescript": "^5.5.0" }
 }

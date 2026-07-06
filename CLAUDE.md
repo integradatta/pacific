@@ -5,7 +5,7 @@ arquitetura, localizar qualquer recurso e alterar com segurança **sem perder co
 
 > Docs vivas complementares em `docs/`: `SPECIFICATION.md` (produto), `SCALABILITY.md` (escala),
 > `RLS_RUNBOOK.md` (segurança de dados), `DEPLOY_RUNBOOK.md` (deploy), `DR_RUNBOOK.md` +
-> `RECOVERY.md` (recuperação), `LOCATION_DESIGN.md` (GPS/geofence).
+> `RECOVERY.md` (recuperação), `BACKUP.md` (backup sem Supabase Pro), `LOCATION_DESIGN.md` (GPS/geofence).
 
 ## O que é
 Pacific é uma plataforma **white-label de acompanhamento financeiro familiar**. Um "padrinho" (credor)
