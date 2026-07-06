@@ -8,3 +8,5 @@ dist/
 .expo/
 .DS_Store
 *.tsbuildinfo
+# Bundle de código gerado para análise — não versionar (grande/duplicado)
+pacific-bundle.txt
