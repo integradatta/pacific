@@ -14,7 +14,8 @@
     "db:rls": "npm run db:rls -w @pacific/database",
     "db:release": "npm run db:release -w @pacific/database",
     "db:seed": "npm run db:seed -w @pacific/database",
-    "db:backup": "bash scripts/db-backup.sh"
+    "db:backup": "bash scripts/db-backup.sh",
+    "db:backup:json": "node scripts/db-backup-json.mjs"
   },
   "devDependencies": { "turbo": "^2.0.0", "typescript": "^5.5.0" }
 }

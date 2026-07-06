@@ -60,6 +60,16 @@ jobs:
 ```
 > Dica: ative **versionamento + regra de retenção** (ex.: manter 30 dias) no bucket → histórico de backups.
 
+## Opção C — interina, sem `pg_dump` (só dados, via Prisma)
+Quando não há `pg_dump` na máquina, dá para capturar **os dados** (não o schema) via Node — a role
+`postgres` do `DIRECT_URL` tem `BYPASSRLS` e lê todos os tenants:
+```bash
+npm run db:backup:json     # → ./backups/pacific-data-<timestamp>.json
+```
+Gera um JSON com todas as tabelas. **Não substitui o pg_dump** (sem DDL/sequences — o schema vive nas
+`migrations/` versionadas), mas garante que **os dados existem fora do Supabase** hoje. Restauração:
+recriar o schema (aplicar `migrations/` + `db:rls`) e reinserir os dados do JSON (respeitando a ordem de FKs).
+
 ## Restaurar
 ```bash
 gunzip -c backups/pacific-<timestamp>.sql.gz | psql "$DIRECT_URL"
