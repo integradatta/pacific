@@ -26,6 +26,10 @@ async function bootstrap(): Promise<void> {
   if (process.env.NODE_ENV === 'production' && !webOrigin) {
     throw new Error('WEB_ORIGIN é obrigatório em produção (CORS) — defina a(s) origem(ns) do web.');
   }
+  // Fail-fast: sem APP_JWT_SECRET o JWT do devedor cairia num segredo vazio ('') — nunca em prod.
+  if (process.env.NODE_ENV === 'production' && !process.env.APP_JWT_SECRET) {
+    throw new Error('APP_JWT_SECRET é obrigatório em produção (assinatura/validação do JWT do devedor).');
+  }
   app.enableCors({ origin: webOrigin ? webOrigin.split(',').map((o) => o.trim()) : true, credentials: true });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
   // Shutdown limpo: dispara os lifecycle hooks (ex.: PrismaService.$disconnect) em SIGTERM/SIGINT.

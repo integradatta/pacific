@@ -19,7 +19,7 @@ export class DebtorTokenService {
         app_metadata: { role: 'DEBTOR', tenantId: params.tenantId, debtorId: params.debtorId, av: params.accessVersion ?? 0 },
       },
       secret,
-      { expiresIn },
+      { expiresIn, algorithm: 'HS256' },
     );
   }
 }
