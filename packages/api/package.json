@@ -20,7 +20,7 @@
     "@pacific/shared": "*",
     "@sentry/node": "^8.55.2",
     "class-transformer": "^0.5.1",
-    "class-validator": "^0.14.1",
+    "class-validator": "^0.15.1",
     "decimal.js": "^10.4.3",
     "dotenv": "^16.4.5",
     "helmet": "^8.2.0",
