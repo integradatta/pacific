@@ -17,5 +17,5 @@
     "db:backup": "bash scripts/db-backup.sh",
     "db:backup:json": "node scripts/db-backup-json.mjs"
   },
-  "devDependencies": { "turbo": "^2.0.0", "typescript": "^5.5.0" }
+  "devDependencies": { "turbo": "^2.10.13", "typescript": "^5.5.0" }
 }
